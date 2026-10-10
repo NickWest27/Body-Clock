@@ -6,11 +6,11 @@ Everything runs in the browser. Your trips are stored on your own device and are
 
 ## Plan sleep
 
-Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the van pickup time, how long you need to get ready and the earliest you can go to bed. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness from pickup to landing. **Add to plan** puts it on the chart as a planned block you can still slide.
+Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the van pickup time (on the clock you choose, local by default), how long you need to get ready and the earliest you can go to bed. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness from pickup to landing. **Add to plan** puts it on the chart as a planned block you can still slide.
 
 ## Warnings
 
-Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Only the time from now to your last landing is flagged. A warning box under the chart lists the stretches and suggests a nap.
+Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading and the warning box look ahead from now to 6 hours after your last landing. A list under the readout keeps every flagged stretch, past and future.
 
 ## Install on a phone
 

@@ -124,6 +124,11 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .leg-static i.ahead{background:var(--ahead);opacity:.45}
 .leg-static i.behind{background:var(--behind);opacity:.45}
 .leg-static i.w{background:var(--warn);opacity:.5;border-top:3px solid var(--warn)}
+.warn-list{margin-top:10px;font-size:.84rem}
+.warn-list p{margin:0 0 3px}
+.warn-list b{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.warn-list .past{color:var(--muted)}
+.warn-list .soon{color:var(--ink);font-weight:500}
 .warn-box{margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--surface);font-size:.88rem}
 .warn-box p{margin:0 0 4px;font-weight:500}
 .warn-box b{color:var(--warn);letter-spacing:.03em}
@@ -375,9 +380,10 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <div><dt>Clock gap</dt><dd id="roGap"></dd></div>
         <div><dt>State</dt><dd id="roState"></dd></div>
       </dl>
+      <div class="warn-list" id="warnList" hidden></div>
       <div class="warn-box" id="warnBox" role="status" hidden>
         <div id="warnLines"></div>
-        <div class="warn-rec" id="warnRec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
+        <div class="warn-rec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
       </div>
     </div>
     <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
@@ -481,7 +487,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>Plan sleep</dt>
       <dd>Takes your van pickup time and get-ready time as the latest wake-up. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
       <dt>Warnings</dt>
-      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Only the time from now to your last landing is flagged, so the past is never shaded. The same stretches show as an amber bar in the sleep row: slide a sleep block over it to fix it. A planned nap that fixes the problem makes the warning go away.</dd>
+      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The list under the readout keeps every flagged stretch, past and future, with the past in grey. A planned nap that fixes the problem makes the warning go away.</dd>
       <dt>While asleep</dt>
       <dd>The dotted stretch of the alertness line is how alert you would be if you were awake at that moment. It is not a measure of the sleep itself. The value after waking can sit below the value at bedtime because bedtime is often near your body-clock peak and wake-up is often near its low, plus sleep inertia. Compare it with what the line would show had you stayed awake, not with the bedtime value.</dd>
       <dt>K: caffeine</dt>
@@ -513,10 +519,10 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <p class="hint" id="plNone" hidden style="margin:0">Add a flight first. The plan aims your sleep at the flight you choose.</p>
       <div id="plForm" class="plan-form">
         <div id="plFlF"><label for="plFl">Flight to be sharp for</label><select id="plFl"></select></div>
-        <div><label for="plPick" id="plPickL">Van pickup</label><input id="plPick" type="datetime-local"></div>
+        <div><label for="plPick">Van pickup</label><div class="tz"><input id="plPick" type="datetime-local"><select id="plZ" aria-label="Clock for the times below"></select></div></div>
         <div class="plan-two">
           <div><label for="plPrep">Get ready (min)</label><input id="plPrep" type="number" min="0" max="240" step="5"></div>
-          <div><label for="plEarly" id="plEarlyL">Earliest bedtime</label><input id="plEarly" type="datetime-local"></div>
+          <div><label for="plEarly">Earliest bedtime</label><input id="plEarly" type="datetime-local"></div>
         </div>
         <p class="hint" id="plHint" style="margin:0"></p>
         <div class="btnrow"><button class="btn primary" id="plGo" type="button">Find best sleep</button></div>
@@ -630,7 +636,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 6';
+var BUILD = '10 Oct 2026 · build 7';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1197,12 +1203,12 @@ function onPointer(e){
 }
 
 /* ---------- warnings ---------- */
-/* Forward-looking: from now to the last landing. If the whole trip is in the past, the whole trip is listed. */
+/* Warnings and shading look ahead from now to the last landing + 6 h. The list also keeps the past. */
 function computeWarn(m){
   var fl = intervals(['flight']), now = Date.now(), limit = m.t1;
   if(fl.length){
     var lastLand = Math.max.apply(null, fl.map(function(f){ return f.b; }));
-    if(lastLand > m.t0) limit = Math.min(m.t1, lastLand);
+    if(lastLand > m.t0) limit = Math.min(m.t1, lastLand + 6*H);
   }
   var live = now < limit;
   var from = !live ? m.t0 : Math.max(now, m.t0);
@@ -1215,35 +1221,52 @@ function computeWarn(m){
       else if(run){ out.push(run); run = null; }
     });
     if(run) out.push(run);
-    return out.filter(function(r){ return r.b - r.a >= PAR.warnMin*H && r.b > from; }).map(function(r){
-      var a = Math.max(r.a, from), b = Math.min(r.b, limit);
-      return {a:a, b:b, now:live && r.a <= from, pa:at(a), pb:at(b)};
+    return out.filter(function(r){ return r.b - r.a >= PAR.warnMin*H; }).map(function(r){
+      var b = Math.min(r.b, limit);
+      return {a:r.a, b:b, pa:at(r.a), pb:at(b), past:!live || b <= from};
+    });
+  }
+  function future(runs){
+    return runs.filter(function(r){ return !r.past; }).map(function(r){
+      var a = Math.max(r.a, from);
+      return {a:a, b:r.b, pa:at(a), pb:r.pb, now:r.a <= from, past:false};
     });
   }
   var press = runsOf(function(p){ return p.S >= PAR.warnS; });
   var low = runsOf(function(p){ return p.Ai < PAR.warnA; });
-  return {bands:merge(press.concat(low)), press:press, low:low, live:live};
+  var fp = future(press), fl2 = future(low);
+  return {bands:merge(fp.concat(fl2)), press:press, low:low, fpress:fp, flow:fl2, live:live};
 }
-function warnRange(r){
+function warnRange(r, useNow){
   /* both ends on one clock: the clock where you are at the start (home clock if that is in flight) */
   var off = r.pa.fl ? S.home : r.pa.loc;
   var sameDay = dayIdx(r.a,off) === dayIdx(r.b,off);
-  var start = r.now ? 'now' : dowLbl(r.a,off) + ' ' + hm(r.a,off);
+  var start = (useNow && r.now) ? 'now' : dowLbl(r.a,off) + ' ' + hm(r.a,off);
   var end = (sameDay ? '' : dowLbl(r.b,off) + ' ') + hm(r.b,off);
   return start + ' → ' + end + ' ' + zname(off) + (r.pa.fl ? ' home clock' : '');
 }
 function renderWarn(){
-  var box = $('#warnBox'), w = M && M.warn, lines = '';
+  var box = $('#warnBox'), w = M && M.warn, lines = '', list = '';
   function line(label, runs){
     if(!runs.length) return '';
-    var shown = runs.slice(0,3).map(warnRange).join('; ');
+    var shown = runs.slice(0,3).map(function(r){ return warnRange(r,true); }).join('; ');
     if(runs.length > 3) shown += '; +' + (runs.length - 3) + ' more';
     return '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> ' + label + ' ' + shown + '</p>';
   }
-  if(w){ lines += line('Excessive sleep pressure', w.press); lines += line('Low alertness', w.low); }
+  function row(label, runs){
+    if(!runs.length) return '';
+    return '<p><b>' + label + '</b> ' + runs.map(function(r){
+      return '<span class="' + (r.past ? 'past' : 'soon') + '">' + warnRange(r,false) + '</span>';
+    }).join(' · ') + '</p>';
+  }
+  if(w){
+    lines += line('Excessive sleep pressure', w.fpress); lines += line('Low alertness', w.flow);
+    list += row('Low alertness', w.low); list += row('High sleep pressure', w.press);
+  }
   box.hidden = !lines;
   $('#warnLines').innerHTML = lines;
-  $('#warnRec').hidden = !(w && w.live);
+  $('#warnList').hidden = !list;
+  $('#warnList').innerHTML = list;
 }
 
 /* ---------- stats ---------- */
@@ -1472,7 +1495,7 @@ function render(){
 
 
 /* ---------- sleep planner ---------- */
-var PL = {run:0, best:null, replaced:0};
+var PL = {run:0, best:null, replaced:0, zone:'local'};
 var PL_STEP = 30*60000, PL_FINE = 15*60000, PL_MINDUR = 30*60000;
 
 function planFlights(){
@@ -1486,7 +1509,7 @@ function planFlight(){
 }
 function planInputs(){
   var f = planFlight(); if(!f) return null;
-  var z = f.r.sz, off = zoneOff(z);
+  var z = $('#plZ').value || 'local', off = zoneOff(z);
   var pickup = toAbs($('#plPick').value, z), early = toAbs($('#plEarly').value, z);
   var prep = Math.max(0, Math.min(240, +$('#plPrep').value || 0));
   return {f:f, z:z, off:off, pickup:pickup, early:early, prep:prep, deadline:pickup - prep*60000};
@@ -1506,18 +1529,18 @@ function planClear(){ $('#plOut').hidden = true; $('#plApply').hidden = true; PL
 function planReset(){ var b = $('#plGo'); b.disabled = false; b.textContent = 'Find best sleep'; }
 function planHint(){
   var q = planInputs(); if(!q) return;
-  var z = zname(q.off);
-  $('#plPickL').textContent = 'Van pickup (' + z + ')';
-  $('#plEarlyL').textContent = 'Earliest bedtime (' + z + ')';
   $('#plHint').textContent = (isNaN(q.pickup) || isNaN(q.early)) ? 'Pick a pickup time and an earliest bedtime.' :
-    'You must be up by ' + dowLbl(q.deadline,q.off) + ' ' + hm(q.deadline,q.off) + ', which is ' + q.prep + ' min before pickup.';
+    'Both times use the clock chosen above. You must be up by ' + dowLbl(q.deadline,q.off) + ' ' + hm(q.deadline,q.off) + ' ' + zname(q.off) + ', which is ' + q.prep + ' min before pickup.';
 }
 function planEarlyDefault(){
   var q = planInputs(); if(!q || isNaN(q.pickup)) return;
   var t0 = toAbs(S.start.t, S.start.z), e = Math.max(Math.ceil(Date.now()/PL_FINE)*PL_FINE, t0);
   $('#plEarly').value = iso(e + q.off*H);
 }
-function planPickDefault(f){ return iso(f.a - 2*H + zoneOff(f.r.sz)*H); }
+/* the clock you are on when the van comes: where the trip timeline puts you 2 h before departure */
+function planZoneFor(f){ return M ? zoneValueAt(f.a - 2*H) : (f.r.sz || 'local'); }
+function planFillZone(z){ fillZoneSelect($('#plZ'), z); PL.zone = z; }
+function planPickDefault(f, z){ return iso(f.a - 2*H + zoneOff(z)*H); }
 function openPlan(){
   var fl = planFlights();
   $('#plForm').hidden = !fl.length; $('#plNone').hidden = fl.length > 0;
@@ -1525,15 +1548,18 @@ function openPlan(){
   if(fl.length){
     var sel = $('#plFl'), h = '';
     fl.forEach(function(f){
-      var off = zoneOff(f.r.sz);
+      var off = zoneOff(planZoneFor(f));
       h += '<option value="'+f.r.id+'">'+esc(f.r.label || 'Flight')+' · '+dowLbl(f.a,off)+' '+hm(f.a,off)+' '+zname(off)+'</option>';
     });
     sel.innerHTML = h;
     var p = S.plan, pick = (p && fl.filter(function(f){ return f.r.id === p.fid; })[0]) || fl[0];
     sel.value = String(pick.r.id);
     $('#plFlF').hidden = fl.length < 2;
-    var keep = p && p.fid === pick.r.id && p.pickup && toAbs(p.pickup, pick.r.sz) < pick.a;
-    $('#plPick').value = keep ? p.pickup : planPickDefault(pick);
+    var pz = p && p.z ? p.z : null;
+    var keep = p && p.fid === pick.r.id && p.pickup && pz && toAbs(p.pickup, pz) < pick.a;
+    var z = keep ? pz : planZoneFor(pick);
+    planFillZone(z);
+    $('#plPick').value = keep ? p.pickup : planPickDefault(pick, z);
     $('#plPrep').value = (p && p.prep !== undefined) ? p.prep : 60;
     planEarlyDefault(); planHint();
   }
@@ -1572,7 +1598,7 @@ function planRun(){
   if(!q || isNaN(q.pickup) || isNaN(q.early)){ planMsg('Pick a pickup time and an earliest bedtime.', true); return; }
   q.early = Math.ceil(q.early/PL_FINE)*PL_FINE;
   if(q.deadline - q.early < H){ planMsg('There is less than 1 h between your earliest bedtime and the time you must be up, so there is no window to recommend.', true); return; }
-  S.plan = {fid:q.f.r.id, pickup:$('#plPick').value, prep:q.prep}; save();
+  S.plan = {fid:q.f.r.id, pickup:$('#plPick').value, z:q.z, prep:q.prep}; save();
   var base = planBase(q), fixed = [];
   PL.replaced = S.rows.length - base.length;
   base.forEach(function(r){
@@ -1775,7 +1801,16 @@ function bind(){
   $('#planDlg').addEventListener('close', function(){ PL.run++; planReset(); });
   $('#plFl').addEventListener('change', function(){
     var f = planFlight(); if(!f) return;
-    $('#plPick').value = planPickDefault(f); planEarlyDefault(); planHint(); planClear();
+    var z = planZoneFor(f); planFillZone(z);
+    $('#plPick').value = planPickDefault(f, z); planEarlyDefault(); planHint(); planClear();
+  });
+  $('#plZ').addEventListener('change', function(){
+    /* switching the clock keeps the same moments and just shows them on the new clock */
+    var old = PL.zone, nz = this.value, pa = toAbs($('#plPick').value, old), ea = toAbs($('#plEarly').value, old);
+    PL.zone = nz;
+    if(!isNaN(pa)) $('#plPick').value = iso(pa + zoneOff(nz)*H);
+    if(!isNaN(ea)) $('#plEarly').value = iso(ea + zoneOff(nz)*H);
+    PL.run++; planReset(); planHint(); planClear();
   });
   ['#plPick','#plPrep','#plEarly'].forEach(function(sel){
     $(sel).addEventListener('input', function(){ PL.run++; planReset(); planHint(); planClear(); });
