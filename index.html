@@ -123,6 +123,12 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .leg-static i{display:inline-block;width:16px;height:12px;background:var(--low);opacity:.25;border-radius:2px}
 .leg-static i.ahead{background:var(--ahead);opacity:.45}
 .leg-static i.behind{background:var(--behind);opacity:.45}
+.leg-static i.w{background:var(--warn);opacity:.5;border-top:3px solid var(--warn)}
+.warn-box{margin-top:10px;padding:10px 12px;border:1px solid var(--warn);border-radius:10px;background:var(--surface);font-size:.88rem}
+.warn-box p{margin:0 0 4px;font-weight:500}
+.warn-box b{color:var(--warn);letter-spacing:.03em}
+.warn-rec{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;color:var(--muted)}
+.warn-rec .btn{min-height:32px;padding:3px 12px;font-size:.84rem}
 .axes{margin:0 0 8px;font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
 .tip{margin:0 0 10px;font-size:.8rem;color:var(--muted);max-width:75ch}
 .readout{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;padding:9px 12px;margin-bottom:10px;background:var(--field);border:1px solid var(--line-soft);border-radius:10px;min-height:50px}
@@ -353,6 +359,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <button type="button" class="leg k-pressure" data-k="pressure" aria-pressed="false"><i></i>Sleep pressure</button>
       <button type="button" class="leg k-night" data-k="night" aria-pressed="true"><i></i>Night</button>
       <span class="leg-static"><i></i>Low</span>
+      <span class="leg-static" id="warnLeg" hidden><i class="w"></i>Warning</span>
       <span class="leg-static" id="diffLeg" hidden><i class="ahead"></i>Ahead<i class="behind"></i>Behind</span>
       <span class="leg-static" id="ghostLeg" hidden><i style="height:0;background:none;opacity:1;border-top:2px solid var(--muted)"></i>Before drag</span>
     </div>
@@ -368,6 +375,10 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <div><dt>Clock gap</dt><dd id="roGap"></dd></div>
         <div><dt>State</dt><dd id="roState"></dd></div>
       </dl>
+      <div class="warn-box" id="warnBox" role="status" hidden>
+        <div id="warnLines"></div>
+        <div class="warn-rec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
+      </div>
     </div>
     <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
   </section>
@@ -469,6 +480,8 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dd>After each wake-up, up to 22 points are subtracted, fading with a 0.6 h time constant. The amount grows with sleep length as 1 − e^(−hours / τ), where τ = 1.8 − 1.3 × (sleep pressure when you fell asleep). With high pressure you reach deep sleep sooner, so a short sleep after a long wake costs more than the same nap after a short wake. It is also worse when you wake near the circadian low. Sleep stages are not modelled.</dd>
       <dt>Plan sleep</dt>
       <dd>Takes your van pickup time and get-ready time as the latest wake-up. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
+      <dt>Warnings</dt>
+      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Only the time from now to your last landing triggers a warning box. A planned nap that fixes the problem makes the warning go away.</dd>
       <dt>While asleep</dt>
       <dd>The dotted stretch of the alertness line is how alert you would be if you were awake at that moment. It is not a measure of the sleep itself. The value after waking can sit below the value at bedtime because bedtime is often near your body-clock peak and wake-up is often near its low, plus sleep inertia. Compare it with what the line would show had you stayed awake, not with the bedtime value.</dd>
       <dt>K: caffeine</dt>
@@ -556,7 +569,8 @@ var PAR = {
   effMin:0.55, solBase:8, solRange:22,
   inMax:22, inTau:0.6, inDur0:1.8, inDurS:1.3,
   ka:3.0, ke:Math.LN2/5, vd:45, ec50:3, caffMax:16, caffS0:0.5, caffSleep:0.3,
-  prcAmp:0.4, prcAsym:0.25, lowFrac:0.1
+  prcAmp:0.4, prcAsym:0.25, lowFrac:0.1,
+  warnA:25, warnS:0.70, warnMin:0.5
 };
 
 function $(s){ return document.querySelector(s); }
@@ -616,7 +630,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 4';
+var BUILD = '10 Oct 2026 · build 5';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -861,9 +875,9 @@ function buildModel(){
       var dw = (t - w.t)/H;
       if(dw < 4) W += w.amp*Math.exp(-dw/PAR.inTau);
     }
-    var A = 100*(PAR.wS*(1-st.s) + PAR.wC*c) - W + PAR.caffMax*cf*(PAR.caffS0 + st.s);
-    A = Math.max(0, Math.min(100, A));
-    pts.push({t:t, cb:c*100, cl:cl*100, sp:st.s*100, E:E, loc:L.off, fl:L.fl, S:st.s, A:A, W:W, mg:gut+plasma,
+    var A0 = 100*(PAR.wS*(1-st.s) + PAR.wC*c) + PAR.caffMax*cf*(PAR.caffS0 + st.s);
+    var A = Math.max(0, Math.min(100, A0 - W)), Ai = Math.max(0, Math.min(100, A0));
+    pts.push({t:t, cb:c*100, cl:cl*100, sp:st.s*100, E:E, loc:L.off, fl:L.fl, S:st.s, A:A, Ai:Ai, W:W, mg:gut+plasma,
               sl:asleepAt(t), lo:c <= PAR.lowFrac, ni:sunElev(t, L.lat, L.lon) < -0.833});
     var mid = t + dt/2, asl = asleepAt(mid);
     var phi = phiOf(mid, E, m);
@@ -935,6 +949,13 @@ function renderChart(){
     if(xb - xa < 1) return;
     o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" fill="var(--low)" fill-opacity=".13"/>');
     if(xb - xa > 30) o.push('<text x="'+((xa+xb)/2).toFixed(1)+'" y="'+(Tm+12)+'" font-size="9.5" text-anchor="middle" style="fill:var(--low);letter-spacing:.08em">LOW</text>');
+  });
+
+  if(M.warn) M.warn.bands.forEach(function(b){
+    var xa = Math.max(Lm, x(b[0])), xb = Math.min(W-Rm, x(b[1]));
+    if(xb - xa < 1) return;
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" fill="var(--warn)" fill-opacity=".2"/>');
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="3" fill="var(--warn)"/>');
   });
 
   if(S.show.diff && S.show.body && S.show.local){
@@ -1170,6 +1191,50 @@ function onPointer(e){
   curT = t; placeCursor(t);
 }
 
+/* ---------- warnings ---------- */
+function computeWarn(m){
+  var fl = intervals(['flight']), now = Date.now(), limit = m.t1;
+  if(fl.length){
+    var lastLand = Math.max.apply(null, fl.map(function(f){ return f.b; }));
+    if(lastLand > m.t0) limit = Math.min(m.t1, lastLand);
+  }
+  var from = now < m.t0 ? m.t0 : (now >= limit ? Infinity : now);
+  function at(t){ return m.pts[Math.max(0, Math.min(m.pts.length-1, Math.round((t - m.t0)/m.dt)))]; }
+  function runsOf(test){
+    var out = [], run = null;
+    m.pts.forEach(function(p){
+      var hit = p.t <= limit && !p.sl && test(p);
+      if(hit){ if(!run) run = {a:p.t, b:p.t + m.dt}; else run.b = p.t + m.dt; }
+      else if(run){ out.push(run); run = null; }
+    });
+    if(run) out.push(run);
+    return out.filter(function(r){ return r.b - r.a >= PAR.warnMin*H; });
+  }
+  function first(runs){
+    for(var i=0;i<runs.length;i++) if(runs[i].b > from){
+      var t = Math.max(runs[i].a, from);
+      return {t:t, now:runs[i].a <= from, p:at(t)};
+    }
+    return null;
+  }
+  var press = runsOf(function(p){ return p.S >= PAR.warnS; });
+  var low = runsOf(function(p){ return p.Ai < PAR.warnA; });
+  return {bands:merge(press.concat(low)), press:first(press), low:first(low)};
+}
+function warnWhen(f){
+  if(f.now) return 'now';
+  if(f.p.fl) return 'at ' + dowLbl(f.t,S.home) + ' ' + hm(f.t,S.home) + ' ' + zname(S.home) + ' (in flight)';
+  return 'at ' + dowLbl(f.t,f.p.loc) + ' ' + hm(f.t,f.p.loc) + ' ' + zname(f.p.loc);
+}
+function renderWarn(){
+  var box = $('#warnBox'), w = M && M.warn;
+  var lines = '';
+  if(w && w.press) lines += '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> Excessive sleep pressure expected ' + warnWhen(w.press) + '.</p>';
+  if(w && w.low) lines += '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> Low alertness expected ' + warnWhen(w.low) + '.</p>';
+  box.hidden = !lines;
+  $('#warnLines').innerHTML = lines;
+}
+
 /* ---------- stats ---------- */
 function renderStats(){
   var box = $('#stats');
@@ -1378,16 +1443,19 @@ function syncDerived(){
   document.querySelectorAll('.leg[data-k]').forEach(function(b){ b.setAttribute('aria-pressed', !!S.show[b.dataset.k]); });
   var gl = $('#ghostLeg'); if(gl) gl.hidden = !(ghost && M && ghost.t0===M.t0 && ghost.t1===M.t1);
   $('#diffLeg').hidden = !(S.show.diff && S.show.body && S.show.local);
+  $('#warnLeg').hidden = !(M && M.warn && M.warn.bands.length);
   $('#sumLine').textContent = 'Home '+zname(S.home)+' · Destination '+zname(S.local)+' · Usual sleep '+S.bed+' to '+S.wake+' · Light '+S.light+'%';
   syncEndField();
 }
 
 function render(){
   M = buildModel();
+  if(M) M.warn = computeWarn(M);
   syncDerived();
   renderChart();
   renderStats();
   renderList();
+  renderWarn();
   save();
 }
 
@@ -1702,6 +1770,7 @@ function bind(){
     $(sel).addEventListener('input', function(){ PL.run++; planReset(); planHint(); planClear(); });
   });
   $('#plGo').addEventListener('click', planRun);
+  $('#warnPlan').addEventListener('click', openPlan);
   $('#plApply').addEventListener('click', applyPlan);
   $('#logBtn').addEventListener('click', function(){ closeMenu(); showTab('events'); openDlg($('#logDlg')); });
   $('#setBtn').addEventListener('click', function(){ closeMenu(); syncSettings(); openDlg($('#setDlg')); });

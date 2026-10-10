@@ -8,6 +8,10 @@ Everything runs in the browser. Your trips are stored on your own device and are
 
 Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the van pickup time, how long you need to get ready and the earliest you can go to bed. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness from pickup to landing. **Add to plan** puts it on the chart as a planned block you can still slide.
 
+## Warnings
+
+Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber. If that happens between now and your last landing, a warning box under the chart gives the first time it is expected and suggests a nap.
+
 ## Install on a phone
 
 1. Open the site's address in Safari (iPhone) or Chrome (Android).
