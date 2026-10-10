@@ -10,7 +10,7 @@ Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the v
 
 ## Warnings
 
-Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber. If that happens between now and your last landing, a warning box under the chart gives the first time it is expected and suggests a nap.
+Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Only the time from now to your last landing is flagged. A warning box under the chart lists the stretches and suggests a nap.
 
 ## Install on a phone
 

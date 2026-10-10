@@ -377,7 +377,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       </dl>
       <div class="warn-box" id="warnBox" role="status" hidden>
         <div id="warnLines"></div>
-        <div class="warn-rec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
+        <div class="warn-rec" id="warnRec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
       </div>
     </div>
     <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
@@ -481,7 +481,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>Plan sleep</dt>
       <dd>Takes your van pickup time and get-ready time as the latest wake-up. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
       <dt>Warnings</dt>
-      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Only the time from now to your last landing triggers a warning box. A planned nap that fixes the problem makes the warning go away.</dd>
+      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Only the time from now to your last landing is flagged, so the past is never shaded. The same stretches show as an amber bar in the sleep row: slide a sleep block over it to fix it. A planned nap that fixes the problem makes the warning go away.</dd>
       <dt>While asleep</dt>
       <dd>The dotted stretch of the alertness line is how alert you would be if you were awake at that moment. It is not a measure of the sleep itself. The value after waking can sit below the value at bedtime because bedtime is often near your body-clock peak and wake-up is often near its low, plus sleep inertia. Compare it with what the line would show had you stayed awake, not with the bedtime value.</dd>
       <dt>K: caffeine</dt>
@@ -630,7 +630,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 5';
+var BUILD = '10 Oct 2026 · build 6';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1043,6 +1043,11 @@ function renderChart(){
     o.push('<text x="'+(Lm-6)+'" y="'+(l[0]+14)+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end">'+l[1]+'</text>');
     o.push('<rect x="'+Lm+'" y="'+l[0]+'" width="'+PW+'" height="'+laneH+'" rx="4" fill="var(--field)" stroke="var(--line-soft)"/>');
   });
+  if(M.warn) M.warn.bands.forEach(function(b){
+    var xa = Math.max(Lm, x(b[0])), xb = Math.min(W-Rm, x(b[1]));
+    if(xb - xa < 1) return;
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+laneY+'" width="'+(xb-xa).toFixed(1)+'" height="'+laneH+'" rx="4" fill="var(--warn)" fill-opacity=".5"><title>Warning: low alertness or high sleep pressure here</title></rect>');
+  });
   S.rows.forEach(function(r){
     if(r.type==='caffeine') return;
     var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
@@ -1192,13 +1197,15 @@ function onPointer(e){
 }
 
 /* ---------- warnings ---------- */
+/* Forward-looking: from now to the last landing. If the whole trip is in the past, the whole trip is listed. */
 function computeWarn(m){
   var fl = intervals(['flight']), now = Date.now(), limit = m.t1;
   if(fl.length){
     var lastLand = Math.max.apply(null, fl.map(function(f){ return f.b; }));
     if(lastLand > m.t0) limit = Math.min(m.t1, lastLand);
   }
-  var from = now < m.t0 ? m.t0 : (now >= limit ? Infinity : now);
+  var live = now < limit;
+  var from = !live ? m.t0 : Math.max(now, m.t0);
   function at(t){ return m.pts[Math.max(0, Math.min(m.pts.length-1, Math.round((t - m.t0)/m.dt)))]; }
   function runsOf(test){
     var out = [], run = null;
@@ -1208,31 +1215,35 @@ function computeWarn(m){
       else if(run){ out.push(run); run = null; }
     });
     if(run) out.push(run);
-    return out.filter(function(r){ return r.b - r.a >= PAR.warnMin*H; });
-  }
-  function first(runs){
-    for(var i=0;i<runs.length;i++) if(runs[i].b > from){
-      var t = Math.max(runs[i].a, from);
-      return {t:t, now:runs[i].a <= from, p:at(t)};
-    }
-    return null;
+    return out.filter(function(r){ return r.b - r.a >= PAR.warnMin*H && r.b > from; }).map(function(r){
+      var a = Math.max(r.a, from), b = Math.min(r.b, limit);
+      return {a:a, b:b, now:live && r.a <= from, pa:at(a), pb:at(b)};
+    });
   }
   var press = runsOf(function(p){ return p.S >= PAR.warnS; });
   var low = runsOf(function(p){ return p.Ai < PAR.warnA; });
-  return {bands:merge(press.concat(low)), press:first(press), low:first(low)};
+  return {bands:merge(press.concat(low)), press:press, low:low, live:live};
 }
-function warnWhen(f){
-  if(f.now) return 'now';
-  if(f.p.fl) return 'at ' + dowLbl(f.t,S.home) + ' ' + hm(f.t,S.home) + ' ' + zname(S.home) + ' (in flight)';
-  return 'at ' + dowLbl(f.t,f.p.loc) + ' ' + hm(f.t,f.p.loc) + ' ' + zname(f.p.loc);
+function warnRange(r){
+  /* both ends on one clock: the clock where you are at the start (home clock if that is in flight) */
+  var off = r.pa.fl ? S.home : r.pa.loc;
+  var sameDay = dayIdx(r.a,off) === dayIdx(r.b,off);
+  var start = r.now ? 'now' : dowLbl(r.a,off) + ' ' + hm(r.a,off);
+  var end = (sameDay ? '' : dowLbl(r.b,off) + ' ') + hm(r.b,off);
+  return start + ' → ' + end + ' ' + zname(off) + (r.pa.fl ? ' home clock' : '');
 }
 function renderWarn(){
-  var box = $('#warnBox'), w = M && M.warn;
-  var lines = '';
-  if(w && w.press) lines += '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> Excessive sleep pressure expected ' + warnWhen(w.press) + '.</p>';
-  if(w && w.low) lines += '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> Low alertness expected ' + warnWhen(w.low) + '.</p>';
+  var box = $('#warnBox'), w = M && M.warn, lines = '';
+  function line(label, runs){
+    if(!runs.length) return '';
+    var shown = runs.slice(0,3).map(warnRange).join('; ');
+    if(runs.length > 3) shown += '; +' + (runs.length - 3) + ' more';
+    return '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> ' + label + ' ' + shown + '</p>';
+  }
+  if(w){ lines += line('Excessive sleep pressure', w.press); lines += line('Low alertness', w.low); }
   box.hidden = !lines;
   $('#warnLines').innerHTML = lines;
+  $('#warnRec').hidden = !(w && w.live);
 }
 
 /* ---------- stats ---------- */
