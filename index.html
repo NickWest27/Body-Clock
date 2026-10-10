@@ -1,0 +1,1571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Body Clock</title>
+<meta name="description" content="Plan sleep, flights and caffeine around your body clock.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#EDF0F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B131C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Body Clock">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>html,body{margin:0;min-height:100%}body{overscroll-behavior-y:none}</style>
+<style>
+/* Layout: app bar with Add and Settings, a chart with a live readout, a stat strip, and a timeline of events that open in an editor sheet. */
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#101C2B; --muted:#566475; --line:#D3DAE3; --line-soft:#E7EBF1;
+  --field:#F7F9FB; --body:#1D6FB8; --local:#B85F0B; --alert:#0E2236; --sleep:#5565C4; --flight:#3A4859;
+  --on-bar:#FFFFFF; --low:#C4402F; --focus:#1D6FB8; --warn:#A8530A; --night:#44546B; --night-op:.12;
+  --caff:#8C5A2B; --press:#7C4DBD; --ahead:#1E8A4C; --behind:#C4402F; --shadow:rgba(16,28,43,.18);
+  --f-sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B131C; --surface:#121D2A; --ink:#E5ECF4; --muted:#92A2B4; --line:#2A3A4C; --line-soft:#1D2B3A;
+    --field:#0E1824; --body:#5DB1F2; --local:#EE9B4B; --alert:#F3F7FB; --sleep:#8E9AF2; --flight:#A3B3C6;
+    --on-bar:#0B131C; --low:#F2796B; --focus:#5DB1F2; --warn:#F0A25A; --night:#050A10; --night-op:.42;
+    --caff:#E0A46B; --press:#B69AF2; --ahead:#4CC38A; --behind:#F2796B; --shadow:rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B131C; --surface:#121D2A; --ink:#E5ECF4; --muted:#92A2B4; --line:#2A3A4C; --line-soft:#1D2B3A;
+  --field:#0E1824; --body:#5DB1F2; --local:#EE9B4B; --alert:#F3F7FB; --sleep:#8E9AF2; --flight:#A3B3C6;
+  --on-bar:#0B131C; --low:#F2796B; --focus:#5DB1F2; --warn:#F0A25A; --night:#050A10; --night-op:.42;
+  --caff:#E0A46B; --press:#B69AF2; --ahead:#4CC38A; --behind:#F2796B; --shadow:rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:1080px;margin-inline:auto;padding-inline:16px;padding-block:14px 48px;display:flex;flex-direction:column;gap:16px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1{margin:0;font-size:1.15rem;line-height:1.2;font-weight:700;letter-spacing:-.005em}
+h2{margin:0;font-size:1rem;font-weight:600}
+h3{margin:0 0 10px;font-size:.78rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+label,.lab{display:block;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+input,select,button{font:inherit;color:inherit}
+input[type=text],input[type=time],input[type=number],input[type=datetime-local],select{
+  width:100%;min-width:0;min-height:40px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--ink);
+  font-family:var(--f-mono);font-size:.86rem}
+select{font-family:var(--f-sans);font-size:.88rem}
+input[type=text]{font-family:var(--f-sans);font-size:.95rem}
+input:disabled,select:disabled{opacity:.6;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:6px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;font-size:.9rem;font-weight:600}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.danger{color:var(--low)}
+.btn.danger:hover{border-color:var(--low)}
+.btn.quiet{background:none;border-color:transparent;color:var(--muted)}
+.icon-btn{width:38px;height:38px;border:0;border-radius:10px;background:none;font-size:1.5rem;line-height:1;cursor:pointer;color:var(--muted)}
+.icon-btn:hover{background:var(--field);color:var(--ink)}
+
+/* app bar */
+.appbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line-soft)}
+.bar-in{max-width:1080px;margin-inline:auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:9px;margin-right:auto;min-width:0}
+.brand svg{width:26px;height:26px;flex:none}
+.brand h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.addwrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 8px);width:270px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px var(--shadow);padding:6px;z-index:30}
+.menu button{display:flex;gap:12px;align-items:center;width:100%;padding:9px 10px;border:0;background:none;border-radius:10px;text-align:left;cursor:pointer}
+.menu button:hover,.menu button:focus-visible{background:var(--field)}
+.mi{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--field);flex:none}
+.mi-t{display:flex;flex-direction:column;line-height:1.25}
+.mi-t strong{font-weight:600;font-size:.92rem}
+.mi-t small{color:var(--muted);font-size:.78rem}
+.k-sleep{color:var(--sleep)} .k-flight{color:var(--flight)} .k-caff{color:var(--caff)}
+.sum{margin:0;font-size:.82rem;color:var(--muted);font-family:var(--f-mono)}
+
+/* settings fields */
+.set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 16px}
+.zone{display:grid;grid-template-columns:minmax(0,1fr) 72px;gap:6px}
+.shift-row{display:flex;align-items:center;gap:10px;min-height:40px}
+.shift-row input{flex:1;min-width:0;accent-color:var(--body)}
+.shift-out{font-family:var(--f-mono);font-size:.82rem;min-width:5ch;text-align:right}
+.hint{margin:5px 0 0;font-size:.78rem;color:var(--muted)}
+.tz{display:flex;flex-wrap:wrap;gap:6px}
+.tz input{flex:1 1 170px}
+.tz select{flex:1 1 130px}
+.grp+.grp{margin-top:22px;padding-top:18px;border-top:1px solid var(--line-soft)}
+.chk{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;font-weight:500;margin:8px 0 0;color:var(--ink);cursor:pointer}
+.chk input{width:auto;min-height:0;accent-color:var(--body)}
+.toggle{display:flex;gap:12px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:.9rem;font-weight:500;color:var(--ink);cursor:pointer;margin:0}
+.toggle input{position:absolute;opacity:0;width:1px;height:1px}
+.track{flex:none;width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;margin-top:1px;transition:background .15s}
+.track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px var(--shadow);transition:transform .15s}
+.toggle input:checked+.track{background:var(--body)}
+.toggle input:checked+.track::after{transform:translateX(18px)}
+.toggle input:focus-visible+.track{outline:2px solid var(--focus);outline-offset:2px}
+.toggle small{display:block;color:var(--muted);font-weight:400;font-size:.8rem;margin-top:1px}
+
+/* chart */
+.chart-head{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.leg{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--field);border-radius:999px;padding:4px 11px;font-size:.8rem;cursor:pointer;min-height:30px}
+.leg[aria-pressed=false]{opacity:.45;text-decoration:line-through}
+.leg i{display:inline-block;width:18px;height:0;border-top:3px solid var(--ink)}
+.leg.k-body i{border-color:var(--body);border-top-width:2px}
+.leg.k-local i{border-color:var(--local);border-top-style:dashed;border-top-width:2px}
+.leg.k-alert i{border-color:var(--alert)}
+.leg.k-pressure i{border-color:var(--press);border-top-style:dotted;border-top-width:3px}
+.leg.k-night i{height:12px;width:16px;border:0;background:var(--night);opacity:.55;border-radius:2px}
+.leg-static{display:inline-flex;align-items:center;gap:7px;font-size:.8rem;color:var(--muted);padding:4px 4px}
+.leg-static i{display:inline-block;width:16px;height:12px;background:var(--low);opacity:.25;border-radius:2px}
+.leg-static i.ahead{background:var(--ahead);opacity:.45}
+.leg-static i.behind{background:var(--behind);opacity:.45}
+.axes{margin:0 0 8px;font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
+.tip{margin:0 0 10px;font-size:.8rem;color:var(--muted);max-width:75ch}
+.readout{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;padding:9px 12px;margin-bottom:10px;background:var(--field);border:1px solid var(--line-soft);border-radius:10px;min-height:50px}
+.ro-when{font-family:var(--f-mono);font-size:.82rem;display:flex;flex-wrap:wrap;gap:2px 14px}
+.ro-when b{font-weight:500}
+.ro-vals{display:flex;flex-wrap:wrap;gap:4px 20px;margin:0}
+.ro-vals div{display:flex;gap:7px;align-items:baseline}
+.ro-vals dt{font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.ro-vals dd{margin:0;font-family:var(--f-mono);font-size:.92rem;font-weight:500;font-variant-numeric:tabular-nums}
+.chart-scroll{overflow-x:auto;border-radius:6px}
+#chart{display:block;touch-action:pan-x pan-y}
+#chart .dg{touch-action:none}
+#chart .dg-edge{cursor:ew-resize}
+#chart .dg-move{cursor:grab}
+#chart .op{cursor:pointer}
+#chart.dragging,#chart.dragging .dg{cursor:grabbing}
+#chart text{font-family:var(--f-mono);fill:var(--muted)}
+.empty{margin:0;padding:40px 12px;text-align:center;color:var(--muted)}
+.clipnote{margin:8px 0 0;font-size:.8rem;color:var(--warn)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.stat{padding:2px 18px;border-left:1px solid var(--line)}
+.stat:first-child{border-left:0;padding-left:0}
+.stat .v{font-family:var(--f-mono);font-size:1.5rem;font-weight:500;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat .v small{font-size:.8rem;font-weight:400;color:var(--muted)}
+.stat .s{font-size:.8rem;color:var(--muted);margin-top:2px;font-family:var(--f-mono)}
+.flights{grid-column:1/-1;margin:14px 0 0;padding:12px 0 0;border-top:1px solid var(--line);list-style:none;display:flex;flex-direction:column;gap:8px}
+.flights li{font-size:.86rem}
+.flights strong{font-weight:600}
+.flights .m{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);display:block}
+
+/* timeline */
+.tl-head{display:flex;gap:10px;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.tl-head span{font-size:.8rem;color:var(--muted)}
+.evlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.ev{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:2px 12px;align-items:center;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-left-width:4px;border-radius:12px;background:var(--surface);cursor:pointer}
+.ev:hover{border-color:var(--muted)}
+.ev.t-sleep,.ev.t-plan{border-left-color:var(--sleep)}
+.ev.t-flight{border-left-color:var(--flight)}
+.ev.t-caffeine{border-left-color:var(--caff)}
+.ev-ico{grid-row:1/3;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:var(--field)}
+.t-sleep .ev-ico,.t-plan .ev-ico{color:var(--sleep)}
+.t-flight .ev-ico{color:var(--flight)}
+.t-caffeine .ev-ico{color:var(--caff)}
+.ev-title{font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-badge{grid-row:1;grid-column:3;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;border:1px dashed var(--sleep);color:var(--sleep);border-radius:999px;padding:1px 8px}
+.ev-meta{grid-column:2/4;font-family:var(--f-mono);font-size:.76rem;color:var(--muted);line-height:1.55}
+.ev-meta b{font-weight:500;color:var(--ink)}
+.ev-meta .warn{color:var(--warn)}
+.ev-meta .bad{color:var(--low)}
+.row-empty{padding:22px 4px;color:var(--muted);text-align:center}
+
+/* dialogs */
+dialog.dlg{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);padding:0;width:min(600px,calc(100vw - 24px));max-height:calc(100vh - 24px);box-shadow:0 20px 60px var(--shadow)}
+dialog.dlg::backdrop{background:rgba(8,14,22,.5)}
+.dlg-in{display:flex;flex-direction:column;max-height:calc(100vh - 24px)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 12px 10px 18px;border-bottom:1px solid var(--line-soft)}
+.dlg-body{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.dlg-foot{display:flex;gap:10px;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--line-soft)}
+.dlg-foot .btn.primary{margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--field);padding:8px 16px;cursor:pointer;font-weight:600;font-size:.88rem}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true],.seg button[aria-selected=true]{background:var(--ink);color:var(--bg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chips button{border:1px solid var(--line);background:var(--field);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.82rem}
+.chips button:hover{border-color:var(--muted)}
+.cap{margin:0;font-family:var(--f-mono);font-size:.78rem;color:var(--muted);line-height:1.6}
+.cap b{font-weight:500;color:var(--ink)}
+.cap .warn{color:var(--warn)}
+.cap .bad{color:var(--low)}
+
+/* model reference */
+.how{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+.how summary{cursor:pointer;font-weight:600}
+.eq{margin:12px 0 4px;padding:10px 12px;background:var(--field);border:1px solid var(--line-soft);border-radius:8px;font-family:var(--f-mono);font-size:.82rem;overflow-x:auto;white-space:pre}
+.how dl{margin:10px 0 0;display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr);gap:8px 16px;max-width:80ch}
+.how dt{font-weight:600;font-size:.88rem}
+.how dd{margin:0;color:var(--muted);font-size:.88rem}
+
+@media (max-width:860px){
+  .stats{grid-template-columns:1fr 1fr}
+  .stat:nth-child(3){grid-column:1/-1;border-left:0;padding-left:0;margin-top:14px}
+  .how dl{grid-template-columns:1fr;gap:2px}
+  .how dd{margin-bottom:8px}
+}
+@media (max-width:560px){
+  dialog.dlg{margin:auto auto 0;width:100vw;max-width:100vw;border-radius:16px 16px 0 0}
+  .tz input,.tz select{flex:1 1 100%}
+  .btn .lbl{display:none}
+  .btn{padding:6px 12px}
+}
+@media (max-width:520px){
+  .stats{grid-template-columns:1fr}
+  .stat{border-left:0;padding-left:0}
+  .stat+.stat{margin-top:14px}
+  .stat:nth-child(3){margin-top:14px}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* v8: slimmer main page, log pop-up, phone fit */
+.chartpanel{padding:12px 14px 14px}
+.legend{flex-wrap:nowrap;overflow-x:auto;padding-bottom:0;margin:0 0 6px;scrollbar-width:none}
+.legend::-webkit-scrollbar{display:none}
+@media (max-width:640px){.legend{-webkit-mask-image:linear-gradient(to right,#000 88%,transparent);mask-image:linear-gradient(to right,#000 88%,transparent);padding-right:18px}}
+#stats.stats .stat .s{overflow-wrap:anywhere}
+.legend .leg,.legend .leg-static{flex:none;white-space:nowrap}
+.readout{display:block;margin:10px 0 0;padding:10px 12px}
+.ro-when{margin-bottom:8px}
+.ro-vals{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px 14px}
+.ro-vals div{display:flex;flex-direction:column;gap:1px;align-items:flex-start}
+.ro-vals dd{font-size:.95rem;white-space:nowrap}
+.axes{margin:8px 0 0;font-size:.74rem}
+.tip{margin:4px 0 0;font-size:.76rem}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.kpi .lab{margin:0 0 2px}
+.kpi .v{font-family:var(--f-mono);font-size:1.45rem;font-weight:500;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi .v small{font-size:.76rem;font-weight:400;color:var(--muted)}
+.kpi .s{font-size:.74rem;color:var(--muted);font-family:var(--f-mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+dialog.tall{height:min(760px,calc(100vh - 24px));height:min(760px,calc(100dvh - 24px))}
+dialog.tall .dlg-in{height:100%;max-height:none}
+dialog.tall .dlg-body{flex:1;min-height:0}
+.tabbar{padding:10px 18px 0}
+.seg.wide{display:flex;width:100%}
+.seg.wide button{flex:1}
+.tl-head{flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.tl-head .chips{margin:0}
+.grp .how{border:0;padding:0;background:none}
+@media (max-width:560px){
+  .wrap{padding-inline:12px;gap:10px;padding-block:10px 24px}
+  .bar-in{padding:8px 12px;gap:8px}
+  .brand h1{font-size:1rem}
+  .brand svg{width:22px;height:22px}
+  .sum{font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tip{display:none}
+  .kpi{padding:8px 10px}
+  .kpi .v{font-size:1.15rem}
+  .kpi .s{display:none}
+  .kpi .lab{font-size:.62rem;letter-spacing:.04em}
+  .ro-vals{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 8px}
+  .ro-vals div:nth-child(3){grid-column:span 2}
+  .readout{padding:8px 10px;margin-top:8px}
+  .ro-when{margin-bottom:6px;font-size:.76rem}
+  .ov{display:none}
+  .ro-vals dt{font-size:.62rem;letter-spacing:.03em}
+  .ro-vals dd{font-size:.82rem}
+  dialog.tall{height:92vh;height:92dvh;max-height:92dvh}
+  #stats.stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #stats.stats .stat{border-left:0;padding:0 8px 0 0;margin:0}
+  #stats.stats .stat+.stat{margin-top:0}
+  #stats.stats .stat .v{font-size:1.15rem}
+  #stats.stats .stat .lab{font-size:.62rem;letter-spacing:.03em}
+  #stats.stats .stat .s{font-size:.68rem}
+  #stats.stats .stat:nth-child(3){grid-column:auto;margin-top:0}
+  .chartpanel{padding:10px 8px 12px}
+}
+
+/* v9: data section, phone safe areas */
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.msg{margin:10px 0 0;font-size:.85rem;padding:9px 12px;border:1px solid var(--line-soft);border-radius:10px;background:var(--field)}
+.msg .btn{min-height:34px;padding:4px 12px;margin:6px 6px 0 0}
+.appbar{padding-top:env(safe-area-inset-top)}
+.wrap{padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+.dlg-foot{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+</style>
+</head>
+<body>
+
+
+
+<header class="appbar">
+  <div class="bar-in">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="var(--body)" stroke-width="2.4"/><path d="M16 8v8l5 3" fill="none" stroke="var(--local)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>Body Clock<span class="ov"> Overlay</span></h1>
+    </div>
+    <div class="addwrap">
+      <button class="btn primary" id="addBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add
+      </button>
+      <div class="menu" id="addMenu" role="menu" hidden>
+        <button type="button" role="menuitem" data-add="sleep"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span class="mi-t"><strong>Sleep</strong><small>A night, 8 h</small></span></button>
+        <button type="button" role="menuitem" data-add="nap"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M5 6h6l-6 7h6M14 11h5l-5 6h5"/></svg></span><span class="mi-t"><strong>Nap</strong><small>A short sleep, 45 min</small></span></button>
+        <button type="button" role="menuitem" data-add="flight"><span class="mi k-flight"><svg class="ic" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="mi-t"><strong>Flight</strong><small>Moves your local clock</small></span></button>
+        <button type="button" role="menuitem" data-add="coffee"><span class="mi k-caff"><svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg></span><span class="mi-t"><strong>Coffee</strong><small>Caffeine dose, 100 mg</small></span></button>
+      </div>
+    </div>
+    <button class="btn" id="logBtn" type="button" aria-label="Log">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Log</span>
+    </button>
+    <button class="btn" id="setBtn" type="button" aria-label="Settings">
+      <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Settings</span>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="sum" id="sumLine"></p>
+
+  <section class="panel chartpanel" aria-labelledby="h-chart">
+    <h2 id="h-chart" class="sr">Rhythm chart</h2>
+    <div class="legend" role="group" aria-label="Chart lines">
+      <button type="button" class="leg k-alert" data-k="alert" aria-pressed="true"><i></i>Alertness</button>
+      <button type="button" class="leg k-body" data-k="body" aria-pressed="true"><i></i>Body clock</button>
+      <button type="button" class="leg k-local" data-k="local" aria-pressed="true"><i></i>Local day</button>
+      <button type="button" class="leg k-pressure" data-k="pressure" aria-pressed="false"><i></i>Sleep pressure</button>
+      <button type="button" class="leg k-night" data-k="night" aria-pressed="true"><i></i>Night</button>
+      <span class="leg-static"><i></i>Low</span>
+      <span class="leg-static" id="diffLeg" hidden><i class="ahead"></i>Ahead<i class="behind"></i>Behind</span>
+      <span class="leg-static" id="ghostLeg" hidden><i style="height:0;background:none;opacity:1;border-top:2px solid var(--muted)"></i>Before drag</span>
+    </div>
+    <div class="chart-scroll" id="chartWrap">
+      <svg id="chart" role="img" aria-label="Chart of alertness index, body clock rhythm and local day rhythm, with sleep, flight, location and caffeine markers"></svg>
+      <p class="empty" id="chartEmpty" hidden>The chart end is before the chart start. Time travel is not modelled.</p>
+    </div>
+    <p class="clipnote" id="clipNote" hidden>The chart shows the first 10 days of your range.</p>
+    <div class="readout" id="readout">
+      <div class="ro-when"><span id="roDate"></span><span>Home <b id="roHome"></b></span><span>Local <b id="roLocal"></b></span></div>
+      <dl class="ro-vals">
+        <div><dt>Alertness</dt><dd id="roA"></dd></div>
+        <div><dt>Body clock</dt><dd id="roC"></dd></div>
+        <div><dt>Clock gap</dt><dd id="roGap"></dd></div>
+        <div><dt>Pressure</dt><dd id="roS"></dd></div>
+        <div><dt>Caffeine</dt><dd id="roK"></dd></div>
+        <div><dt>State</dt><dd id="roState"></dd></div>
+        <div><dt>Sky</dt><dd id="roSky"></dd></div>
+      </dl>
+    </div>
+    <p class="axes" id="axesNote"></p>
+    <p class="tip">Tap a block to edit it. Drag sleep blocks and coffee markers to move them, or drag a sleep block's edges to change its times.</p>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Key numbers"></section>
+</main>
+
+<dialog class="dlg tall" id="logDlg" aria-labelledby="logTitle">
+  <div class="dlg-in">
+    <div class="dlg-head"><h2 id="logTitle">Log</h2><button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <div class="tabbar"><div class="seg wide" role="tablist" aria-label="Log sections">
+      <button type="button" role="tab" id="tabBtnEvents" data-tab="events" aria-selected="true" aria-controls="tabEvents">Events</button>
+      <button type="button" role="tab" id="tabBtnSummary" data-tab="summary" aria-selected="false" aria-controls="tabSummary">Trip summary</button>
+    </div></div>
+    <div class="dlg-body">
+      <div id="tabEvents" role="tabpanel" aria-labelledby="tabBtnEvents">
+        <div class="tl-head"><div class="chips" id="quickAdd" role="group" aria-label="Add an event">
+          <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="nap">+ Nap</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button>
+        </div><span id="tlCount"></span></div>
+        <ul class="evlist" id="rows"></ul>
+      </div>
+      <div id="tabSummary" role="tabpanel" aria-labelledby="tabBtnSummary" hidden>
+        <div class="stats" id="stats"></div>
+      </div>
+    </div>
+    <div class="dlg-foot"><span></span><button class="btn primary" type="button" data-close>Done</button></div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="setDlg" aria-labelledby="setTitle">
+  <div class="dlg-in">
+    <div class="dlg-head"><h2 id="setTitle">Settings</h2><button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <div class="dlg-body">
+      <section class="grp">
+        <h3>Time zones</h3>
+        <div class="set-grid">
+          <div>
+            <label for="homeSel">Home time zone (body clock)</label>
+            <div class="zone"><select id="homeSel"></select><input id="homeOff" type="number" step="0.5" min="-12" max="14" aria-label="Home UTC offset in hours"></div>
+          </div>
+          <div>
+            <label for="localSel">Destination time zone</label>
+            <div class="zone"><select id="localSel"></select><input id="localOff" type="number" step="0.5" min="-12" max="14" aria-label="Destination UTC offset in hours"></div>
+          </div>
+        </div>
+        <p class="hint">Offsets assume daylight time, which applies to both ends of an October trip.</p>
+      </section>
+      <section class="grp">
+        <h3>Where you start</h3>
+        <div class="set-grid">
+          <div>
+            <label for="startT">Awake since (wake-up after a normal night)</label>
+            <div class="tz"><input id="startT" type="datetime-local"><select id="startZ" aria-label="Clock for chart start"></select></div>
+          </div>
+          <div>
+            <label for="locSel">You start the chart in</label>
+            <select id="locSel"></select>
+            <p class="hint">Each flight sets where you are after it lands.</p>
+          </div>
+        </div>
+      </section>
+      <section class="grp">
+        <h3>Your routine at home</h3>
+        <div class="set-grid">
+          <div><label for="bed">Usual bedtime</label><input id="bed" type="time"></div>
+          <div><label for="wake">Usual wake time</label><input id="wake" type="time"></div>
+          <div>
+            <label for="light">Daytime light exposure</label>
+            <div class="shift-row"><input id="light" type="range" min="0" max="100" step="5"><span class="shift-out" id="lightOut"></span></div>
+            <p class="hint" id="lightHint"></p>
+          </div>
+        </div>
+        <p class="hint">The chart starts from your wake-up after a normal night: usual bedtime and wake time, body clock on home time.</p>
+      </section>
+      <section class="grp">
+        <h3>Chart</h3>
+        <label class="toggle" for="showDiff"><input id="showDiff" type="checkbox" role="switch"><span class="track" aria-hidden="true"></span><span>Show the gap between body clock and local day<small>Shades the area between the two curves: green when your body clock is ahead of local time, red when it is behind. Needs both curves switched on.</small></span></label>
+        <div style="margin-top:16px">
+          <label for="endT">Chart ends</label>
+          <div class="tz"><input id="endT" type="datetime-local"><select id="endZ" aria-label="Clock for chart end"></select></div>
+          <label class="chk" for="endAuto"><input id="endAuto" type="checkbox"> Auto: last flight + 12 h</label>
+        </div>
+      </section>
+      <section class="grp">
+        <h3>Your data</h3>
+        <div class="btnrow"><button class="btn" id="expBtn" type="button">Back up trip</button><button class="btn" id="impBtn" type="button">Restore from file</button><input id="impFile" type="file" accept=".json,application/json" hidden></div>
+        <p class="hint">Your trip is saved automatically in this browser. A backup file lets you keep a copy or move the trip to another device.</p>
+        <p class="msg" id="dataMsg" role="status" hidden></p>
+        <p class="hint" id="verLine"></p>
+      </section>
+      <section class="grp"><details class="how">
+    <summary>How the model works</summary>
+    <div class="eq">Alertness = 100 × ( 0.64 × (1 − S) + 0.36 × C ) − W + K      clipped to 0–100</div>
+    <dl>
+      <dt>S: sleep pressure</dt>
+      <dd>Two-process model (Borbély, Daan and Beersma 1984). Rises toward 1 while awake with a time constant of 18.2 h and falls toward 0 in sleep with a time constant of 4.2 h. Sleep clears pressure at 55% to 100% of full speed depending on circadian phase (slowest in your body-clock day), and caffeine in your system trims it further. Falling asleep takes 8 to 30 minutes, longer when the circadian rhythm is high and pressure is low, and that time counts as awake. The chart starts at the steady-state value after your usual bedtime and wake time.</dd>
+      <dt>C: circadian rhythm</dt>
+      <dd>A 24 h wave plus a 12 h harmonic for the early-afternoon dip, scaled 0 to 1. The lowest point sits 1 h after the core-temperature minimum, which is placed 2.5 h before your usual wake time. The 0.64 / 0.36 weights come from the relative size of the homeostatic and circadian terms in the two-process model (swings of about 0.43 and 0.24).</dd>
+      <dt>W: sleep inertia</dt>
+      <dd>After each wake-up, up to 22 points are subtracted, fading with a 0.6 h time constant. The amount grows with sleep length as 1 − e^(−hours / τ), where τ = 1.8 − 1.3 × (sleep pressure when you fell asleep). With high pressure you reach deep sleep sooner, so a short sleep after a long wake costs more than the same nap after a short wake. It is also worse when you wake near the circadian low. Sleep stages are not modelled.</dd>
+      <dt>K: caffeine</dt>
+      <dd>One-compartment model for a 75 kg adult: absorption rate 3 per hour, half-life 5 h, distribution volume 45 L. The boost is up to +16 points at a typical sleep pressure (half of that at 3 mg/L, which is roughly a 130 mg dose at its peak). It is scaled by 0.5 + sleep pressure, because caffeine blocks the adenosine that builds up while you are awake: about 0.7× when rested and 1.3× after a long wake. The same concentration cuts sleep recovery by up to 30%.</dd>
+      <dt>Body-clock shifts</dt>
+      <dd>Light drives the shift through a phase response curve centred on your usual daylight window at home. Light earlier in your body-clock day than usual advances the clock, and light later than usual delays it. Light level is your daytime exposure setting in daylight, 20% of that when awake at night, and zero when asleep. Daylight comes from the sun's position at your location. The shift rate is normalised so that your usual day at home causes no drift. Delays are weighted 25% stronger than advances, so westward travel adjusts faster than eastward. With 50% light the model gives roughly 0.9 h/day eastward and 1.1 h/day westward for a 5 h change, in line with the usual 1 h/day and 1.5 h/day rules of thumb.</dd>
+      <dt>Clock gap</dt>
+      <dd>The difference between where your body clock sits and the clock where you are. When you are behind (the local clock is later than your body clock, as after flying east) the area between the two curves is red. When you are ahead (as after flying west) it is green. Gaps under 15 minutes are not shaded.</dd>
+      <dt>Where you are</dt>
+      <dd>You start in the zone you pick. During a flight your position moves in a straight line from the departure city to the landing city, and the local clock and the sun move with it. Each zone uses a representative city: New York for US Eastern, Dallas for US Central, London for London, and so on. A custom offset assumes 40°N.</dd>
+      <dt>Night and low</dt>
+      <dd>Night is shaded when the sun is below the horizon at your position. Body-clock low marks the lowest tenth of the circadian wave.</dd>
+      <dt>Chart end</dt>
+      <dd>Set automatically to 12 h after your last flight lands, or after your last sleep row if that ends later.</dd>
+    </dl>
+  </details></section>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn danger" id="resetBtn" type="button">Reset to example trip</button>
+      <button class="btn primary" type="button" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="evDlg" aria-labelledby="evTitle">
+  <div class="dlg-in">
+    <div class="dlg-head"><h2 id="evTitle">Edit</h2><button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <div class="dlg-body">
+      <div><label for="evLabel">Label</label><input id="evLabel" type="text"></div>
+      <div id="evStatusF"><span class="lab">Status</span><div class="seg" role="group" aria-label="Sleep status"><button type="button" data-v="sleep" aria-pressed="false">Done</button><button type="button" data-v="plan" aria-pressed="false">Planned</button></div></div>
+      <div><label for="evS" id="evSL">Start</label><div class="tz"><input id="evS" type="datetime-local"><select id="evSZ" aria-label="Clock for start"></select></div></div>
+      <div id="evEF"><label for="evE">End</label><div class="tz"><input id="evE" type="datetime-local"><select id="evEZ" aria-label="Clock for end"></select></div></div>
+      <div id="evLandF"><label for="evLand">Lands in</label><select id="evLand"></select><p class="hint">Your local clock follows this after landing.</p></div>
+      <div id="evMgF"><label for="evMg">Dose (mg)</label><input id="evMg" type="number" min="0" max="1000" step="10"><div class="chips" id="evChips"><button type="button" data-mg="50">Tea 50</button><button type="button" data-mg="100">Coffee 100</button><button type="button" data-mg="150">Large 150</button><button type="button" data-mg="200">Double 200</button></div></div>
+      <p class="cap" id="evCap"></p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn danger" id="evDel" type="button">Delete</button>
+      <button class="btn primary" type="button" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+'use strict';
+var H = 3600000;
+var MINUS = '−';
+var KEY = 'body-clock-overlay-v3', OLDKEY = 'body-clock-overlay-v2';
+var DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var ZONES = [
+  {n:'Hawaii',a:'HST',o:-10,lat:21.31,lon:-157.86},{n:'Pacific',a:'PDT',o:-7,lat:34.05,lon:-118.25},
+  {n:'Mountain',a:'MDT',o:-6,lat:39.74,lon:-104.99},{n:'US Central',a:'CDT',o:-5,lat:32.78,lon:-96.8},
+  {n:'US Eastern',a:'EDT',o:-4,lat:40.71,lon:-74.0},{n:'UTC',a:'UTC',o:0,lat:51.48,lon:0},
+  {n:'London',a:'BST',o:1,lat:51.51,lon:-0.13},{n:'Central Europe',a:'CEST',o:2,lat:50.11,lon:8.68},
+  {n:'Dubai',a:'GST',o:4,lat:25.2,lon:55.27},{n:'Singapore',a:'SGT',o:8,lat:1.35,lon:103.82},
+  {n:'Tokyo',a:'JST',o:9,lat:35.68,lon:139.69},{n:'Sydney',a:'AEDT',o:11,lat:-33.87,lon:151.21}
+];
+
+/* model parameters */
+var PAR = {
+  tauRise:18.2, tauDecay:4.2, wS:0.64, wC:0.36,
+  effMin:0.55, solBase:8, solRange:22,
+  inMax:22, inTau:0.6, inDur0:1.8, inDurS:1.3,
+  ka:3.0, ke:Math.LN2/5, vd:45, ec50:3, caffMax:16, caffS0:0.5, caffSleep:0.3,
+  prcAmp:0.4, prcAsym:0.25, lowFrac:0.1
+};
+
+function $(s){ return document.querySelector(s); }
+function pad(n){ return (n<10?'0':'')+n; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+/* ---------- state ---------- */
+var nid = 1;
+function row(label,type,s,sz,e,ez,land,mg){ return {id:nid++,label:label,type:type,s:s,sz:sz,e:e,ez:ez,land:land,mg:mg}; }
+function defaults(){
+  nid = 1;
+  return {
+    v:3, home:-4, local:1, startLoc:'home', bed:'23:00', wake:'07:00', light:50, endAuto:true,
+    show:{alert:true,body:true,local:true,pressure:false,night:true,diff:false},
+    start:{t:'2026-10-08T08:00',z:'home'},
+    end:{t:'2026-10-11T00:00',z:'home'},
+    rows:[
+      row('DFW to LHR (times estimated)','flight','2026-10-08T16:30','z:-5','2026-10-09T07:45','local','local'),
+      row('In-flight nap','sleep','2026-10-09T02:00','z:0','2026-10-09T02:30','z:0'),
+      row('Hotel nap','sleep','2026-10-09T09:20','local','2026-10-09T12:30','local'),
+      row('Night in London','plan','2026-10-10T00:00','local','2026-10-10T07:30','local'),
+      row('Coffee','caffeine','2026-10-10T08:00','local','2026-10-10T08:00','local',undefined,150),
+      row('LHR to DFW','flight','2026-10-10T14:30','local','2026-10-10T18:45','z:-5','z:-5')
+    ]
+  };
+}
+function validState(o){ return o && Array.isArray(o.rows) && o.start && o.end && o.show; }
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(raw){
+      var o = JSON.parse(raw);
+      if(o && o.v===3 && validState(o)){ nid = 1; o.rows.forEach(function(r){ if(r.id>=nid) nid = r.id+1; }); return o; }
+    }
+    var old = localStorage.getItem(OLDKEY);
+    if(old){
+      var p = JSON.parse(old);
+      if(p && validState(p)){
+        p.v = 3; p.light = 50; delete p.rate;
+        p.show.pressure = false;
+        nid = 1; p.rows.forEach(function(r){ if(r.id>=nid) nid = r.id+1; });
+        return p;
+      }
+    }
+  }catch(e){}
+  return defaults();
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function fixState(o){
+  if(o.show.night===undefined) o.show.night = true;
+  if(o.show.pressure===undefined) o.show.pressure = false;
+  if(o.show.diff===undefined) o.show.diff = false;
+  if(o.endAuto===undefined) o.endAuto = true;
+  if(o.light===undefined) o.light = 50;
+  nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
+  return o;
+}
+var BUILD = '10 Oct 2026 · build 1';
+var S = fixState(load());
+
+/* ---------- time helpers ---------- */
+function fmtOff(o){
+  var a = Math.abs(o), h = Math.floor(a), m = Math.round((a-h)*60);
+  return 'UTC'+(o<0?MINUS:'+')+h+(m?':'+pad(m):'');
+}
+function zname(o){
+  for(var i=0;i<ZONES.length;i++) if(ZONES[i].o===o) return ZONES[i].a;
+  return fmtOff(o);
+}
+function zoneOff(z){
+  if(z==='home') return S.home;
+  if(z==='local') return S.local;
+  var v = parseFloat(String(z).slice(2));
+  return isNaN(v) ? 0 : v;
+}
+function parseLocal(str){
+  var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(str||'');
+  if(!m) return NaN;
+  return Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5]);
+}
+function toAbs(t,z){ return parseLocal(t) - zoneOff(z)*H; }
+function iso(ms){ var d = new Date(ms); return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())+'T'+pad(d.getUTCHours())+':'+pad(d.getUTCMinutes()); }
+function parts(ms,off){ return new Date(ms + off*H); }
+function hm(ms,off){ var d = parts(ms,off); return pad(d.getUTCHours())+':'+pad(d.getUTCMinutes()); }
+function dayLbl(ms,off){ var d = parts(ms,off); return DOW[d.getUTCDay()]+' '+d.getUTCDate()+' '+MON[d.getUTCMonth()]; }
+function dowLbl(ms,off){ return DOW[parts(ms,off).getUTCDay()]; }
+function dayIdx(ms,off){ return Math.floor((ms + off*H)/(24*H)); }
+function rangeStr(a,b,off){
+  if(dayIdx(a,off)===dayIdx(b,off)) return dowLbl(a,off)+' '+hm(a,off)+'–'+hm(b,off);
+  return dowLbl(a,off)+' '+hm(a,off)+' → '+dowLbl(b,off)+' '+hm(b,off);
+}
+function tod(ms,off){ var h = ms/H + off; return ((h%24)+24)%24; }
+function hhmmToH(s){ var m = /^(\d\d):(\d\d)/.exec(s||''); return m ? (+m[1] + (+m[2])/60) : 0; }
+function f1(x){ return (Math.round(x*10)/10).toFixed(1); }
+function overlap(a,b,c,d){ return Math.max(0, Math.min(b,d)-Math.max(a,c)); }
+
+/* ---------- sun position ---------- */
+function coordsFor(off){
+  for(var i=0;i<ZONES.length;i++) if(ZONES[i].o===off) return {lat:ZONES[i].lat, lon:ZONES[i].lon};
+  return {lat:40, lon:off*15};
+}
+function sunElev(ms,lat,lon){
+  var R = Math.PI/180;
+  var T = (ms/86400000 + 2440587.5 - 2451545.0)/36525;
+  var L0 = (280.46646 + T*(36000.76983 + T*0.0003032)) % 360;
+  var Mn = 357.52911 + T*(35999.05029 - 0.0001537*T);
+  var Mr = Mn*R;
+  var C = Math.sin(Mr)*(1.914602 - T*(0.004817 + 0.000014*T)) + Math.sin(2*Mr)*(0.019993 - 0.000101*T) + Math.sin(3*Mr)*0.000289;
+  var om = 125.04 - 1934.136*T;
+  var lam = L0 + C - 0.00569 - 0.00478*Math.sin(om*R);
+  var eps = 23 + (26 + (21.448 - T*(46.815 + T*(0.00059 - T*0.001813)))/60)/60 + 0.00256*Math.cos(om*R);
+  var decl = Math.asin(Math.sin(eps*R)*Math.sin(lam*R));
+  var ecc = 0.016708634 - T*(0.000042037 + 0.0000001267*T);
+  var yy = Math.pow(Math.tan(eps*R/2), 2), L0r = L0*R;
+  var eqt = 4/R*(yy*Math.sin(2*L0r) - 2*ecc*Math.sin(Mr) + 4*ecc*yy*Math.sin(Mr)*Math.cos(2*L0r) - 0.5*yy*yy*Math.sin(4*L0r) - 1.25*ecc*ecc*Math.sin(2*Mr));
+  var utcMin = ((ms/60000)%1440 + 1440)%1440;
+  var tst = (((utcMin + eqt + 4*lon)%1440) + 1440)%1440;
+  var ha = (tst/4 - 180)*R;
+  var la = lat*R;
+  var cz = Math.sin(la)*Math.sin(decl) + Math.cos(la)*Math.cos(decl)*Math.cos(ha);
+  return 90 - Math.acos(Math.max(-1, Math.min(1, cz)))/R;
+}
+
+/* ---------- physiology ---------- */
+/* circadian wave: 24 h harmonic plus a 12 h harmonic (early-afternoon dip), scaled 0-1, trough 1 h after CBTmin */
+var CW = (function(){
+  function raw(p){ return -Math.cos(2*Math.PI*(p-1)/24) - 0.2*Math.cos(2*Math.PI*(p-9.5)/12); }
+  var mn = 1e9, mx = -1e9, arg = 0;
+  for(var i=0;i<2400;i++){ var p = i/100, v = raw(p); if(v < mn){ mn = v; arg = p; } if(v > mx) mx = v; }
+  var shift = 1 - arg;
+  return function(p){ return (raw(p - shift) - mn)/(mx - mn); };
+})();
+function phiOf(ms,off,m){ return (((tod(ms,off) - m)%24)+24)%24; }
+function circ(ms,off,m){ return CW(phiOf(ms,off,m)); }
+function nadirH(){ var w = hhmmToH(S.wake) - 2.5; return ((w%24)+24)%24; }
+
+/* phase response to light. First-harmonic curve whose zero crossing sits at the middle of the usual
+   daylight window (phiC, set per model run), so a normal day at home balances out. Light earlier than
+   that point advances the clock, later light delays it. Delays are scaled up a little (PAR.prcAsym)
+   because the free-running body clock is slightly longer than 24 h. */
+var phiC = 8;
+function prc(phi){
+  var v = -PAR.prcAmp*Math.sin(2*Math.PI*(phi - phiC)/24);
+  return v > 0 ? v*(1 - PAR.prcAsym) : v*(1 + PAR.prcAsym);
+}
+function lightLevel(elev, asleep, g){
+  if(asleep) return 0;
+  var f = elev >= 5 ? 1 : (elev <= -6 ? 0.2 : 0.2 + 0.8*(elev+6)/11);
+  return f*g;
+}
+function stepS(st, asleep, c, dtH, cf){
+  if(asleep){
+    if(!st.prev) st.since = 0;
+    var sol = (PAR.solBase + PAR.solRange*c*(1-st.s))/60;
+    if(st.since < sol) st.s = 1 - (1-st.s)*Math.exp(-dtH/PAR.tauRise);
+    else {
+      var eff = (PAR.effMin + (1-PAR.effMin)*(1-c))*(1 - PAR.caffSleep*cf);
+      st.s = st.s*Math.exp(-eff*dtH/PAR.tauDecay);
+    }
+    st.since += dtH;
+  } else {
+    st.s = 1 - (1-st.s)*Math.exp(-dtH/PAR.tauRise);
+  }
+  st.prev = asleep;
+}
+function habitSleeping(hr,bedH,wakeH){ return bedH > wakeH ? (hr >= bedH || hr < wakeH) : (hr >= bedH && hr < wakeH); }
+
+/* ---------- model ---------- */
+var M = null;
+function merge(list){
+  var s = list.map(function(x){ return [x.a,x.b]; }).sort(function(p,q){ return p[0]-q[0]; });
+  var out = [];
+  s.forEach(function(iv){
+    var l = out[out.length-1];
+    if(l && iv[0] <= l[1]) l[1] = Math.max(l[1], iv[1]); else out.push([iv[0], iv[1]]);
+  });
+  return out;
+}
+function intervals(types){
+  var out = [];
+  S.rows.forEach(function(r){
+    if(types.indexOf(r.type) < 0) return;
+    var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
+    if(b > a) out.push({a:a,b:b,r:r});
+  });
+  return out;
+}
+function doseList(){
+  return S.rows.filter(function(r){ return r.type==='caffeine'; }).map(function(r){
+    return {t:toAbs(r.s,r.sz), mg:Math.max(0, +r.mg||0)};
+  }).filter(function(d){ return !isNaN(d.t) && d.mg > 0; }).sort(function(p,q){ return p.t - q.t; });
+}
+
+function buildModel(){
+  var t0 = toAbs(S.start.t, S.start.z), t1 = toAbs(S.end.t, S.end.z);
+  var sleepAll = intervals(['sleep','plan']);
+  var flightsAll = intervals(['flight']), autoUsed = false;
+  if(S.endAuto !== false && flightsAll.length){
+    t1 = Math.max.apply(null, flightsAll.map(function(f){ return f.b; })) + 12*H;
+    sleepAll.forEach(function(iv){ if(iv.b > t1) t1 = iv.b; });
+    autoUsed = true;
+  }
+  if(!(t0 > 0) || !(t1 > t0)) return null;
+  var clipped = false;
+  if(t1 - t0 > 240*H){ t1 = t0 + 240*H; clipped = true; }
+  var m = nadirH();
+  var sleepM = merge(sleepAll);
+  var bedH = hhmmToH(S.bed), wakeH = hhmmToH(S.wake);
+  var sleepLen = ((wakeH - bedH)%24 + 24)%24 || 8;
+
+  /* location timeline */
+  var flights = flightsAll.slice().sort(function(p,q){ return p.a - q.a; }).map(function(f){
+    var to = zoneOff(f.r.land || 'local');
+    return {a:f.a, b:f.b, to:to, toC:coordsFor(to)};
+  });
+  var startOff = zoneOff(S.startLoc || 'home');
+  function locAt(t){
+    var cur = startOff, cc = coordsFor(startOff);
+    for(var i=0;i<flights.length;i++){
+      var f = flights[i];
+      if(t < f.a) return {off:cur, lat:cc.lat, lon:cc.lon, fl:false};
+      if(t < f.b){
+        var k = (t-f.a)/(f.b-f.a), dl = ((f.toC.lon - cc.lon + 540)%360) - 180;
+        return {off:cur + (f.to-cur)*k, lat:cc.lat + (f.toC.lat-cc.lat)*k, lon:cc.lon + dl*k, fl:true};
+      }
+      cur = f.to; cc = f.toC;
+    }
+    return {off:cur, lat:cc.lat, lon:cc.lon, fl:false};
+  }
+  var segs = [], cur = startOff, prev = t0;
+  flights.forEach(function(f){
+    if(f.a > prev) segs.push({a:prev, b:f.a, off:cur, fl:false});
+    var fa = Math.max(f.a, prev);
+    if(f.b > fa) segs.push({a:fa, b:f.b, off:f.to, from:cur, fl:true});
+    cur = f.to; prev = Math.max(prev, f.b);
+  });
+  segs.push({a:prev, b:Math.max(prev,t1), off:cur, fl:false});
+  var offs = [S.home, startOff].concat(flights.map(function(f){ return f.to; }));
+  var Elo = Math.min.apply(null, offs), Ehi = Math.max.apply(null, offs);
+
+  /* steady-state sleep pressure at wake-up after the usual routine */
+  var seed = {s:0.25, since:0, prev:false}, seedAsl = false, sBed = 0.55;
+  for(var di=0; di<2400; di++){
+    var hr = (wakeH + di*0.1 + 0.05)%24;
+    var hs = habitSleeping(hr,bedH,wakeH);
+    if(hs && !seedAsl && di > 0) sBed = seed.s;
+    seedAsl = hs;
+    stepS(seed, hs, CW((((hr - m)%24)+24)%24), 0.1, 0);
+  }
+  var s0 = seed.s;
+
+  /* reference-day light drift at home, so a normal day at home causes no shift */
+  var g = S.light/100, hc = coordsFor(S.home);
+  var dayStart = Math.floor((t0 + S.home*H)/(24*H))*24*H - S.home*H, refSum = 0;
+  var cx = 0, cy = 0;
+  for(var rj=0; rj<240; rj++){
+    var qt = dayStart + (rj+0.5)*0.1*H, qh = tod(qt, S.home);
+    var qw = lightLevel(sunElev(qt, hc.lat, hc.lon), habitSleeping(qh,bedH,wakeH), 1);
+    var qa = 2*Math.PI*(((qh - m)%24+24)%24)/24;
+    cx += qw*Math.cos(qa); cy += qw*Math.sin(qa);
+  }
+  phiC = ((Math.atan2(cy,cx)*24/(2*Math.PI))%24 + 24)%24;
+  for(var rk=0; rk<240; rk++){
+    var rt = dayStart + (rk+0.5)*0.1*H, rh = tod(rt, S.home);
+    refSum += lightLevel(sunElev(rt, hc.lat, hc.lon), habitSleeping(rh,bedH,wakeH), g)*prc(((rh - m)%24+24)%24)*0.1;
+  }
+  var driftPerH = refSum/24;
+
+  var dtH = Math.max(0.1, (t1-t0)/H/3000);
+  var dt = dtH*H, N = Math.ceil((t1-t0)/dt);
+  var doses = doseList(), di2 = 0, gut = 0, plasma = 0;
+  var wakes = [{t:t0, dur:sleepLen, amp:null, on:t0, s0:sBed}];
+  sleepM.forEach(function(iv){ if(iv[1] > t0) wakes.push({t:iv[1], dur:(iv[1]-iv[0])/H, amp:null, on:iv[0], s0:(iv[0] <= t0 ? sBed : null)}); });
+  function asleepAt(t){ for(var i=0;i<sleepM.length;i++) if(t>=sleepM[i][0] && t<sleepM[i][1]) return true; return false; }
+
+  var pts = [], st = {s:s0, since:0, prev:false}, E = S.home;
+  for(var i=0;i<=N;i++){
+    var t = Math.min(t0 + i*dt, t1);
+    var L = locAt(t);
+    var c = circ(t,E,m), cl = circ(t,L.off,m);
+    while(di2 < doses.length && doses[di2].t <= t){ gut += doses[di2].mg; di2++; }
+    var cp = plasma/PAR.vd, cf = cp/(cp + PAR.ec50);
+    var W = 0;
+    for(var wi=0; wi<wakes.length; wi++){
+      var w = wakes[wi];
+      if(w.s0 === null && t >= w.on) w.s0 = st.s;
+      if(t < w.t) continue;
+      if(w.amp === null){
+        var tauIn = Math.max(0.4, PAR.inDur0 - PAR.inDurS*w.s0);
+        w.amp = PAR.inMax*(1 - Math.exp(-w.dur/tauIn))*(0.7 + 0.3*(1-c));
+      }
+      var dw = (t - w.t)/H;
+      if(dw < 4) W += w.amp*Math.exp(-dw/PAR.inTau);
+    }
+    var A = 100*(PAR.wS*(1-st.s) + PAR.wC*c) - W + PAR.caffMax*cf*(PAR.caffS0 + st.s);
+    A = Math.max(0, Math.min(100, A));
+    pts.push({t:t, cb:c*100, cl:cl*100, sp:st.s*100, E:E, loc:L.off, fl:L.fl, S:st.s, A:A, W:W, mg:gut+plasma,
+              sl:asleepAt(t), lo:c <= PAR.lowFrac, ni:sunElev(t, L.lat, L.lon) < -0.833});
+    var mid = t + dt/2, asl = asleepAt(mid);
+    var phi = phiOf(mid, E, m);
+    stepS(st, asl, CW(phi), dtH, cf);
+    var gOld = gut; gut *= Math.exp(-PAR.ka*dtH);
+    plasma = plasma*Math.exp(-PAR.ke*dtH) + (gOld - gut)*Math.exp(-PAR.ke*dtH/2);
+    var Lm = locAt(mid);
+    var Lx = lightLevel(sunElev(mid, Lm.lat, Lm.lon), asl, g);
+    E += (Lx*prc(phi) - driftPerH)*dtH;
+    E = Math.max(Elo, Math.min(Ehi, E));
+  }
+  function runs(key){
+    var out = [], run = null;
+    pts.forEach(function(p){
+      if(p[key] && !run) run = {a:p.t, b:p.t};
+      else if(p[key]) run.b = p.t;
+      else if(run){ run.b = p.t; out.push(run); run = null; }
+    });
+    if(run) out.push(run);
+    return out;
+  }
+  return {t0:t0,t1:t1,dt:dt,m:m,pts:pts,sleepAll:sleepAll,sleepM:sleepM,clipped:clipped,bands:runs('lo'),nights:runs('ni'),
+          autoUsed:autoUsed,locAt:locAt,segs:segs,doses:doses,s0:s0};
+}
+function ptAt(t){
+  var i = Math.round((t - M.t0)/M.dt);
+  i = Math.max(0, Math.min(M.pts.length-1, i));
+  return M.pts[i];
+}
+
+/* ---------- chart ---------- */
+var G = null, curT = null, drag = null, ghost = null;
+var Lm = 54, Rm = 18, Tm = 32, PH = 250, NARROW = false;
+
+function renderChart(){
+  var wrap = $('#chartWrap'), svg = $('#chart'), empty = $('#chartEmpty');
+  $('#clipNote').hidden = !(M && M.clipped);
+  if(!M){ svg.style.display = 'none'; empty.hidden = false; G = null; return; }
+  svg.style.display = 'block'; empty.hidden = true;
+  NARROW = wrap.clientWidth < 640;
+  Lm = NARROW ? 44 : 54; Rm = NARROW ? 10 : 18; PH = NARROW ? 210 : 250;
+  var W = NARROW ? Math.max(300, wrap.clientWidth) : Math.max(760, wrap.clientWidth), PW = W - Lm - Rm;
+  var laneH = 20, laneY = Tm + PH + 10, lane2 = laneY + laneH + 6, lane3 = lane2 + laneH + 6;
+  var hasCaff = M.doses.length > 0 || S.rows.some(function(r){ return r.type==='caffeine'; });
+  var lane4 = lane3 + laneH + 6, laneEnd = hasCaff ? lane4 + laneH : lane3 + laneH;
+  var axisY = laneEnd + 18, dateY = axisY + 15, Ht = dateY + 8;
+  var P = S.home;
+  var span = (M.t1 - M.t0)/H;
+  function x(t){ return Lm + (t - M.t0)/(M.t1 - M.t0)*PW; }
+  function y(v){ return Tm + PH*(1 - v/100); }
+  G = {W:W,PW:PW,Ht:Ht,laneEnd:laneEnd,x:x,y:y};
+  var o = [];
+
+  o.push('<defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="var(--sleep)" fill-opacity=".07"/><line x1="0" y1="0" x2="0" y2="7" stroke="var(--sleep)" stroke-opacity=".55" stroke-width="2"/></pattern></defs>');
+
+  [0,25,50,75,100].forEach(function(v){
+    o.push('<line x1="'+Lm+'" x2="'+(W-Rm)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line-soft)" stroke-width="1"/>');
+    o.push('<text x="'+(Lm-8)+'" y="'+(y(v)+3.5)+'" font-size="10.5" text-anchor="end">'+v+'</text>');
+  });
+
+  if(S.show.night !== false) M.nights.forEach(function(b){
+    var xa = Math.max(Lm, x(b.a)), xb = Math.min(W-Rm, x(b.b));
+    if(xb - xa < 0.5) return;
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" style="fill:var(--night);fill-opacity:var(--night-op)"/>');
+  });
+
+  M.bands.forEach(function(b){
+    var xa = Math.max(Lm, x(b.a)), xb = Math.min(W-Rm, x(b.b));
+    if(xb - xa < 1) return;
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" fill="var(--low)" fill-opacity=".13"/>');
+    if(xb - xa > 30) o.push('<text x="'+((xa+xb)/2).toFixed(1)+'" y="'+(Tm+12)+'" font-size="9.5" text-anchor="middle" style="fill:var(--low);letter-spacing:.08em">LOW</text>');
+  });
+
+  if(S.show.diff && S.show.body && S.show.local){
+    var gruns = [], gcur = null;
+    for(var gi2=0; gi2<M.pts.length; gi2++){
+      var gp = M.pts[gi2], gg = gp.E - gp.loc, gs = Math.abs(gg) < 0.25 ? 0 : (gg > 0 ? 1 : -1);
+      if(gs === 0){ gcur = null; continue; }
+      if(gcur && gcur.s === gs) gcur.e = gi2; else { gcur = {s:gs, a:gi2, e:gi2}; gruns.push(gcur); }
+    }
+    gruns.forEach(function(r){
+      if(r.e <= r.a) return;
+      var d = '';
+      for(var k=r.a; k<=r.e; k++) d += (k===r.a?'M':'L')+x(M.pts[k].t).toFixed(1)+' '+y(M.pts[k].cb).toFixed(1);
+      for(var k2=r.e; k2>=r.a; k2--) d += 'L'+x(M.pts[k2].t).toFixed(1)+' '+y(M.pts[k2].cl).toFixed(1);
+      o.push('<path d="'+d+'Z" style="fill:var('+(r.s>0?'--ahead':'--behind')+')" fill-opacity=".2" stroke="none"/>');
+    });
+  }
+
+  M.sleepAll.forEach(function(iv){
+    var xa = Math.max(Lm, x(iv.a)), xb = Math.min(W-Rm, x(iv.b));
+    if(xb - xa < 0.5) return;
+    var plan = iv.r.type==='plan';
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" fill="'+(plan?'url(#hatch)':'var(--sleep)')+'" fill-opacity="'+(plan?1:.17)+'"/>');
+  });
+
+  var pxH = PW/span, step = 24, cand = [1,2,3,6,12,24];
+  for(var ci=0; ci<cand.length; ci++){ if(cand[ci]*pxH >= 40){ step = cand[ci]; break; } }
+  var first = Math.ceil((M.t0/H + P)/step)*step - P;
+  var dateLabels = [];
+  for(var th = first; th*H <= M.t1 + 1; th += step){
+    var tt = th*H, xx = x(tt);
+    var hr = tod(tt,P), isMid = Math.abs(hr) < 1e-6 || Math.abs(hr-24) < 1e-6;
+    o.push('<line x1="'+xx.toFixed(1)+'" x2="'+xx.toFixed(1)+'" y1="'+Tm+'" y2="'+laneEnd+'" stroke="'+(isMid?'var(--line)':'var(--line-soft)')+'" stroke-width="1"/>');
+    o.push('<text x="'+xx.toFixed(1)+'" y="'+axisY+'" font-size="10.5" text-anchor="middle">'+pad(Math.round(hr)%24)+'</text>');
+    o.push('<text x="'+xx.toFixed(1)+'" y="'+(Tm-10)+'" font-size="10" text-anchor="middle" fill-opacity=".85">'+pad(Math.round(tod(tt,M.locAt(tt).off))%24)+'</text>');
+    if(isMid) dateLabels.push(tt);
+  }
+  var firstMid = dateLabels.length ? x(dateLabels[0]) : (W-Rm);
+  if(firstMid - Lm > 90) o.push('<text x="'+(Lm+2)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dayLbl(M.t0,P)+'</text>');
+  dateLabels.forEach(function(tt){
+    var xx = x(tt);
+    if(xx > W - Rm - 70) return;
+    o.push('<text x="'+(xx+4).toFixed(1)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dayLbl(tt+1000,P)+'</text>');
+  });
+  o.push('<text x="'+(Lm-6)+'" y="'+axisY+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end">HOME</text>');
+  o.push('<text x="'+(Lm-6)+'" y="'+(Tm-10)+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end" fill-opacity=".85">LOCAL</text>');
+
+  o.push('<line x1="'+Lm+'" x2="'+(W-Rm)+'" y1="'+y(25)+'" y2="'+y(25)+'" stroke="var(--low)" stroke-opacity=".5" stroke-dasharray="2 4"/>');
+
+  function path(key){
+    var d = '';
+    for(var i=0;i<M.pts.length;i++){ var p = M.pts[i]; d += (i?'L':'M')+x(p.t).toFixed(1)+' '+y(p[key]).toFixed(1); }
+    return d;
+  }
+  if(ghost && S.show.alert && ghost.t0===M.t0 && ghost.t1===M.t1 && ghost.A.length===M.pts.length){
+    var gd = '';
+    for(var gi=0; gi<ghost.A.length; gi++) gd += (gi?'L':'M')+x(M.pts[gi].t).toFixed(1)+' '+y(ghost.A[gi]).toFixed(1);
+    o.push('<path d="'+gd+'" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-opacity=".8" stroke-linejoin="round"/>');
+  }
+  if(S.show.pressure) o.push('<path d="'+path('sp')+'" fill="none" stroke="var(--press)" stroke-width="1.8" stroke-dasharray="1.5 3" stroke-linecap="round"/>');
+  if(S.show.local) o.push('<path d="'+path('cl')+'" fill="none" stroke="var(--local)" stroke-width="1.8" stroke-dasharray="6 4" stroke-linejoin="round"/>');
+  if(S.show.body)  o.push('<path d="'+path('cb')+'" fill="none" stroke="var(--body)" stroke-width="2" stroke-linejoin="round"/>');
+  if(S.show.alert) o.push('<path d="'+path('A')+'" fill="none" stroke="var(--alert)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>');
+
+  var now = Date.now();
+  if(now > M.t0 && now < M.t1){
+    var xn = x(now);
+    o.push('<line x1="'+xn.toFixed(1)+'" x2="'+xn.toFixed(1)+'" y1="'+Tm+'" y2="'+laneEnd+'" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3"/>');
+    o.push('<text x="'+(xn+4).toFixed(1)+'" y="'+(Tm+PH-6)+'" font-size="10" style="fill:var(--ink)">now</text>');
+  }
+
+  /* lanes */
+  var lanes = [[laneY,'SLEEP'],[lane2,'FLIGHT'],[lane3,'WHERE']];
+  if(hasCaff) lanes.push([lane4,NARROW?'CAFF':'CAFFEINE']);
+  lanes.forEach(function(l){
+    o.push('<text x="'+(Lm-6)+'" y="'+(l[0]+14)+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end">'+l[1]+'</text>');
+    o.push('<rect x="'+Lm+'" y="'+l[0]+'" width="'+PW+'" height="'+laneH+'" rx="4" fill="var(--field)" stroke="var(--line-soft)"/>');
+  });
+  S.rows.forEach(function(r){
+    if(r.type==='caffeine') return;
+    var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
+    if(!(b > a)) return;
+    var xa = Math.max(Lm, x(a)), xb = Math.min(W-Rm, x(b));
+    if(xb - xa < 0.5) return;
+    var w = xb - xa, ly = r.type==='flight' ? lane2 : laneY;
+    var fill = r.type==='flight' ? 'var(--flight)' : (r.type==='plan' ? 'url(#hatch)' : 'var(--sleep)');
+    var stroke = r.type==='plan' ? ' stroke="var(--sleep)" stroke-dasharray="4 3"' : '';
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+ly+'" width="'+w.toFixed(1)+'" height="'+laneH+'" rx="4" fill="'+fill+'"'+stroke+'><title>'+esc(r.label||'Untitled')+' · '+f1((b-a)/H)+' h</title></rect>');
+    var lbl = r.label || '';
+    if(lbl && w > lbl.length*6.2 + 12){
+      var tc = r.type==='plan' ? 'var(--ink)' : 'var(--on-bar)';
+      o.push('<text x="'+(xa+7).toFixed(1)+'" y="'+(ly+14)+'" font-size="10.5" style="fill:'+tc+'">'+esc(lbl)+'</text>');
+    }
+    if(r.type!=='flight' && w > 26){
+      var gc = r.type==='plan' ? 'var(--ink)' : 'var(--on-bar)';
+      if(x(a) >= Lm) o.push('<line x1="'+(xa+3.5).toFixed(1)+'" x2="'+(xa+3.5).toFixed(1)+'" y1="'+(ly+5)+'" y2="'+(ly+15)+'" stroke="'+gc+'" stroke-width="2" stroke-linecap="round" opacity=".85"/>');
+      if(x(b) <= W-Rm) o.push('<line x1="'+(xb-3.5).toFixed(1)+'" x2="'+(xb-3.5).toFixed(1)+'" y1="'+(ly+5)+'" y2="'+(ly+15)+'" stroke="'+gc+'" stroke-width="2" stroke-linecap="round" opacity=".85"/>');
+    }
+  });
+  M.segs.forEach(function(sg){
+    var xa = Math.max(Lm, x(sg.a)), xb = Math.min(W-Rm, x(sg.b));
+    if(xb - xa < 0.5) return;
+    var w = xb - xa;
+    var lbl = sg.fl ? 'in flight' : zname(sg.off);
+    o.push('<rect x="'+xa.toFixed(1)+'" y="'+lane3+'" width="'+w.toFixed(1)+'" height="'+laneH+'" rx="4" fill="'+(sg.fl?'var(--line)':'var(--line-soft)')+'" stroke="var(--line)"><title>'+lbl+(sg.fl?' to '+zname(sg.off):'')+'</title></rect>');
+    if(w > lbl.length*6.2 + 12) o.push('<text x="'+(xa+7).toFixed(1)+'" y="'+(lane3+14)+'" font-size="10.5" style="fill:var(--ink)">'+lbl+'</text>');
+  });
+  if(hasCaff) S.rows.forEach(function(r){
+    if(r.type!=='caffeine') return;
+    var t = toAbs(r.s,r.sz), mg = Math.max(0, +r.mg||0);
+    if(isNaN(t) || t < M.t0 || t > M.t1) return;
+    var xm = x(t);
+    o.push('<circle cx="'+xm.toFixed(1)+'" cy="'+(lane4+laneH/2)+'" r="6" style="fill:var(--caff)"><title>'+esc(r.label||'Caffeine')+' · '+mg+' mg</title></circle>');
+    o.push('<text x="'+(xm+10).toFixed(1)+'" y="'+(lane4+14)+'" font-size="10.5" style="fill:var(--ink)">'+mg+' mg</text>');
+  });
+
+  o.push('<line id="cLine" x1="0" x2="0" y1="'+Tm+'" y2="'+laneEnd+'" stroke="var(--ink)" stroke-width="1.2"/>');
+  o.push('<circle id="cDot" r="5" cx="0" cy="0" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>');
+  o.push('<rect id="hit" x="'+Lm+'" y="'+Tm+'" width="'+PW+'" height="'+(laneEnd-Tm)+'" fill="transparent"/>');
+
+  /* drag handles */
+  S.rows.forEach(function(r){
+    if(r.type!=='flight') return;
+    var fa = toAbs(r.s,r.sz), fb = toAbs(r.e,r.ez);
+    if(!(fb > fa)) return;
+    var fxa = Math.max(Lm, x(fa)), fxb = Math.min(W-Rm, x(fb));
+    if(fxb - fxa < 0.5) return;
+    o.push('<rect class="op" data-id="'+r.id+'" x="'+fxa.toFixed(1)+'" y="'+lane2+'" width="'+(fxb-fxa).toFixed(1)+'" height="'+laneH+'" fill="transparent"><title>Tap to edit '+esc(r.label||'flight')+'</title></rect>');
+  });
+  S.rows.forEach(function(r){
+    if(r.type==='flight') return;
+    if(r.type==='caffeine'){
+      var tc2 = toAbs(r.s,r.sz);
+      if(isNaN(tc2) || tc2 < M.t0 || tc2 > M.t1) return;
+      o.push('<rect class="dg dg-move" data-id="'+r.id+'" data-mode="move" x="'+(x(tc2)-9).toFixed(1)+'" y="'+lane4+'" width="18" height="'+laneH+'" fill="transparent"><title>Drag to move</title></rect>');
+      return;
+    }
+    var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
+    if(!(b > a)) return;
+    var xa = x(a), xb = x(b);
+    if(xb < Lm || xa > W-Rm) return;
+    var xs = Math.max(Lm, xa), xe = Math.min(W-Rm, xb), hw = 7;
+    o.push('<rect class="dg dg-move" data-id="'+r.id+'" data-mode="move" x="'+xs.toFixed(1)+'" y="'+laneY+'" width="'+(xe-xs).toFixed(1)+'" height="'+laneH+'" fill="transparent"><title>Drag to move '+esc(r.label||'sleep')+'</title></rect>');
+    if(xa >= Lm) o.push('<rect class="dg dg-edge" data-id="'+r.id+'" data-mode="start" x="'+(xa-hw).toFixed(1)+'" y="'+laneY+'" width="'+(hw*2)+'" height="'+laneH+'" fill="transparent"><title>Drag to change start</title></rect>');
+    if(xb <= W-Rm) o.push('<rect class="dg dg-edge" data-id="'+r.id+'" data-mode="end" x="'+(xb-hw).toFixed(1)+'" y="'+laneY+'" width="'+(hw*2)+'" height="'+laneH+'" fill="transparent"><title>Drag to change end</title></rect>');
+  });
+  if(drag && drag.t!=null){
+    var dl = hm(drag.t,S.home)+' '+zname(S.home)+' · '+hm(drag.t,M.locAt(drag.t).off)+' local';
+    var lw = dl.length*6.3 + 14, lx = Math.max(Lm, Math.min(W-Rm-lw, x(drag.t)-lw/2));
+    o.push('<g pointer-events="none"><rect x="'+lx.toFixed(1)+'" y="'+(laneY-24)+'" width="'+lw.toFixed(1)+'" height="18" rx="4" fill="var(--surface)" stroke="var(--ink)"/><text x="'+(lx+7).toFixed(1)+'" y="'+(laneY-11)+'" font-size="10.5" style="fill:var(--ink)">'+dl+'</text></g>');
+  }
+
+  svg.setAttribute('viewBox','0 0 '+W+' '+Ht);
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', Ht);
+  svg.innerHTML = o.join('');
+  placeCursor(curT);
+}
+
+function defaultCursorT(){
+  var now = Date.now();
+  if(now > M.t0 && now < M.t1) return now;
+  var best = M.pts[0];
+  M.pts.forEach(function(p){ if(p.A < best.A) best = p; });
+  return best.t;
+}
+function localLbl(p){ return hm(p.t, p.loc) + (p.fl ? ' in flight' : ' ' + zname(p.loc)); }
+function placeCursor(t){
+  if(!M || !G) return;
+  if(t==null || t < M.t0 || t > M.t1) t = defaultCursorT();
+  var p = ptAt(t);
+  var xx = G.x(p.t);
+  var yv = S.show.alert ? p.A : (S.show.body ? p.cb : (S.show.local ? p.cl : p.A));
+  var line = $('#cLine'), dot = $('#cDot');
+  if(line){ line.setAttribute('x1', xx); line.setAttribute('x2', xx); }
+  if(dot){ dot.setAttribute('cx', xx); dot.setAttribute('cy', G.y(yv)); }
+  $('#roDate').textContent = dayLbl(p.t, S.home);
+  $('#roHome').textContent = hm(p.t, S.home) + ' ' + zname(S.home);
+  $('#roLocal').textContent = localLbl(p);
+  $('#roA').textContent = Math.round(p.A);
+  $('#roC').textContent = Math.round(p.cb);
+  var gapH = p.E - p.loc;
+  $('#roGap').textContent = Math.abs(gapH) < 0.25 ? 'in sync' : f1(Math.abs(gapH)) + ' h ' + (gapH > 0 ? 'ahead' : 'behind');
+  $('#roS').textContent = Math.round(p.S*100) + '%';
+  $('#roK').textContent = p.mg >= 1 ? Math.round(p.mg) + ' mg' : 'none';
+  $('#roState').textContent = p.sl ? 'Asleep' : 'Awake' + (p.W >= 1 ? ' (inertia ' + MINUS + Math.round(p.W) + ')' : '');
+  $('#roSky').textContent = p.ni ? 'Night' : 'Day';
+}
+function pointerToT(e){
+  var svg = $('#chart'), r = svg.getBoundingClientRect();
+  var px = (e.clientX - r.left) * (G.W / r.width);
+  if(px < Lm || px > G.W - Rm) return null;
+  return M.t0 + (px - Lm)/G.PW*(M.t1 - M.t0);
+}
+function pointerT(e){
+  var svg = $('#chart'), r = svg.getBoundingClientRect();
+  var px = (e.clientX - r.left) * (G.W / r.width);
+  px = Math.max(Lm, Math.min(G.W - Rm, px));
+  return M.t0 + (px - Lm)/G.PW*(M.t1 - M.t0);
+}
+function rowById(id){ return S.rows.filter(function(x){ return x.id === id; })[0]; }
+function syncRowInputs(r){
+  if(edId === r.id){ $('#evS').value = r.s; $('#evE').value = r.e; }
+}
+function dragMove(e){
+  var r = rowById(drag.id);
+  if(!r || !M || !G) return;
+  if(!drag.moved){ drag.moved = true; ghost = drag.ghost; }
+  var t = pointerT(e), SNAP = 15*60000, MIN = 15*60000, a = drag.a0, b = drag.b0;
+  function snap(ms,off){ return Math.round((ms + off*H)/SNAP)*SNAP - off*H; }
+  if(drag.mode==='start'){ a = Math.min(snap(t, zoneOff(r.sz)), b - MIN); drag.t = a; }
+  else if(drag.mode==='end'){ b = Math.max(snap(t, zoneOff(r.ez)), a + MIN); drag.t = b; }
+  else {
+    var d = Math.round((t - drag.tp)/SNAP)*SNAP;
+    d = Math.max(M.t0 - drag.a0, Math.min(M.t1 - drag.b0, d));
+    a = drag.a0 + d; b = drag.b0 + d; drag.t = a;
+  }
+  r.s = iso(a + zoneOff(r.sz)*H);
+  r.e = r.type==='caffeine' ? r.s : iso(b + zoneOff(r.ez)*H);
+  syncRowInputs(r);
+  curT = drag.t;
+  render();
+}
+function onPointer(e){
+  if(!M || !G) return;
+  var t = pointerToT(e);
+  if(t==null) return;
+  curT = t; placeCursor(t);
+}
+
+/* ---------- stats ---------- */
+function renderStats(){
+  var box = $('#stats');
+  if(!M){ box.innerHTML = ''; $('#kpis').innerHTML = ''; return; }
+  var t0 = M.t0, t1 = M.t1, sleepM = M.sleepM;
+  var total = 0, logged = 0;
+  sleepM.forEach(function(iv){ total += overlap(iv[0],iv[1],t0,t1); });
+  merge(intervals(['sleep'])).forEach(function(iv){ logged += overlap(iv[0],iv[1],t0,t1); });
+  var planned = Math.max(0, total - logged);
+
+  var cursor = t0, best = {len:0, a:t0, b:t0};
+  sleepM.forEach(function(iv){
+    if(iv[1] <= t0 || iv[0] >= t1) return;
+    var gap = Math.max(iv[0],t0) - cursor;
+    if(gap > best.len) best = {len:gap, a:cursor, b:Math.max(iv[0],t0)};
+    cursor = Math.min(iv[1], t1);
+  });
+  if(t1 - cursor > best.len) best = {len:t1-cursor, a:cursor, b:t1};
+
+  var low = M.pts[0];
+  M.pts.forEach(function(p){ if(p.A < low.A) low = p; });
+
+  var h = '';
+  h += '<div class="stat"><div class="lab">Sleep in range</div><div class="v">'+f1(total/H)+' <small>h</small></div><div class="s">'+f1(logged/H)+' h slept · '+f1(planned/H)+' h planned</div></div>';
+  h += '<div class="stat"><div class="lab">Longest time awake</div><div class="v">'+f1(best.len/H)+' <small>h</small></div><div class="s">'+dowLbl(best.a,S.home)+' '+hm(best.a,S.home)+' → '+dowLbl(best.b,S.home)+' '+hm(best.b,S.home)+' home</div></div>';
+  h += '<div class="stat"><div class="lab">Lowest alertness index</div><div class="v">'+Math.round(low.A)+' <small>/ 100</small></div><div class="s">'+dowLbl(low.t,S.home)+' '+hm(low.t,S.home)+' home · '+hm(low.t,low.loc)+' local</div></div>';
+
+  var kp = '';
+  kp += '<div class="kpi"><div class="lab">Sleep</div><div class="v">'+f1(total/H)+' <small>h</small></div><div class="s">'+f1(logged/H)+' slept · '+f1(planned/H)+' planned</div></div>';
+  kp += '<div class="kpi"><div class="lab">Longest awake</div><div class="v">'+f1(best.len/H)+' <small>h</small></div><div class="s">ends '+dowLbl(best.b,S.home)+' '+hm(best.b,S.home)+'</div></div>';
+  kp += '<div class="kpi"><div class="lab">Lowest alertness</div><div class="v">'+Math.round(low.A)+' <small>/ 100</small></div><div class="s">'+dowLbl(low.t,S.home)+' '+hm(low.t,S.home)+' home</div></div>';
+  $('#kpis').innerHTML = kp;
+
+  var fl = intervals(['flight']).sort(function(p,q){ return p.a - q.a; });
+  if(fl.length){
+    h += '<ul class="flights">';
+    fl.forEach(function(f){
+      var lastWake = t0, inside = false;
+      M.sleepM.forEach(function(iv){
+        if(f.a >= iv[0] && f.a < iv[1]) inside = true;
+        else if(iv[1] <= f.a && iv[1] > lastWake) lastWake = iv[1];
+      });
+      var awake = inside ? 0 : (f.a - lastWake)/H;
+      var prior = 0;
+      var winStart = Math.max(t0, f.a-24*H), winH = Math.max(0,(f.a-winStart)/H);
+      M.sleepM.forEach(function(iv){ prior += overlap(iv[0],iv[1],winStart,f.a); });
+      var inLow = 0;
+      M.pts.forEach(function(p){ if(p.t >= f.a && p.t < f.b && p.lo) inLow += M.dt; });
+      var depLoc = M.locAt(f.a).off;
+      var depA = ptAt(f.a).A, minA = 101;
+      M.pts.forEach(function(p){ if(p.t >= f.a && p.t < f.b && p.A < minA) minA = p.A; });
+      if(minA > 100) minA = depA;
+      h += '<li><strong>'+esc(f.r.label||'Flight')+'</strong> <span class="m">Departs '+dowLbl(f.a,S.home)+' '+hm(f.a,S.home)+' home · '+hm(f.a,depLoc)+' local · '+f1((f.b-f.a)/H)+' h airborne</span>'+
+           '<span class="m">Awake '+f1(awake)+' h at departure · '+f1(prior/H)+' h sleep in the prior '+Math.round(winH)+' h · '+f1(inLow/H)+' h of flight inside the body-clock low</span>'+
+           '<span class="m">Alertness index '+Math.round(depA)+' at departure · lowest in flight '+Math.round(minA)+'</span></li>';
+    });
+    h += '</ul>';
+  }
+  box.innerHTML = h;
+}
+
+/* ---------- timeline and editor ---------- */
+var edId = null;
+var ICONS = {
+  sleep:'<svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+  flight:'<svg class="ic" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>',
+  caffeine:'<svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg>'
+};
+function zoneOptionsHTML(val){
+  var h = '<option value="home">Home · '+zname(S.home)+'</option><option value="local">Destination · '+zname(S.local)+'</option>';
+  var known = false;
+  ZONES.forEach(function(z){ var v = 'z:'+z.o; if(v===val) known = true; h += '<option value="'+v+'">'+z.n+' ('+z.a+')</option>'; });
+  if(val!=='home' && val!=='local' && !known) h += '<option value="'+esc(val)+'">'+fmtOff(zoneOff(val))+'</option>';
+  return h;
+}
+function fillZoneSelect(sel,val){ sel.innerHTML = zoneOptionsHTML(val); sel.value = val; }
+
+/* returns {when, sub} HTML for a row */
+function eventInfo(r){
+  var a = toAbs(r.s,r.sz);
+  var home = zname(S.home), loc = zname(S.local);
+  if(r.type==='caffeine'){
+    if(isNaN(a)) return {when:'<span class="bad">Pick a time.</span>', sub:''};
+    return {when:'<b>'+home+'</b> '+dowLbl(a,S.home)+' '+hm(a,S.home)+' · <b>'+loc+'</b> '+dowLbl(a,S.local)+' '+hm(a,S.local),
+            sub:(+r.mg||0)+' mg'};
+  }
+  var b = toAbs(r.e,r.ez);
+  if(!(b > a)) return {when:'<span class="bad">End is before start, so this is ignored.</span>', sub:''};
+  var sub = f1((b-a)/H)+' h';
+  if(r.type==='flight'){
+    sub += ' airborne · lands in ' + zname(zoneOff(r.land || 'local'));
+  } else if(M){
+    var bed = hhmmToH(S.bed), wake = hhmmToH(S.wake), n = 0, inN = 0;
+    M.pts.forEach(function(p){
+      if(p.t < a || p.t >= b) return;
+      n++;
+      if(habitSleeping(tod(p.t, p.E), bed, wake)) inN++;
+    });
+    if(n){
+      var pc = Math.round(100*inN/n);
+      sub += ' · <span class="'+(pc<50?'warn':'')+'">'+pc+'% inside your body-clock night</span>';
+    }
+  }
+  return {when:'<b>'+home+'</b> '+rangeStr(a,b,S.home)+' · <b>'+loc+'</b> '+rangeStr(a,b,S.local), sub:sub};
+}
+
+function renderList(){
+  var ul = $('#rows');
+  var list = S.rows.slice().sort(function(p,q){
+    var x = toAbs(p.s,p.sz), y2 = toAbs(q.s,q.sz);
+    return (isNaN(x)?1e18:x) - (isNaN(y2)?1e18:y2);
+  });
+  var h = '';
+  list.forEach(function(r){
+    var info = eventInfo(r);
+    var ic = r.type==='flight' ? ICONS.flight : (r.type==='caffeine' ? ICONS.caffeine : ICONS.sleep);
+    h += '<li><button type="button" class="ev t-'+r.type+'" data-id="'+r.id+'">'+
+      '<span class="ev-ico">'+ic+'</span>'+
+      '<span class="ev-title">'+esc(r.label || (r.type==='flight'?'Flight':r.type==='caffeine'?'Caffeine':'Sleep'))+'</span>'+
+      (r.type==='plan' ? '<span class="ev-badge">Planned</span>' : '<span></span>')+
+      '<span class="ev-meta">'+info.when+(info.sub?'<br>'+info.sub:'')+'</span></button></li>';
+  });
+  if(!list.length) h = '<li class="row-empty">Nothing here yet. Use Add to put in a sleep, a flight or a coffee.</li>';
+  ul.innerHTML = h;
+  $('#tlCount').textContent = list.length ? list.length + (list.length===1?' event':' events') + ' · tap to edit' : '';
+  if(edId !== null){ var er = rowById(edId); if(er) $('#evCap').innerHTML = capHTML(er); }
+}
+function capHTML(r){ var i = eventInfo(r); return i.when + (i.sub ? ' · ' + i.sub : ''); }
+
+function openDlg(d){ if(d.showModal){ try{ d.showModal(); return; }catch(err){} } d.setAttribute('open',''); }
+function closeDlg(d){ if(d.close){ try{ d.close(); return; }catch(err){} } d.removeAttribute('open'); }
+
+function openEditor(id){
+  var r = rowById(id); if(!r) return;
+  edId = id;
+  var isSleep = r.type==='sleep' || r.type==='plan', isFl = r.type==='flight', isCf = r.type==='caffeine';
+  $('#evTitle').textContent = isFl ? 'Flight' : (isCf ? 'Caffeine' : 'Sleep');
+  $('#evLabel').value = r.label || '';
+  $('#evStatusF').hidden = !isSleep;
+  document.querySelectorAll('#evStatusF button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.v === r.type); });
+  $('#evSL').textContent = isCf ? 'Time' : 'Start';
+  fillZoneSelect($('#evSZ'), r.sz); $('#evS').value = r.s;
+  $('#evEF').hidden = isCf;
+  fillZoneSelect($('#evEZ'), r.ez); $('#evE').value = r.e;
+  $('#evLandF').hidden = !isFl;
+  fillZoneSelect($('#evLand'), r.land || 'local');
+  $('#evMgF').hidden = !isCf;
+  $('#evMg').value = r.mg === undefined ? 100 : r.mg;
+  $('#evCap').innerHTML = capHTML(r);
+  openDlg($('#evDlg'));
+}
+
+function zoneValueAt(t){
+  var off = Math.round(M.locAt(t).off*2)/2;
+  if(off === S.home) return 'home';
+  if(off === S.local) return 'local';
+  return 'z:'+off;
+}
+function addEvent(kind){
+  var anchor = (M && curT != null && curT >= M.t0 && curT <= M.t1) ? curT : (M ? defaultCursorT() : toAbs(S.start.t, S.start.z));
+  if(isNaN(anchor)) anchor = Date.UTC(2026,9,10,12,0);
+  anchor = Math.round(anchor/(15*60000))*15*60000;
+  var z = M ? zoneValueAt(anchor) : 'home', off = zoneOff(z);
+  function at(ms){ return iso(ms + off*H); }
+  var r;
+  if(kind==='sleep') r = row('Sleep','plan', at(anchor), z, at(anchor + 8*H), z);
+  else if(kind==='nap') r = row('Nap','plan', at(anchor), z, at(anchor + 0.75*H), z);
+  else if(kind==='coffee') r = row('Coffee','caffeine', at(anchor), z, at(anchor), z, undefined, 100);
+  else {
+    var land = z==='home' ? 'local' : 'home', lz = land;
+    r = row('Flight','flight', at(anchor), z, iso(anchor + 8*H + zoneOff(lz)*H), lz, land);
+  }
+  S.rows.push(r);
+  render();
+  openEditor(r.id);
+}
+
+/* ---------- settings sync ---------- */
+function fillZonePicker(sel, off){
+  var h = '';
+  ZONES.forEach(function(z){ h += '<option value="'+z.o+'">'+z.n+' ('+z.a+')</option>'; });
+  h += '<option value="custom">Custom offset</option>';
+  sel.innerHTML = h;
+  sel.value = ZONES.some(function(z){ return z.o===off; }) ? String(off) : 'custom';
+}
+function syncSettings(){
+  fillZonePicker($('#homeSel'), S.home); $('#homeOff').value = S.home;
+  fillZonePicker($('#localSel'), S.local); $('#localOff').value = S.local;
+  fillZoneSelect($('#locSel'), S.startLoc);
+  $('#bed').value = S.bed; $('#wake').value = S.wake;
+  $('#light').value = S.light;
+  fillZoneSelect($('#startZ'), S.start.z); fillZoneSelect($('#endZ'), S.end.z);
+  $('#startT').value = S.start.t; $('#endT').value = S.end.t;
+  $('#showDiff').checked = !!S.show.diff;
+  syncDerived();
+}
+function syncEndField(){
+  var locked = !!(M && M.autoUsed);
+  $('#endAuto').checked = S.endAuto !== false;
+  $('#endT').disabled = locked; $('#endZ').disabled = locked;
+  $('#endT').value = locked ? iso(M.t1 + zoneOff(S.end.z)*H) : S.end.t;
+}
+function syncDerived(){
+  $('#lightOut').textContent = S.light+'%';
+  var moved = '';
+  if(M){
+    var last = M.pts[M.pts.length-1], d = last.E - S.home;
+    moved = ' Body clock shift by the chart end: '+(d>=0?'+':MINUS)+f1(Math.abs(d))+' h.';
+  }
+  $('#lightHint').textContent = 'Share of full daylight you get when awake with the sun up. Zero holds home time.'+moved;
+  document.querySelectorAll('.leg[data-k]').forEach(function(b){ b.setAttribute('aria-pressed', !!S.show[b.dataset.k]); });
+  $('#axesNote').textContent = 'Bottom: home clock ('+zname(S.home)+')  ·  Top: local clock';
+  var gl = $('#ghostLeg'); if(gl) gl.hidden = !(ghost && M && ghost.t0===M.t0 && ghost.t1===M.t1);
+  $('#diffLeg').hidden = !(S.show.diff && S.show.body && S.show.local);
+  $('#sumLine').textContent = 'Home '+zname(S.home)+' · Destination '+zname(S.local)+' · Usual sleep '+S.bed+' to '+S.wake+' · Light '+S.light+'%';
+  syncEndField();
+}
+
+function render(){
+  M = buildModel();
+  syncDerived();
+  renderChart();
+  renderStats();
+  renderList();
+  save();
+}
+
+
+/* ---------- backup and restore ---------- */
+function say(msg, isHtml){
+  var m = $('#dataMsg'); m.hidden = false;
+  if(isHtml) m.innerHTML = msg; else m.textContent = msg;
+}
+async function doBackup(){
+  var d = new Date(), name = 'body-clock-trip-' + d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + '.json';
+  var text = JSON.stringify({app:'body-clock-overlay', version:3, exported:d.toISOString(), state:S}, null, 1);
+  try{
+    var dl = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null;
+    if(dl){ await dl.save({filename:name, data:text}); say('Backup saved as ' + name + '.'); return; }
+  }catch(err){ if(err && err.code === 'declined'){ say('Backup cancelled.'); return; } }
+  try{
+    var file = new File([text], name, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); say('Backup shared. Choose Save to Files to keep it.'); return; }
+  }catch(err){ if(err && err.name === 'AbortError'){ say('Backup cancelled.'); return; } }
+  try{
+    var url = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+    var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    say('Backup downloaded as ' + name + '.');
+  }catch(err){ say('Could not create a backup file here.'); }
+}
+function startRestore(file){
+  var rd = new FileReader();
+  rd.onload = function(){
+    var o; try{ o = JSON.parse(rd.result); }catch(e){ say('That file is not a Body Clock backup.'); return; }
+    var st = o && o.state ? o.state : o;
+    if(!(st && st.v === 3 && validState(st))){ say('That file is not a Body Clock backup, or it comes from a different version.'); return; }
+    var n = st.rows.length;
+    say('Found a trip with ' + n + (n===1 ? ' event' : ' events') + '. Replace what is here? <button type="button" class="btn" id="rsYes">Replace</button><button type="button" class="btn quiet" id="rsNo">Cancel</button>', true);
+    $('#rsYes').onclick = function(){ S = fixState(st); curT = null; ghost = null; syncSettings(); render(); say('Trip restored.'); };
+    $('#rsNo').onclick = function(){ say('Restore cancelled.'); };
+  };
+  rd.onerror = function(){ say('Could not read that file.'); };
+  rd.readAsText(file);
+}
+
+/* ---------- events ---------- */
+function bind(){
+  function afterZoneChange(){
+    fillZoneSelect($('#startZ'), S.start.z); fillZoneSelect($('#endZ'), S.end.z);
+    fillZoneSelect($('#locSel'), S.startLoc);
+    render();
+  }
+  function zoneChange(selId, offId, key){
+    $(selId).addEventListener('change', function(){
+      var v = this.value;
+      if(v!=='custom'){ S[key] = parseFloat(v); $(offId).value = S[key]; }
+      afterZoneChange();
+    });
+    $(offId).addEventListener('input', function(){
+      var v = parseFloat(this.value);
+      if(isNaN(v) || v < -12 || v > 14) return;
+      S[key] = v;
+      $(selId).value = ZONES.some(function(z){ return z.o===v; }) ? String(v) : 'custom';
+      afterZoneChange();
+    });
+  }
+  zoneChange('#homeSel','#homeOff','home');
+  zoneChange('#localSel','#localOff','local');
+  $('#locSel').addEventListener('change', function(){ S.startLoc = this.value; render(); });
+
+  $('#bed').addEventListener('input', function(){ if(this.value){ S.bed = this.value; render(); } });
+  $('#wake').addEventListener('input', function(){ if(this.value){ S.wake = this.value; render(); } });
+  $('#light').addEventListener('input', function(){ S.light = +this.value; render(); });
+
+  document.querySelectorAll('.leg[data-k]').forEach(function(b){
+    b.addEventListener('click', function(){ S.show[this.dataset.k] = !S.show[this.dataset.k]; render(); });
+  });
+
+  $('#startT').addEventListener('input', function(){ S.start.t = this.value; render(); });
+  $('#endT').addEventListener('input', function(){ S.end.t = this.value; render(); });
+  $('#startZ').addEventListener('change', function(){ S.start.z = this.value; render(); });
+  $('#endZ').addEventListener('change', function(){ S.end.z = this.value; render(); });
+  $('#endAuto').addEventListener('change', function(){
+    S.endAuto = this.checked;
+    if(!this.checked && M) S.end.t = iso(M.t1 + zoneOff(S.end.z)*H);
+    render();
+  });
+
+  /* timeline list and editor */
+  $('#rows').addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('.ev');
+    if(b) openEditor(+b.dataset.id);
+  });
+  function ed(fn){ return function(){ var r = rowById(edId); if(!r) return; fn.call(this, r); render(); }; }
+  function cafSync(r){ if(r.type==='caffeine'){ r.e = r.s; r.ez = r.sz; } }
+  $('#evLabel').addEventListener('input', ed(function(r){ r.label = this.value; }));
+  $('#evS').addEventListener('input', ed(function(r){ r.s = this.value; cafSync(r); }));
+  $('#evSZ').addEventListener('change', ed(function(r){ r.sz = this.value; cafSync(r); }));
+  $('#evE').addEventListener('input', ed(function(r){ r.e = this.value; }));
+  $('#evEZ').addEventListener('change', ed(function(r){ r.ez = this.value; }));
+  $('#evLand').addEventListener('change', ed(function(r){ r.land = this.value; }));
+  $('#evMg').addEventListener('input', ed(function(r){ r.mg = this.value; }));
+  $('#evChips').addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('button[data-mg]');
+    var r = rowById(edId); if(!b || !r) return;
+    r.mg = +b.dataset.mg; $('#evMg').value = r.mg; render();
+  });
+  document.querySelectorAll('#evStatusF button').forEach(function(b){
+    b.addEventListener('click', function(){
+      var r = rowById(edId); if(!r) return;
+      r.type = this.dataset.v;
+      document.querySelectorAll('#evStatusF button').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.v === r.type); });
+      render();
+    });
+  });
+  $('#evDel').addEventListener('click', function(){
+    S.rows = S.rows.filter(function(x){ return x.id !== edId; });
+    closeDlg($('#evDlg')); render();
+  });
+  $('#evDlg').addEventListener('close', function(){ edId = null; });
+
+  /* dialogs: close buttons and backdrop taps */
+  ['#setDlg','#evDlg','#logDlg'].forEach(function(sel){
+    var d = $(sel);
+    d.addEventListener('click', function(e){ if(e.target === d) closeDlg(d); });
+    d.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click', function(){ closeDlg(d); }); });
+  });
+  function showTab(name){
+    document.querySelectorAll('#logDlg [role=tab]').forEach(function(b){ b.setAttribute('aria-selected', String(b.dataset.tab === name)); });
+    $('#tabEvents').hidden = name !== 'events'; $('#tabSummary').hidden = name !== 'summary';
+  }
+  document.querySelectorAll('#logDlg [role=tab]').forEach(function(b){ b.addEventListener('click', function(){ showTab(this.dataset.tab); }); });
+  $('#quickAdd').addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-add]');
+    if(b) addEvent(b.dataset.add);
+  });
+  $('#logBtn').addEventListener('click', function(){ closeMenu(); showTab('events'); openDlg($('#logDlg')); });
+  $('#setBtn').addEventListener('click', function(){ closeMenu(); syncSettings(); openDlg($('#setDlg')); });
+  $('#verLine').textContent = 'Version: ' + BUILD;
+  $('#expBtn').addEventListener('click', doBackup);
+  $('#impBtn').addEventListener('click', function(){ $('#impFile').click(); });
+  $('#impFile').addEventListener('change', function(){ var f = this.files && this.files[0]; if(f) startRestore(f); this.value = ''; });
+  $('#showDiff').addEventListener('change', function(){ S.show.diff = this.checked; render(); });
+
+  /* add menu */
+  var menu = $('#addMenu'), addBtn = $('#addBtn');
+  function closeMenu(){ menu.hidden = true; addBtn.setAttribute('aria-expanded','false'); }
+  addBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    var open = menu.hidden;
+    menu.hidden = !open; addBtn.setAttribute('aria-expanded', String(open));
+    if(open){ var f = menu.querySelector('button'); if(f) f.focus(); }
+  });
+  menu.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-add]');
+    if(!b) return;
+    closeMenu(); addEvent(b.dataset.add);
+  });
+  document.addEventListener('click', function(e){ if(!menu.hidden && !e.target.closest('.addwrap')) closeMenu(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !menu.hidden){ closeMenu(); addBtn.focus(); } });
+
+  var resetBtn = $('#resetBtn'), resetTimer = null;
+  resetBtn.addEventListener('click', function(){
+    if(!resetTimer){
+      resetBtn.textContent = 'Click again to reset';
+      resetTimer = setTimeout(function(){ resetBtn.textContent = 'Reset to example trip'; resetTimer = null; }, 3500);
+      return;
+    }
+    clearTimeout(resetTimer); resetTimer = null;
+    resetBtn.textContent = 'Reset to example trip';
+    S = defaults(); curT = null; ghost = null;
+    syncSettings(); render();
+  });
+
+  var svg = $('#chart');
+  svg.addEventListener('pointerdown', function(e){
+    var el = e.target;
+    if(el.classList && el.classList.contains('dg') && M && G){
+      var r = rowById(+el.dataset.id);
+      if(!r) return;
+      var a0 = toAbs(r.s,r.sz);
+      drag = {id:r.id, mode:el.dataset.mode, a0:a0, b0:r.type==='caffeine' ? a0 : toAbs(r.e,r.ez), tp:pointerT(e), t:null,
+              ghost:{t0:M.t0, t1:M.t1, A:M.pts.map(function(p){ return p.A; })}};
+      try{ svg.setPointerCapture(e.pointerId); }catch(err){}
+      svg.classList.add('dragging');
+      e.preventDefault();
+      return;
+    }
+    onPointer(e);
+  });
+  svg.addEventListener('pointermove', function(e){ if(drag) dragMove(e); else onPointer(e); });
+  function endDrag(e){
+    if(!drag) return;
+    var tapId = drag.moved ? null : drag.id;
+    drag = null;
+    svg.classList.remove('dragging');
+    try{ svg.releasePointerCapture(e.pointerId); }catch(err){}
+    render();
+    if(tapId !== null && e.type === 'pointerup') openEditor(tapId);
+  }
+  svg.addEventListener('click', function(e){
+    var el = e.target;
+    if(el.classList && el.classList.contains('op')) openEditor(+el.dataset.id);
+  });
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+
+  var rt = null, lastW = 0;
+  function onResize(){
+    var w = $('#chartWrap').clientWidth;
+    if(w === lastW) return;
+    lastW = w;
+    clearTimeout(rt); rt = setTimeout(function(){ if(M) renderChart(); }, 80);
+  }
+  if(window.ResizeObserver) new ResizeObserver(onResize).observe($('#chartWrap'));
+  else window.addEventListener('resize', onResize);
+}
+
+syncSettings();
+bind();
+render();
+})();
+</script>
+
+<script>
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+</script>
+
+</body>
+</html>
