@@ -453,6 +453,8 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dd>A 24 h wave plus a 12 h harmonic for the early-afternoon dip, scaled 0 to 1. The lowest point sits 1 h after the core-temperature minimum, which is placed 2.5 h before your usual wake time. The 0.64 / 0.36 weights come from the relative size of the homeostatic and circadian terms in the two-process model (swings of about 0.43 and 0.24).</dd>
       <dt>W: sleep inertia</dt>
       <dd>After each wake-up, up to 22 points are subtracted, fading with a 0.6 h time constant. The amount grows with sleep length as 1 − e^(−hours / τ), where τ = 1.8 − 1.3 × (sleep pressure when you fell asleep). With high pressure you reach deep sleep sooner, so a short sleep after a long wake costs more than the same nap after a short wake. It is also worse when you wake near the circadian low. Sleep stages are not modelled.</dd>
+      <dt>While asleep</dt>
+      <dd>The alertness line is not drawn during sleep. The formula only describes someone who is awake, so it has no meaning for a sleeping person. The line restarts at wake-up, and the dip there is the sleep inertia.</dd>
       <dt>K: caffeine</dt>
       <dd>One-compartment model for a 75 kg adult: absorption rate 3 per hour, half-life 5 h, distribution volume 45 L. The boost is up to +16 points at a typical sleep pressure (half of that at 3 mg/L, which is roughly a 130 mg dose at its peak). It is scaled by 0.5 + sleep pressure, because caffeine blocks the adenosine that builds up while you are awake: about 0.7× when rested and 1.3× after a long wake. The same concentration cuts sleep recovery by up to 30%.</dd>
       <dt>Body-clock shifts</dt>
@@ -575,7 +577,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 1';
+var BUILD = '10 Oct 2026 · build 2';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -935,20 +937,28 @@ function renderChart(){
 
   o.push('<line x1="'+Lm+'" x2="'+(W-Rm)+'" y1="'+y(25)+'" y2="'+y(25)+'" stroke="var(--low)" stroke-opacity=".5" stroke-dasharray="2 4"/>');
 
-  function path(key){
-    var d = '';
-    for(var i=0;i<M.pts.length;i++){ var p = M.pts[i]; d += (i?'L':'M')+x(p.t).toFixed(1)+' '+y(p[key]).toFixed(1); }
+  function path(key, gapAsleep){
+    var d = '', pen = false;
+    for(var i=0;i<M.pts.length;i++){
+      var p = M.pts[i];
+      if(gapAsleep && p.sl){ pen = false; continue; }
+      d += (pen?'L':'M')+x(p.t).toFixed(1)+' '+y(p[key]).toFixed(1); pen = true;
+    }
     return d;
   }
   if(ghost && S.show.alert && ghost.t0===M.t0 && ghost.t1===M.t1 && ghost.A.length===M.pts.length){
     var gd = '';
-    for(var gi=0; gi<ghost.A.length; gi++) gd += (gi?'L':'M')+x(M.pts[gi].t).toFixed(1)+' '+y(ghost.A[gi]).toFixed(1);
+    var gpen = false;
+    for(var gi=0; gi<ghost.A.length; gi++){
+      if(ghost.sl[gi]){ gpen = false; continue; }
+      gd += (gpen?'L':'M')+x(M.pts[gi].t).toFixed(1)+' '+y(ghost.A[gi]).toFixed(1); gpen = true;
+    }
     o.push('<path d="'+gd+'" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-opacity=".8" stroke-linejoin="round"/>');
   }
   if(S.show.pressure) o.push('<path d="'+path('sp')+'" fill="none" stroke="var(--press)" stroke-width="1.8" stroke-dasharray="1.5 3" stroke-linecap="round"/>');
   if(S.show.local) o.push('<path d="'+path('cl')+'" fill="none" stroke="var(--local)" stroke-width="1.8" stroke-dasharray="6 4" stroke-linejoin="round"/>');
   if(S.show.body)  o.push('<path d="'+path('cb')+'" fill="none" stroke="var(--body)" stroke-width="2" stroke-linejoin="round"/>');
-  if(S.show.alert) o.push('<path d="'+path('A')+'" fill="none" stroke="var(--alert)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>');
+  if(S.show.alert) o.push('<path d="'+path('A',true)+'" fill="none" stroke="var(--alert)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>');
 
   var now = Date.now();
   if(now > M.t0 && now < M.t1){
@@ -1049,7 +1059,7 @@ function defaultCursorT(){
   var now = Date.now();
   if(now > M.t0 && now < M.t1) return now;
   var best = M.pts[0];
-  M.pts.forEach(function(p){ if(p.A < best.A) best = p; });
+  M.pts.forEach(function(p){ if(!p.sl && (best.sl || p.A < best.A)) best = p; });
   return best.t;
 }
 function localLbl(p){ return hm(p.t, p.loc) + (p.fl ? ' in flight' : ' ' + zname(p.loc)); }
@@ -1058,14 +1068,14 @@ function placeCursor(t){
   if(t==null || t < M.t0 || t > M.t1) t = defaultCursorT();
   var p = ptAt(t);
   var xx = G.x(p.t);
-  var yv = S.show.alert ? p.A : (S.show.body ? p.cb : (S.show.local ? p.cl : p.A));
+  var yv = (S.show.alert && !p.sl) ? p.A : (S.show.body ? p.cb : (S.show.local ? p.cl : (p.sl ? null : p.A)));
   var line = $('#cLine'), dot = $('#cDot');
   if(line){ line.setAttribute('x1', xx); line.setAttribute('x2', xx); }
-  if(dot){ dot.setAttribute('cx', xx); dot.setAttribute('cy', G.y(yv)); }
+  if(dot){ dot.setAttribute('cx', xx); if(yv === null) dot.setAttribute('visibility','hidden'); else { dot.setAttribute('visibility','visible'); dot.setAttribute('cy', G.y(yv)); } }
   $('#roDate').textContent = dayLbl(p.t, S.home);
   $('#roHome').textContent = hm(p.t, S.home) + ' ' + zname(S.home);
   $('#roLocal').textContent = localLbl(p);
-  $('#roA').textContent = Math.round(p.A);
+  $('#roA').textContent = p.sl ? 'asleep' : Math.round(p.A);
   $('#roC').textContent = Math.round(p.cb);
   var gapH = p.E - p.loc;
   $('#roGap').textContent = Math.abs(gapH) < 0.25 ? 'in sync' : f1(Math.abs(gapH)) + ' h ' + (gapH > 0 ? 'ahead' : 'behind');
@@ -1136,7 +1146,7 @@ function renderStats(){
   if(t1 - cursor > best.len) best = {len:t1-cursor, a:cursor, b:t1};
 
   var low = M.pts[0];
-  M.pts.forEach(function(p){ if(p.A < low.A) low = p; });
+  M.pts.forEach(function(p){ if(!p.sl && (low.sl || p.A < low.A)) low = p; });
 
   var h = '';
   h += '<div class="stat"><div class="lab">Sleep in range</div><div class="v">'+f1(total/H)+' <small>h</small></div><div class="s">'+f1(logged/H)+' h slept · '+f1(planned/H)+' h planned</div></div>';
@@ -1166,7 +1176,7 @@ function renderStats(){
       M.pts.forEach(function(p){ if(p.t >= f.a && p.t < f.b && p.lo) inLow += M.dt; });
       var depLoc = M.locAt(f.a).off;
       var depA = ptAt(f.a).A, minA = 101;
-      M.pts.forEach(function(p){ if(p.t >= f.a && p.t < f.b && p.A < minA) minA = p.A; });
+      M.pts.forEach(function(p){ if(p.t >= f.a && p.t < f.b && !p.sl && p.A < minA) minA = p.A; });
       if(minA > 100) minA = depA;
       h += '<li><strong>'+esc(f.r.label||'Flight')+'</strong> <span class="m">Departs '+dowLbl(f.a,S.home)+' '+hm(f.a,S.home)+' home · '+hm(f.a,depLoc)+' local · '+f1((f.b-f.a)/H)+' h airborne</span>'+
            '<span class="m">Awake '+f1(awake)+' h at departure · '+f1(prior/H)+' h sleep in the prior '+Math.round(winH)+' h · '+f1(inLow/H)+' h of flight inside the body-clock low</span>'+
@@ -1519,7 +1529,7 @@ function bind(){
       if(!r) return;
       var a0 = toAbs(r.s,r.sz);
       drag = {id:r.id, mode:el.dataset.mode, a0:a0, b0:r.type==='caffeine' ? a0 : toAbs(r.e,r.ez), tp:pointerT(e), t:null,
-              ghost:{t0:M.t0, t1:M.t1, A:M.pts.map(function(p){ return p.A; })}};
+              ghost:{t0:M.t0, t1:M.t1, A:M.pts.map(function(p){ return p.A; }), sl:M.pts.map(function(p){ return p.sl; })}};
       try{ svg.setPointerCapture(e.pointerId); }catch(err){}
       svg.classList.add('dragging');
       e.preventDefault();
