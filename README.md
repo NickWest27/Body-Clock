@@ -6,7 +6,9 @@ Everything runs in the browser. Your trips are stored on your own device and are
 
 ## Plan sleep
 
-Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the van pickup time (on the clock you choose, local by default), how long you need to get ready and the earliest you can go to bed. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness from pickup to landing. **Add to plan** puts it on the chart as a planned block you can still slide.
+Enter your real flights, naps and sleeps, then tap **Plan sleep**. For an upcoming flight, give it the van pickup time (on the clock you choose, local by default), how long you need to get ready and the earliest you can go to bed. With no flight ahead, choose "No flight, just a wake-up time" and it aims at the 8 hours after you get up. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness. **Add to plan** puts it on the chart as a planned block you can still slide.
+
+A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.
 
 ## Warnings
 

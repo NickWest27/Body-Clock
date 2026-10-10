@@ -383,7 +383,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <div class="warn-list" id="warnList" hidden></div>
       <div class="warn-box" id="warnBox" role="status" hidden>
         <div id="warnLines"></div>
-        <div class="warn-rec">Recommend you plan a nap. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
+        <div class="warn-rec">Recommend you plan a sleep. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
       </div>
     </div>
     <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
@@ -485,7 +485,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>W: sleep inertia</dt>
       <dd>After each wake-up, up to 22 points are subtracted, fading with a 0.6 h time constant. The amount grows with sleep length as 1 − e^(−hours / τ), where τ = 1.8 − 1.3 × (sleep pressure when you fell asleep). With high pressure you reach deep sleep sooner, so a short sleep after a long wake costs more than the same nap after a short wake. It is also worse when you wake near the circadian low. Sleep stages are not modelled.</dd>
       <dt>Plan sleep</dt>
-      <dd>Takes your van pickup time and get-ready time as the latest wake-up. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
+      <dd>Takes your van pickup time and get-ready time as the latest wake-up. With no flight ahead it uses a wake-up time you choose and aims at the 8 hours after it. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
       <dt>Warnings</dt>
       <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The list under the readout keeps every flagged stretch, past and future, with the past in grey. A planned nap that fixes the problem makes the warning go away.</dd>
       <dt>While asleep</dt>
@@ -516,12 +516,11 @@ dialog.tall .dlg-body{flex:1;min-height:0}
   <div class="dlg-in">
     <div class="dlg-head"><h2 id="planTitle">Plan sleep</h2><button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
     <div class="dlg-body">
-      <p class="hint" id="plNone" hidden style="margin:0">Add a flight first. The plan aims your sleep at the flight you choose.</p>
       <div id="plForm" class="plan-form">
-        <div id="plFlF"><label for="plFl">Flight to be sharp for</label><select id="plFl"></select></div>
-        <div><label for="plPick">Van pickup</label><div class="tz"><input id="plPick" type="datetime-local"><select id="plZ" aria-label="Clock for the times below"></select></div></div>
+        <div id="plFlF"><label for="plFl">Be sharp for</label><select id="plFl"></select></div>
+        <div><label for="plPick" id="plPickL">Van pickup</label><div class="tz"><input id="plPick" type="datetime-local"><select id="plZ" aria-label="Clock for the times below"></select></div></div>
         <div class="plan-two">
-          <div><label for="plPrep">Get ready (min)</label><input id="plPrep" type="number" min="0" max="240" step="5"></div>
+          <div id="plPrepF"><label for="plPrep">Get ready (min)</label><input id="plPrep" type="number" min="0" max="240" step="5"></div>
           <div><label for="plEarly">Earliest bedtime</label><input id="plEarly" type="datetime-local"></div>
         </div>
         <p class="hint" id="plHint" style="margin:0"></p>
@@ -547,6 +546,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
     </div>
     <div class="dlg-foot">
       <button class="btn danger" id="evDel" type="button">Delete</button>
+      <button class="btn" id="evAuto" type="button" hidden>Auto plan</button>
       <button class="btn primary" type="button" data-close>Done</button>
     </div>
   </div>
@@ -636,7 +636,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 7';
+var BUILD = '10 Oct 2026 · build 8';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1403,6 +1403,7 @@ function openEditor(id){
   $('#evTitle').textContent = isFl ? 'Flight' : (isCf ? 'Caffeine' : 'Sleep');
   $('#evLabel').value = r.label || '';
   $('#evStatusF').hidden = !isSleep;
+  $('#evAuto').hidden = r.type !== 'plan';
   document.querySelectorAll('#evStatusF button').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.v === r.type); });
   $('#evSL').textContent = isCf ? 'Time' : 'Start';
   fillZoneSelect($('#evSZ'), r.sz); $('#evS').value = r.s;
@@ -1422,8 +1423,8 @@ function zoneValueAt(t){
   if(off === S.local) return 'local';
   return 'z:'+off;
 }
-function addEvent(kind){
-  var anchor = (M && curT != null && curT >= M.t0 && curT <= M.t1) ? curT : (M ? defaultCursorT() : toAbs(S.start.t, S.start.z));
+function addEvent(kind, anchorOverride){
+  var anchor = anchorOverride ? anchorOverride : ((M && curT != null && curT >= M.t0 && curT <= M.t1) ? curT : (M ? defaultCursorT() : toAbs(S.start.t, S.start.z)));
   if(isNaN(anchor)) anchor = Date.UTC(2026,9,10,12,0);
   anchor = Math.round(anchor/(15*60000))*15*60000;
   var z = M ? zoneValueAt(anchor) : 'home', off = zoneOff(z);
@@ -1495,30 +1496,34 @@ function render(){
 
 
 /* ---------- sleep planner ---------- */
-var PL = {run:0, best:null, replaced:0, zone:'local'};
-var PL_STEP = 30*60000, PL_FINE = 15*60000, PL_MINDUR = 30*60000;
+var PL = {run:0, best:null, replaced:0, zone:'local', target:null};
+var PL_STEP = 30*60000, PL_FINE = 15*60000, PL_MINDUR = 30*60000, PL_AFTER = 8*H;
 
 function planFlights(){
-  var all = intervals(['flight']).sort(function(p,q){ return p.a - q.a; }), now = Date.now();
-  var up = all.filter(function(f){ return f.a > now; });
-  return up.length ? up : all;
+  var now = Date.now();
+  return intervals(['flight']).filter(function(f){ return f.a > now; }).sort(function(p,q){ return p.a - q.a; });
 }
+function planMode(){ return $('#plFl').value === 'none' ? 'none' : 'flight'; }
 function planFlight(){
-  var fl = planFlights(), id = +$('#plFl').value;
-  return fl.filter(function(f){ return f.r.id === id; })[0] || fl[0] || null;
+  var id = +$('#plFl').value;
+  return planFlights().filter(function(f){ return f.r.id === id; })[0] || null;
 }
 function planInputs(){
-  var f = planFlight(); if(!f) return null;
+  var mode = planMode(), f = mode === 'flight' ? planFlight() : null;
+  if(mode === 'flight' && !f) return null;
   var z = $('#plZ').value || 'local', off = zoneOff(z);
   var pickup = toAbs($('#plPick').value, z), early = toAbs($('#plEarly').value, z);
-  var prep = Math.max(0, Math.min(240, +$('#plPrep').value || 0));
-  return {f:f, z:z, off:off, pickup:pickup, early:early, prep:prep, deadline:pickup - prep*60000};
+  var prep = mode === 'none' ? 0 : Math.max(0, Math.min(240, +$('#plPrep').value || 0));
+  return {mode:mode, f:f, z:z, off:off, pickup:pickup, early:early, prep:prep, deadline:pickup - prep*60000,
+          winA:pickup, winB:mode === 'flight' ? f.b : pickup + PL_AFTER};
 }
 function planBase(q){
+  var target = PL.target !== null ? rowById(PL.target) : null;
   return S.rows.filter(function(r){
+    if(r === target) return false;
     if(r.type !== 'plan') return true;
     var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
-    return !(b > q.early && a < q.pickup);
+    return !(b > q.early && a < q.winA);
   });
 }
 function planMsg(html, bad){
@@ -1529,44 +1534,69 @@ function planClear(){ $('#plOut').hidden = true; $('#plApply').hidden = true; PL
 function planReset(){ var b = $('#plGo'); b.disabled = false; b.textContent = 'Find best sleep'; }
 function planHint(){
   var q = planInputs(); if(!q) return;
-  $('#plHint').textContent = (isNaN(q.pickup) || isNaN(q.early)) ? 'Pick a pickup time and an earliest bedtime.' :
-    'Both times use the clock chosen above. You must be up by ' + dowLbl(q.deadline,q.off) + ' ' + hm(q.deadline,q.off) + ' ' + zname(q.off) + ', which is ' + q.prep + ' min before pickup.';
+  var bad = isNaN(q.pickup) || isNaN(q.early);
+  $('#plHint').textContent = bad ? (q.mode === 'none' ? 'Pick a wake-up time and an earliest bedtime.' : 'Pick a pickup time and an earliest bedtime.') :
+    'Both times use the clock chosen above. ' + (q.mode === 'none'
+      ? 'The plan aims at the 8 hours after you get up.'
+      : 'You must be up by ' + dowLbl(q.deadline,q.off) + ' ' + hm(q.deadline,q.off) + ' ' + zname(q.off) + ', which is ' + q.prep + ' min before pickup.');
 }
 function planEarlyDefault(){
-  var q = planInputs(); if(!q || isNaN(q.pickup)) return;
+  var q = planInputs(); if(!q) return;
   var t0 = toAbs(S.start.t, S.start.z), e = Math.max(Math.ceil(Date.now()/PL_FINE)*PL_FINE, t0);
   $('#plEarly').value = iso(e + q.off*H);
 }
 /* the clock you are on when the van comes: where the trip timeline puts you 2 h before departure */
-function planZoneFor(f){ return M ? zoneValueAt(f.a - 2*H) : (f.r.sz || 'local'); }
+function planZoneFor(f){ return M ? zoneValueAt(f.a - 2*H) : 'local'; }
+function planZoneNow(){ return M ? zoneValueAt(Date.now()) : 'local'; }
 function planFillZone(z){ fillZoneSelect($('#plZ'), z); PL.zone = z; }
 function planPickDefault(f, z){ return iso(f.a - 2*H + zoneOff(z)*H); }
-function openPlan(){
-  var fl = planFlights();
-  $('#plForm').hidden = !fl.length; $('#plNone').hidden = fl.length > 0;
-  planClear(); planReset();
-  if(fl.length){
-    var sel = $('#plFl'), h = '';
-    fl.forEach(function(f){
-      var off = zoneOff(planZoneFor(f));
-      h += '<option value="'+f.r.id+'">'+esc(f.r.label || 'Flight')+' · '+dowLbl(f.a,off)+' '+hm(f.a,off)+' '+zname(off)+'</option>';
-    });
-    sel.innerHTML = h;
-    var p = S.plan, pick = (p && fl.filter(function(f){ return f.r.id === p.fid; })[0]) || fl[0];
-    sel.value = String(pick.r.id);
-    $('#plFlF').hidden = fl.length < 2;
-    var pz = p && p.z ? p.z : null;
-    var keep = p && p.fid === pick.r.id && p.pickup && pz && toAbs(p.pickup, pz) < pick.a;
-    var z = keep ? pz : planZoneFor(pick);
+/* with no flight ahead: your usual wake-up clock time, at least 3 h from now */
+function planWakeDefault(z){
+  var off = zoneOff(z), loc = Date.now() + 3*H + off*H;
+  var tgt = Math.floor(loc/(24*H))*24*H + hhmmToH(S.wake)*H;
+  if(tgt < loc) tgt += 24*H;
+  return iso(tgt);
+}
+function planApplyMode(fresh){
+  var mode = planMode(), f = planFlight();
+  $('#plPickL').textContent = mode === 'none' ? 'Be up by' : 'Van pickup';
+  $('#plPrepF').hidden = mode === 'none';
+  if(fresh){
+    var z = mode === 'none' ? planZoneNow() : planZoneFor(f);
     planFillZone(z);
-    $('#plPick').value = keep ? p.pickup : planPickDefault(pick, z);
-    $('#plPrep').value = (p && p.prep !== undefined) ? p.prep : 60;
-    planEarlyDefault(); planHint();
+    $('#plPick').value = mode === 'none' ? planWakeDefault(z) : planPickDefault(f, z);
+    planEarlyDefault();
   }
+  planHint();
+}
+function openPlan(targetId){
+  PL.target = (typeof targetId === 'number') ? targetId : null;
+  var fl = planFlights();
+  planClear(); planReset();
+  var sel = $('#plFl'), h = '';
+  fl.forEach(function(f){
+    var off = zoneOff(planZoneFor(f));
+    h += '<option value="'+f.r.id+'">'+esc(f.r.label || 'Flight')+' · '+dowLbl(f.a,off)+' '+hm(f.a,off)+' '+zname(off)+'</option>';
+  });
+  h += '<option value="none">No flight, just a wake-up time</option>';
+  sel.innerHTML = h;
+  $('#plFlF').hidden = fl.length === 0;
+  var p = S.plan, pick = null, mode = 'none';
+  if(fl.length){
+    pick = (p && fl.filter(function(f){ return f.r.id === p.fid; })[0]) || fl[0];
+    mode = (p && p.fid === 'none') ? 'none' : 'flight';
+  }
+  sel.value = mode === 'none' ? 'none' : String(pick.r.id);
+  var pz = p && p.z ? p.z : null;
+  var keep = !!(p && pz && p.pickup && (mode === 'none' ? p.fid === 'none' && toAbs(p.pickup, pz) > Date.now() + H
+                                                         : p.fid === pick.r.id && toAbs(p.pickup, pz) < pick.a));
+  if(keep){ planFillZone(pz); $('#plPick').value = p.pickup; planEarlyDefault(); }
+  $('#plPrep').value = (p && p.prep !== undefined && p.prep !== null) ? p.prep : 60;
+  planApplyMode(!keep);
   openDlg($('#planDlg'));
 }
 
-/* score one candidate sleep (a,b absolute ms, or null for no extra sleep) */
+/* score one candidate sleep (a,b absolute ms, or 0,0 for no extra sleep) */
 function planEval(ctx, a, b, keep){
   var sr = S.rows, sa = S.endAuto, se = S.end, m = null;
   var rows = ctx.base.slice();
@@ -1578,7 +1608,7 @@ function planEval(ctx, a, b, keep){
   var n = 0, sum = 0, min = 101;
   for(var i=0;i<m.pts.length;i++){
     var p = m.pts[i];
-    if(p.t < ctx.q.pickup || p.t > ctx.q.f.b || p.sl) continue;
+    if(p.t < ctx.q.winA || p.t > ctx.q.winB || p.sl) continue;
     n++; sum += p.A; if(p.A < min) min = p.A;
   }
   if(!n) return null;
@@ -1595,18 +1625,19 @@ function planFits(ctx, a, b){
 }
 function planRun(){
   var q = planInputs();
-  if(!q || isNaN(q.pickup) || isNaN(q.early)){ planMsg('Pick a pickup time and an earliest bedtime.', true); return; }
+  if(!q || isNaN(q.pickup) || isNaN(q.early)){ planMsg(q && q.mode === 'none' ? 'Pick a wake-up time and an earliest bedtime.' : 'Pick a pickup time and an earliest bedtime.', true); return; }
   q.early = Math.ceil(q.early/PL_FINE)*PL_FINE;
   if(q.deadline - q.early < H){ planMsg('There is less than 1 h between your earliest bedtime and the time you must be up, so there is no window to recommend.', true); return; }
-  S.plan = {fid:q.f.r.id, pickup:$('#plPick').value, z:q.z, prep:q.prep}; save();
+  S.plan = {fid:q.mode === 'none' ? 'none' : q.f.r.id, pickup:$('#plPick').value, z:q.z, prep:+$('#plPrep').value || 0}; save();
   var base = planBase(q), fixed = [];
-  PL.replaced = S.rows.length - base.length;
+  var target = PL.target !== null ? rowById(PL.target) : null;
+  PL.replaced = S.rows.length - base.length - (target ? 1 : 0);
   base.forEach(function(r){
     if(r.type === 'caffeine') return;
     var a = toAbs(r.s,r.sz), b = toAbs(r.e,r.ez);
     if(b > a) fixed.push([a,b]);
   });
-  var ctx = {q:q, base:base, fixed:fixed, t1:Math.ceil((q.f.b + 15*60000)/60000)*60000, floor:0};
+  var ctx = {q:q, base:base, fixed:fixed, t1:Math.ceil((q.winB + 15*60000)/60000)*60000, floor:0};
   var none = planEval(ctx, 0, 0);
   if(!none){ planMsg('The model could not score this window. Check the chart range in Settings.', true); return; }
   ctx.floor = none.s0*0.95;
@@ -1620,15 +1651,21 @@ function planRun(){
   function finish(){
     var b = job.best, full = planEval(ctx, b.a, b.b, true), inN = 0, n = 0, bed = hhmmToH(S.bed), wake = hhmmToH(S.wake);
     full.m.pts.forEach(function(p){ if(p.t >= b.a && p.t < b.b){ n++; if(habitSleeping(tod(p.t,p.E), bed, wake)) inN++; } });
-    PL.best = {a:b.a, b:b.b, z:q.z, off:q.off, early:q.early, pickup:q.pickup};
-    var land = q.f.b, lo = zoneOff(q.f.r.land || 'local'), pc = n ? Math.round(100*inN/n) : 0;
+    PL.best = {a:b.a, b:b.b, z:q.z, off:q.off, early:q.early, winA:q.winA};
+    var pc = n ? Math.round(100*inN/n) : 0, scored;
+    if(q.mode === 'flight'){
+      var lo = zoneOff(q.f.r.land || 'local');
+      scored = 'Scored from pickup (' + dowLbl(q.pickup,q.off) + ' ' + hm(q.pickup,q.off) + ' ' + zname(q.off) + ') to landing (' + dowLbl(q.winB,lo) + ' ' + hm(q.winB,lo) + ' ' + zname(lo) + ').';
+    } else {
+      scored = 'Scored over the 8 h after you get up (' + dowLbl(q.winA,q.off) + ' ' + hm(q.winA,q.off) + ' → ' + hm(q.winB,q.off) + ' ' + zname(q.off) + ').';
+    }
     var h = '<div class="pl-k">Best sleep window</div>' +
       '<div class="pl-big">' + rangeStr(b.a,b.b,q.off) + ' <small>' + zname(q.off) + '</small></div>' +
       '<div class="pl-sub">' + f1((b.b-b.a)/H) + ' h · home clock ' + rangeStr(b.a,b.b,S.home) + ' ' + zname(S.home) + ' · ' + pc + '% inside your body-clock night</div>' +
       '<div class="pl-cmp"><div><b>With this sleep</b><span>Average ' + Math.round(b.mean) + '</span><span>Lowest ' + Math.round(b.min) + '</span></div>' +
       '<div><b>No more sleep</b><span>Average ' + Math.round(none.mean) + '</span><span>Lowest ' + Math.round(none.min) + '</span></div></div>' +
-      '<p class="hint">Scored from pickup (' + dowLbl(q.pickup,q.off) + ' ' + hm(q.pickup,q.off) + ' ' + zname(q.off) + ') to landing (' + dowLbl(land,lo) + ' ' + hm(land,lo) + ' ' + zname(lo) + ').' +
-      (PL.replaced ? ' Adding it replaces ' + PL.replaced + ' planned sleep' + (PL.replaced>1?'s':'') + ' in that range.' : '') + ' You can slide the block on the chart afterwards.</p>';
+      '<p class="hint">' + scored +
+      (PL.replaced > 0 ? ' Adding it replaces ' + PL.replaced + ' planned sleep' + (PL.replaced>1?'s':'') + ' in that range.' : '') + ' You can slide the block on the chart afterwards.</p>';
     var o = $('#plOut'); o.hidden = false; o.innerHTML = h;
     $('#plApply').hidden = false; planReset();
   }
@@ -1643,7 +1680,7 @@ function planRun(){
     }
     btn.textContent = 'Searching… ' + Math.min(99, Math.round(100*job.done/job.total)) + '%';
     if(queue.length){ setTimeout(tick, 0); return; }
-    if(!job.best){ planMsg('Your sleep pressure is already close to its usual wake-up level, so the model sees no sleep window that would help. Try an earlier bedtime or a later pickup.', true); planReset(); return; }
+    if(!job.best){ planMsg('Your sleep pressure is already close to its usual wake-up level, so the model sees no sleep window that would help. Try an earlier bedtime or a later wake-up.', true); planReset(); return; }
     if(job.stage === 0){
       job.stage = 1;
       var bw = job.best.b, bd = job.best.b - job.best.a;
@@ -1657,15 +1694,26 @@ function planRun(){
 }
 function applyPlan(){
   var b = PL.best; if(!b) return;
-  var q = {early:b.early, pickup:b.pickup};
+  var target = PL.target !== null ? rowById(PL.target) : null;
   S.rows = S.rows.filter(function(r){
-    if(r.type !== 'plan') return true;
+    if(r.type !== 'plan' || r === target) return true;
     var a = toAbs(r.s,r.sz), e = toAbs(r.e,r.ez);
-    return !(e > q.early && a < q.pickup);
+    return !(e > b.early && a < b.winA);
   });
-  S.rows.push(row('Planned sleep','plan', iso(b.a + b.off*H), b.z, iso(b.b + b.off*H), b.z));
-  curT = b.b; ghost = null;
+  var st = iso(b.a + b.off*H), en = iso(b.b + b.off*H);
+  if(target){ target.label = 'Planned sleep'; target.type = 'plan'; target.s = st; target.sz = b.z; target.e = en; target.ez = b.z; }
+  else S.rows.push(row('Planned sleep','plan', st, b.z, en, b.z));
+  PL.target = null; curT = b.b; ghost = null;
   closeDlg($('#planDlg')); render();
+}
+/* the warning box button: open a new planned sleep in the editor, which has Auto plan */
+function warnPlanSleep(){
+  var w = M && M.warn, first = null;
+  if(w) w.fpress.concat(w.flow).forEach(function(r){ if(first === null || r.a < first) first = r.a; });
+  var base = Math.ceil(Date.now()/PL_FINE)*PL_FINE;
+  var anchor = first !== null ? Math.max(base, Math.ceil((first - 9*H)/PL_FINE)*PL_FINE) : base;
+  if(M && (anchor < M.t0 || anchor > M.t1)) anchor = undefined;
+  addEvent('sleep', anchor);
 }
 
 /* ---------- backup and restore ---------- */
@@ -1772,6 +1820,7 @@ function bind(){
     b.addEventListener('click', function(){
       var r = rowById(edId); if(!r) return;
       r.type = this.dataset.v;
+      $('#evAuto').hidden = r.type !== 'plan';
       document.querySelectorAll('#evStatusF button').forEach(function(x){ x.setAttribute('aria-pressed', x.dataset.v === r.type); });
       render();
     });
@@ -1781,6 +1830,7 @@ function bind(){
     closeDlg($('#evDlg')); render();
   });
   $('#evDlg').addEventListener('close', function(){ edId = null; });
+  $('#evAuto').addEventListener('click', function(){ var id = edId; closeDlg($('#evDlg')); openPlan(id); });
 
   /* dialogs: close buttons and backdrop taps */
   ['#setDlg','#evDlg','#logDlg','#planDlg'].forEach(function(sel){
@@ -1797,13 +1847,9 @@ function bind(){
     var b = e.target.closest && e.target.closest('[data-add]');
     if(b) addEvent(b.dataset.add);
   });
-  $('#planBtn').addEventListener('click', function(){ closeMenu(); openPlan(); });
+  $('#planBtn').addEventListener('click', function(){ closeMenu(); openPlan(null); });
   $('#planDlg').addEventListener('close', function(){ PL.run++; planReset(); });
-  $('#plFl').addEventListener('change', function(){
-    var f = planFlight(); if(!f) return;
-    var z = planZoneFor(f); planFillZone(z);
-    $('#plPick').value = planPickDefault(f, z); planEarlyDefault(); planHint(); planClear();
-  });
+  $('#plFl').addEventListener('change', function(){ PL.run++; planReset(); planApplyMode(true); planClear(); });
   $('#plZ').addEventListener('change', function(){
     /* switching the clock keeps the same moments and just shows them on the new clock */
     var old = PL.zone, nz = this.value, pa = toAbs($('#plPick').value, old), ea = toAbs($('#plEarly').value, old);
@@ -1816,7 +1862,7 @@ function bind(){
     $(sel).addEventListener('input', function(){ PL.run++; planReset(); planHint(); planClear(); });
   });
   $('#plGo').addEventListener('click', planRun);
-  $('#warnPlan').addEventListener('click', openPlan);
+  $('#warnPlan').addEventListener('click', warnPlanSleep);
   $('#plApply').addEventListener('click', applyPlan);
   $('#logBtn').addEventListener('click', function(){ closeMenu(); showTab('events'); openDlg($('#logDlg')); });
   $('#setBtn').addEventListener('click', function(){ closeMenu(); syncSettings(); openDlg($('#setDlg')); });
