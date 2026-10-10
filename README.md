@@ -4,6 +4,10 @@ A single-page tool for planning sleep, flights and caffeine around your body clo
 
 Everything runs in the browser. Your trips are stored on your own device and are never sent anywhere.
 
+## Plan sleep
+
+Enter your real flights, naps and sleeps, then tap **Plan sleep**. Give it the van pickup time, how long you need to get ready and the earliest you can go to bed. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness from pickup to landing. **Add to plan** puts it on the chart as a planned block you can still slide.
+
 ## Install on a phone
 
 1. Open the site's address in Safari (iPhone) or Chrome (Android).
