@@ -337,8 +337,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add
       </button>
       <div class="menu" id="addMenu" role="menu" hidden>
-        <button type="button" role="menuitem" data-add="sleep"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span class="mi-t"><strong>Sleep</strong><small>A night, 8 h</small></span></button>
-        <button type="button" role="menuitem" data-add="nap"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M5 6h6l-6 7h6M14 11h5l-5 6h5"/></svg></span><span class="mi-t"><strong>Nap</strong><small>A short sleep, 45 min</small></span></button>
+        <button type="button" role="menuitem" data-add="sleep"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span class="mi-t"><strong>Sleep</strong><small>Starts at 8 h, then slide or resize</small></span></button>
         <button type="button" role="menuitem" data-add="flight"><span class="mi k-flight"><svg class="ic" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="mi-t"><strong>Flight</strong><small>Moves your local clock</small></span></button>
         <button type="button" role="menuitem" data-add="coffee"><span class="mi k-caff"><svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg></span><span class="mi-t"><strong>Coffee</strong><small>Caffeine dose, 100 mg</small></span></button>
       </div>
@@ -401,7 +400,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
     <div class="dlg-body">
       <div id="tabEvents" role="tabpanel" aria-labelledby="tabBtnEvents">
         <div class="tl-head"><div class="chips" id="quickAdd" role="group" aria-label="Add an event">
-          <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="nap">+ Nap</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button>
+          <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button>
         </div><span id="tlCount"></span></div>
         <ul class="evlist" id="rows"></ul>
       </div>
@@ -487,7 +486,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>Plan sleep</dt>
       <dd>Takes your van pickup time and get-ready time as the latest wake-up. With no flight ahead it uses a wake-up time you choose and aims at the 8 hours after it. It runs the full model for hundreds of sleep windows (start time and length) that fit between your earliest bedtime and that deadline, and scores each one on alertness from pickup to landing: half the average, half the lowest point. A window cannot run past the point where sleep pressure falls to its usual wake-up level, because you would wake on your own. It only knows what the model knows, so it will not see a noisy room or a meal.</dd>
       <dt>Warnings</dt>
-      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The list under the readout keeps every flagged stretch, past and future, with the past in grey. A planned nap that fixes the problem makes the warning go away.</dd>
+      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The list under the readout keeps every flagged stretch, past and future, with the past in grey. A planned sleep that fixes the problem makes the warning go away.</dd>
       <dt>While asleep</dt>
       <dd>The dotted stretch of the alertness line is how alert you would be if you were awake at that moment. It is not a measure of the sleep itself. The value after waking can sit below the value at bedtime because bedtime is often near your body-clock peak and wake-up is often near its low, plus sleep inertia. Compare it with what the line would show had you stayed awake, not with the bedtime value.</dd>
       <dt>K: caffeine</dt>
@@ -636,7 +635,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 8';
+var BUILD = '10 Oct 2026 · build 9';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1431,7 +1430,6 @@ function addEvent(kind, anchorOverride){
   function at(ms){ return iso(ms + off*H); }
   var r;
   if(kind==='sleep') r = row('Sleep','plan', at(anchor), z, at(anchor + 8*H), z);
-  else if(kind==='nap') r = row('Nap','plan', at(anchor), z, at(anchor + 0.75*H), z);
   else if(kind==='coffee') r = row('Coffee','caffeine', at(anchor), z, at(anchor), z, undefined, 100);
   else {
     var land = z==='home' ? 'local' : 'home', lz = land;
