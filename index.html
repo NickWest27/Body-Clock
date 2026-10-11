@@ -505,7 +505,8 @@ dialog.tall .dlg-body{flex:1;min-height:0}
   </details></section>
     </div>
     <div class="dlg-foot">
-      <button class="btn danger" id="resetBtn" type="button">Reset to example trip</button>
+      <button class="btn danger" id="newBtn" type="button">Start new trip</button>
+      <button class="btn danger" id="resetBtn" type="button">Load example trip</button>
       <button class="btn primary" type="button" data-close>Done</button>
     </div>
   </div>
@@ -589,7 +590,7 @@ function defaults(){
   nid = 1;
   return {
     v:3, home:-4, local:1, startLoc:'home', bed:'23:00', wake:'07:00', light:50, endAuto:true,
-    show:{alert:true,body:true,local:true,pressure:false,night:true,diff:false},
+    show:{alert:true,body:true,local:true,pressure:true,night:true,diff:false},
     start:{t:'2026-10-08T08:00',z:'home'},
     end:{t:'2026-10-11T00:00',z:'home'},
     plan:null,
@@ -597,10 +598,30 @@ function defaults(){
       row('DFW to LHR (times estimated)','flight','2026-10-08T16:30','z:-5','2026-10-09T07:45','local','local'),
       row('In-flight nap','sleep','2026-10-09T02:00','z:0','2026-10-09T02:30','z:0'),
       row('Hotel nap','sleep','2026-10-09T09:20','local','2026-10-09T12:30','local'),
-      row('Night in London','plan','2026-10-10T00:00','local','2026-10-10T07:30','local'),
+      row('Night in London','sleep','2026-10-09T22:30','local','2026-10-10T09:30','local'),
       row('Coffee','caffeine','2026-10-10T08:00','local','2026-10-10T08:00','local',undefined,150),
-      row('LHR to DFW','flight','2026-10-10T14:30','local','2026-10-10T18:45','z:-5','z:-5')
+      row('Coffee','caffeine','2026-10-10T12:15','local','2026-10-10T12:15','local',undefined,100),
+      row('LHR to DFW','flight','2026-10-10T14:30','local','2026-10-10T18:45','z:-5','z:-5'),
+      row('Coffee','caffeine','2026-10-10T17:30','z:-5','2026-10-10T17:30','z:-5',undefined,100),
+      row('DFW to ATL','flight','2026-10-10T20:45','z:-5','2026-10-10T23:00','home','home')
     ]
+  };
+}
+/* A blank trip keeps your settings (home zone, bed and wake times, light, graph options).
+   The chart starts at your most recent usual wake-up and runs 3 days past now. */
+function blankTrip(){
+  nid = 1;
+  var now = Date.now(), off = S.home;
+  var wp = String(S.wake).split(':'), wakeMs = ((+wp[0]||0)*60 + (+wp[1]||0))*60000;
+  var local = now + off*H, start = Math.floor(local/(24*H))*24*H + wakeMs;
+  if(start > local) start -= 24*H;
+  return {
+    v:3, home:S.home, local:S.local, startLoc:'home', bed:S.bed, wake:S.wake, light:S.light, endAuto:true,
+    show:JSON.parse(JSON.stringify(S.show)),
+    start:{t:iso(start), z:'home'},
+    end:{t:iso(Math.ceil((now + 72*H + off*H)/H)*H), z:'home'},
+    plan:null,
+    rows:[]
   };
 }
 function validState(o){ return o && Array.isArray(o.rows) && o.start && o.end && o.show; }
@@ -635,7 +656,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 9';
+var BUILD = '10 Oct 2026 · build 10';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1887,18 +1908,22 @@ function bind(){
   document.addEventListener('click', function(e){ if(!menu.hidden && !e.target.closest('.addwrap')) closeMenu(); });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !menu.hidden){ closeMenu(); addBtn.focus(); } });
 
-  var resetBtn = $('#resetBtn'), resetTimer = null;
-  resetBtn.addEventListener('click', function(){
-    if(!resetTimer){
-      resetBtn.textContent = 'Click again to reset';
-      resetTimer = setTimeout(function(){ resetBtn.textContent = 'Reset to example trip'; resetTimer = null; }, 3500);
-      return;
-    }
-    clearTimeout(resetTimer); resetTimer = null;
-    resetBtn.textContent = 'Reset to example trip';
-    S = defaults(); curT = null; ghost = null;
-    syncSettings(); render();
-  });
+  function twoClick(btn, label, ask, action){
+    var timer = null;
+    btn.addEventListener('click', function(){
+      if(!timer){
+        btn.textContent = ask;
+        timer = setTimeout(function(){ btn.textContent = label; timer = null; }, 3500);
+        return;
+      }
+      clearTimeout(timer); timer = null;
+      btn.textContent = label;
+      action();
+    });
+  }
+  function swapTrip(next){ S = fixState(next); curT = null; ghost = null; syncSettings(); render(); }
+  twoClick($('#resetBtn'), 'Load example trip', 'Click again to replace', function(){ swapTrip(defaults()); });
+  twoClick($('#newBtn'), 'Start new trip', 'Click again to clear', function(){ swapTrip(blankTrip()); });
 
   var svg = $('#chart');
   svg.addEventListener('pointerdown', function(e){

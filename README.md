@@ -14,6 +14,10 @@ A warning's **Plan sleep** button opens a new planned sleep in the editor. Set t
 
 Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading and the warning box look ahead from now to 6 hours after your last landing. A list under the readout keeps every flagged stretch, past and future.
 
+## Start a new trip
+
+Open Settings. **Start new trip** clears all flights, sleeps and coffees. It keeps your home zone, bed and wake times, light setting and graph options. The chart starts at your most recent usual wake-up. **Load example trip** replaces everything with the built-in DFW → LHR → DFW → ATL trip, which is handy for testing. Both buttons ask you to click twice. Use **Back up trip** first if you want to keep what you have.
+
 ## Install on a phone
 
 1. Open the site's address in Safari (iPhone) or Chrome (Android).
