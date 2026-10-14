@@ -10,6 +10,8 @@ Enter your real flights and sleeps. In each flight, set your role: **Operate** (
 
 Tap **Plan sleep**, choose the Operate flight and give the van pickup time (on the clock you choose), how long you need to get ready and the earliest you can go to bed. The earliest bedtime starts at the layover, which is the previous Operate flight's landing plus your landing-to-bed time. **Compare plans** shows up to five options: normal night, sleep sooner, stay up later, nap after landing and nap before the flight. Each card gives alertness at landing, the lowest point, hours asleep, how easily you would fall asleep, how much of the sleep falls in your usual night, and hours under high sleep pressure. Tap a card and **Add to plan** puts its blocks on the chart as planned sleeps you can still slide. Adding a plan replaces the planned sleeps inside the layover. Planned sleeps outside it stay, and so do sleeps marked Actual.
 
+**Clear planned sleeps** is at the bottom of the Log. It removes every sleep marked Planned, including planned naps and relief rests. Actual sleeps, flights and coffees stay. It asks you to tap twice.
+
 With no flight ahead, choose "No flight, just a wake-up time" and it aims at the 8 hours after you get up.
 
 A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.

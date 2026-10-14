@@ -411,6 +411,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
           <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button>
         </div><span id="tlCount"></span></div>
         <ul class="evlist" id="rows"></ul>
+        <div class="btnrow" style="margin-top:12px"><button class="btn danger" id="clrPlan" type="button" hidden></button></div>
       </div>
       <div id="tabSummary" role="tabpanel" aria-labelledby="tabBtnSummary" hidden>
         <div class="stats" id="stats"></div>
@@ -692,7 +693,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '14 Oct 2026 · build 13';
+var BUILD = '14 Oct 2026 · build 14';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1398,6 +1399,14 @@ function zoneOptionsHTML(val){
 }
 function fillZoneSelect(sel,val){ sel.innerHTML = zoneOptionsHTML(val); sel.value = val; }
 
+/* Clear planned sleeps: removes every row marked Planned. Actual sleeps, flights and coffees stay. */
+var clrTimer = null;
+function planCount(){ return S.rows.filter(function(r){ return r.type === 'plan'; }).length; }
+function syncClrPlan(){
+  var b = $('#clrPlan'), n = planCount();
+  b.hidden = n === 0;
+  if(clrTimer === null) b.textContent = 'Clear ' + n + ' planned sleep' + (n === 1 ? '' : 's');
+}
 /* returns {when, sub} HTML for a row */
 function eventInfo(r){
   var a = toAbs(r.s,r.sz);
@@ -1445,6 +1454,7 @@ function renderList(){
   });
   if(!list.length) h = '<li class="row-empty">Nothing here yet. Use Add to put in a sleep, a flight or a coffee.</li>';
   ul.innerHTML = h;
+  syncClrPlan();
   $('#tlCount').textContent = list.length ? list.length + (list.length===1?' event':' events') + ' · tap to edit' : '';
   if(edId !== null){ var er = rowById(edId); if(er) $('#evCap').innerHTML = capHTML(er); }
 }
@@ -2215,6 +2225,18 @@ function bind(){
   $('#setBtn').addEventListener('click', function(){ closeMenu(); syncSettings(); openDlg($('#setDlg')); });
   $('#verLine').textContent = 'Version: ' + BUILD;
   $('#updBtn').addEventListener('click', checkUpdate);
+  $('#clrPlan').addEventListener('click', function(){
+    var b = this;
+    if(clrTimer === null){
+      b.textContent = 'Click again to clear';
+      clrTimer = setTimeout(function(){ clrTimer = null; syncClrPlan(); }, 3500);
+      return;
+    }
+    clearTimeout(clrTimer); clrTimer = null;
+    S.rows = S.rows.filter(function(r){ return r.type !== 'plan'; });
+    PL.target = null; ghost = null;
+    render();
+  });
   $('#expBtn').addEventListener('click', doBackup);
   $('#impBtn').addEventListener('click', function(){ $('#impFile').click(); });
   $('#impFile').addEventListener('change', function(){ var f = this.files && this.files[0]; if(f) startRestore(f); this.value = ''; });
