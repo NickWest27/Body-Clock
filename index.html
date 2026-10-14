@@ -540,7 +540,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <div id="evStatusF"><span class="lab">Status</span><div class="seg" role="group" aria-label="Sleep status"><button type="button" data-v="sleep" aria-pressed="false">Actual</button><button type="button" data-v="plan" aria-pressed="false">Planned</button></div></div>
       <div><label for="evS" id="evSL">Start</label><div class="tz"><input id="evS" type="datetime-local"><select id="evSZ" aria-label="Clock for start"></select></div></div>
       <div id="evEF"><label for="evE">End</label><div class="tz"><input id="evE" type="datetime-local"><select id="evEZ" aria-label="Clock for end"></select></div></div>
-      <div id="evLandF"><label for="evLand">Lands in</label><select id="evLand"></select><p class="hint">Your local clock follows this after landing.</p></div>
+      <div id="evLandF"><label for="evLand">Lands in</label><select id="evLand"></select><p class="hint">Where you are after landing. It follows the arrival clock unless you change it here.</p></div>
       <div id="evMgF"><label for="evMg">Dose (mg)</label><input id="evMg" type="number" min="0" max="1000" step="10"><div class="chips" id="evChips"><button type="button" data-mg="50">Tea 50</button><button type="button" data-mg="100">Coffee 100</button><button type="button" data-mg="150">Large 150</button><button type="button" data-mg="200">Double 200</button></div></div>
       <p class="cap" id="evCap"></p>
     </div>
@@ -656,7 +656,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 10';
+var BUILD = '10 Oct 2026 · build 11';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1827,7 +1827,11 @@ function bind(){
   $('#evS').addEventListener('input', ed(function(r){ r.s = this.value; cafSync(r); }));
   $('#evSZ').addEventListener('change', ed(function(r){ r.sz = this.value; cafSync(r); }));
   $('#evE').addEventListener('input', ed(function(r){ r.e = this.value; }));
-  $('#evEZ').addEventListener('change', ed(function(r){ r.ez = this.value; }));
+  $('#evEZ').addEventListener('change', ed(function(r){
+    var was = r.ez; r.ez = this.value;
+    /* The landing place normally matches the clock you give the arrival time in. Follow it unless you set it apart. */
+    if(r.type==='flight' && (r.land || 'local') === was){ r.land = r.ez; fillZoneSelect($('#evLand'), r.land); }
+  }));
   $('#evLand').addEventListener('change', ed(function(r){ r.land = this.value; }));
   $('#evMg').addEventListener('input', ed(function(r){ r.mg = this.value; }));
   $('#evChips').addEventListener('click', function(e){
