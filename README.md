@@ -34,6 +34,8 @@ On iPhone, the home-screen app keeps its own storage, separate from Safari. Add 
 
 Replace `index.html` (and bump `VERSION` in `sw.js`). The app fetches the new copy whenever it has a connection and shows it the next time you open it. Settings shows the build number.
 
+To force an update on a phone, open Settings and tap **Update app**. It asks the server for the newest build with a unique address, which skips every cache on the way. If a newer build exists, it removes the saved copy and reloads. If you already have the newest build, tap again to clear the saved copy and reload anyway. Your trip is not touched. GitHub Pages can take up to about 10 minutes to publish a push, so a build may not be there yet.
+
 ## Files
 
 - `index.html`: the whole app

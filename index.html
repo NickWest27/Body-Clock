@@ -482,6 +482,8 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <p class="hint">Your trip is saved automatically in this browser. A backup file lets you keep a copy or move the trip to another device.</p>
         <p class="msg" id="dataMsg" role="status" hidden></p>
         <p class="hint" id="verLine"></p>
+        <div class="btnrow"><button class="btn" id="updBtn" type="button">Update app</button></div>
+        <p class="msg" id="updMsg" role="status" hidden></p>
       </section>
       <section class="grp"><details class="how">
     <summary>How the model works</summary>
@@ -690,7 +692,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '10 Oct 2026 · build 12';
+var BUILD = '14 Oct 2026 · build 13';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -2016,6 +2018,37 @@ function warnPlanSleep(){
   addEvent('sleep', anchor);
 }
 
+/* ---------- update ---------- */
+/* Asks the server for the newest build with a unique address, which skips every cache on the way.
+   If it differs from the running build, or you ask again, it removes the saved copy and reloads. Your trip is not touched. */
+async function cleanReload(){
+  try{ if(navigator.serviceWorker){ var regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(function(r){ return r.unregister(); })); } }catch(e){}
+  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('body-clock-') === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  location.replace(location.pathname + '?u=' + Date.now());
+}
+async function checkUpdate(){
+  var btn = $('#updBtn'), msg = $('#updMsg');
+  function say2(t){ msg.hidden = false; msg.textContent = t; }
+  if(btn.dataset.force === '1'){
+    if(navigator.onLine === false){ say2('You are offline. Clearing the saved copy now would leave the app unable to open, so I have not touched it. Try again online.'); return; }
+    say2('Reloading…'); cleanReload(); return;
+  }
+  btn.disabled = true; say2('Checking…');
+  try{
+    var res = await fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'});
+    var txt = await res.text();
+    var m = /var BUILD = '([^']*)'/.exec(txt);
+    if(!res.ok || !m) throw new Error('bad reply');
+    if(m[1] !== BUILD){ say2('Found ' + m[1] + '. Reloading…'); cleanReload(); return; }
+    say2('You already have the newest build (' + BUILD + '). Tap again to clear the saved copy and reload anyway.');
+    btn.dataset.force = '1'; btn.textContent = 'Reload anyway';
+  }catch(err){
+    say2('Could not reach the server, so I cannot check. Tap again to clear the saved copy and reload when you are online.');
+    btn.dataset.force = '1'; btn.textContent = 'Reload anyway';
+  }
+  btn.disabled = false;
+}
+
 /* ---------- backup and restore ---------- */
 function say(msg, isHtml){
   var m = $('#dataMsg'); m.hidden = false;
@@ -2181,6 +2214,7 @@ function bind(){
   $('#logBtn').addEventListener('click', function(){ closeMenu(); showTab('events'); openDlg($('#logDlg')); });
   $('#setBtn').addEventListener('click', function(){ closeMenu(); syncSettings(); openDlg($('#setDlg')); });
   $('#verLine').textContent = 'Version: ' + BUILD;
+  $('#updBtn').addEventListener('click', checkUpdate);
   $('#expBtn').addEventListener('click', doBackup);
   $('#impBtn').addEventListener('click', function(){ $('#impFile').click(); });
   $('#impFile').addEventListener('change', function(){ var f = this.files && this.files[0]; if(f) startRestore(f); this.value = ''; });
@@ -2271,8 +2305,14 @@ render();
 </script>
 
 <script>
+if(/[?&]u=\d+/.test(location.search)){ try{ history.replaceState(null, '', location.pathname); }catch(e){} }
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
-  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(function(reg){
+      /* look for a new build each time the app comes back to the foreground */
+      document.addEventListener('visibilitychange', function(){ if(!document.hidden) reg.update().catch(function(){}); });
+    }).catch(function(){});
+  });
 }
 </script>
 

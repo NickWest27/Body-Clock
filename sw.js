@@ -1,6 +1,6 @@
 /* Offline cache for Body Clock. Serves the saved copy immediately and refreshes it in the background,
    so an update arrives the next time the app is opened. Change VERSION when you ship a new build. */
-const VERSION = '2026-10-14.12';
+const VERSION = '2026-10-14.13';
 const CACHE = 'body-clock-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
@@ -19,6 +19,8 @@ self.addEventListener('fetch', function(e){
   if(req.method !== 'GET') return;
   var url = new URL(req.url);
   if(url.origin !== self.location.origin) return;
+  /* update checks from the Update app button go straight to the network, never the saved copy */
+  if(url.searchParams.has('check')) return;
   e.respondWith(
     caches.open(CACHE).then(function(cache){
       return cache.match(req, {ignoreSearch:true}).then(function(cached){
