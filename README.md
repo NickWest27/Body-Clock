@@ -6,7 +6,11 @@ Everything runs in the browser. Your trips are stored on your own device and are
 
 ## Plan sleep
 
-Enter your real flights, naps and sleeps, then tap **Plan sleep**. For an upcoming flight, give it the van pickup time (on the clock you choose, local by default), how long you need to get ready and the earliest you can go to bed. With no flight ahead, choose "No flight, just a wake-up time" and it aims at the 8 hours after you get up. It tries every sleep window that ends in time, runs the full model for each, and picks the one with the best alertness. **Add to plan** puts it on the chart as a planned block you can still slide.
+Enter your real flights and sleeps. In each flight, set your role: **Operate** (the planner scores it) or **Commute** (it does not, and it assumes you cannot sleep aboard). On an Operate flight you can also enter the **expected relief rest** in hours. Settings holds **Landing to bed** (default 2 h) and **When the clocks disagree** (home time, balanced, or local time).
+
+Tap **Plan sleep**, choose the Operate flight and give the van pickup time (on the clock you choose), how long you need to get ready and the earliest you can go to bed. The earliest bedtime starts at the layover, which is the previous Operate flight's landing plus your landing-to-bed time. **Compare plans** shows up to five options: normal night, sleep sooner, stay up later, nap after landing and nap before the flight. Each card gives alertness at landing, the lowest point, hours asleep, how easily you would fall asleep, how much of the sleep falls in your usual night, and hours under high sleep pressure. Tap a card and **Add to plan** puts its blocks on the chart as planned sleeps you can still slide. Adding a plan replaces the planned sleeps inside the layover. Planned sleeps outside it stay, and so do sleeps marked Actual.
+
+With no flight ahead, choose "No flight, just a wake-up time" and it aims at the 8 hours after you get up.
 
 A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.
 
