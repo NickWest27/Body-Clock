@@ -124,6 +124,12 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .leg-static i.ahead{background:var(--ahead);opacity:.45}
 .leg-static i.behind{background:var(--behind);opacity:.45}
 .leg-static i.w{background:var(--warn);opacity:.5;border-top:3px solid var(--warn)}
+.fl-sum{margin-top:10px;font-size:.84rem}
+.fl-sum p{margin:0 0 3px}
+.fl-sum b{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.fl-sum .n{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.fl-sum .n.lo{color:var(--low)}
+.fl-sum .past{color:var(--muted)}
 .warn-list{margin-top:10px;font-size:.84rem}
 .warn-list p{margin:0 0 3px}
 .warn-list b{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-right:6px}
@@ -293,7 +299,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
   .bar-in{padding:8px 12px;gap:8px}
   .brand h1{font-size:1rem}
   .brand svg{width:22px;height:22px}
-  .sum{font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sum{font-size:.72rem;line-height:1.45}
   .tip{display:none}
   .kpi{padding:8px 10px}
   .kpi .v{font-size:1.15rem}
@@ -387,6 +393,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <div><dt>Clock gap</dt><dd id="roGap"></dd></div>
         <div><dt>State</dt><dd id="roState"></dd></div>
       </dl>
+      <div class="fl-sum" id="flSum" hidden></div>
       <div class="warn-list" id="warnList" hidden></div>
       <div class="warn-box" id="warnBox" role="status" hidden>
         <div id="warnLines"></div>
@@ -693,7 +700,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '14 Oct 2026 · build 14';
+var BUILD = '15 Oct 2026 · build 15';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1057,12 +1064,14 @@ function renderChart(){
     o.push('<text x="'+xx.toFixed(1)+'" y="'+(Tm-10)+'" font-size="10" text-anchor="middle" fill-opacity=".85">'+pad(Math.round(tod(tt,M.locAt(tt).off))%24)+'</text>');
     if(isMid) dateLabels.push(tt);
   }
+  var dayPx = 24*pxH, shortDay = dayPx < 96, dayW = shortDay ? 44 : 70;
+  function dLbl(t){ var s2 = dayLbl(t,P); return shortDay ? s2.replace(/ [A-Za-z]+$/,'') : s2; }
   var firstMid = dateLabels.length ? x(dateLabels[0]) : (W-Rm);
-  if(firstMid - Lm > 90) o.push('<text x="'+(Lm+2)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dayLbl(M.t0,P)+'</text>');
+  if(firstMid - Lm > dayW + 14) o.push('<text x="'+(Lm+2)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dLbl(M.t0)+'</text>');
   dateLabels.forEach(function(tt){
     var xx = x(tt);
-    if(xx > W - Rm - 70) return;
-    o.push('<text x="'+(xx+4).toFixed(1)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dayLbl(tt+1000,P)+'</text>');
+    if(xx > W - Rm - dayW) return;
+    o.push('<text x="'+(xx+4).toFixed(1)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dLbl(tt+1000)+'</text>');
   });
   o.push('<text x="'+(Lm-6)+'" y="'+axisY+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end">HOME</text>');
   o.push('<text x="'+(Lm-6)+'" y="'+(Tm-10)+'" font-size="'+(NARROW?8.5:9.5)+'" text-anchor="end" fill-opacity=".85">LOCAL</text>');
@@ -1086,11 +1095,11 @@ function renderChart(){
     o.push('<path d="'+gd+'" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-opacity=".8" stroke-linejoin="round"/>');
   }
   if(S.show.pressure) o.push('<path d="'+path('sp')+'" fill="none" stroke="var(--press)" stroke-width="1.8" stroke-dasharray="1.5 3" stroke-linecap="round"/>');
-  if(S.show.local) o.push('<path d="'+path('cl')+'" fill="none" stroke="var(--local)" stroke-width="1.8" stroke-dasharray="6 4" stroke-linejoin="round"/>');
-  if(S.show.body)  o.push('<path d="'+path('cb')+'" fill="none" stroke="var(--body)" stroke-width="2" stroke-linejoin="round"/>');
+  if(S.show.local) o.push('<path d="'+path('cl')+'" fill="none" stroke="var(--local)" stroke-opacity=".5" stroke-width="1.4" stroke-dasharray="6 4" stroke-linejoin="round"/>');
+  if(S.show.body)  o.push('<path d="'+path('cb')+'" fill="none" stroke="var(--body)" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>');
   if(S.show.alert){
     o.push('<path d="'+path('A','asleep')+'" fill="none" stroke="var(--alert)" stroke-opacity=".55" stroke-width="2.2" stroke-dasharray="1.5 4.5" stroke-linecap="round"/>');
-    o.push('<path d="'+path('A','awake')+'" fill="none" stroke="var(--alert)" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round"/>');
+    o.push('<path d="'+path('A','awake')+'" fill="none" stroke="var(--alert)" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>');
   }
 
   var now = Date.now();
@@ -1321,10 +1330,38 @@ function renderWarn(){
     lines += line('Excessive sleep pressure', w.fpress); lines += line('Low alertness', w.flow);
     list += row('Low alertness', w.low); list += row('High sleep pressure', w.press);
   }
+  renderFlSum();
   box.hidden = !lines;
   $('#warnLines').innerHTML = lines;
   $('#warnList').hidden = !list;
   $('#warnList').innerHTML = list;
+}
+
+/* Operate-flight summary: lowest awake alertness in flight and alertness at landing (last awake point). */
+function flSumData(){
+  if(!M) return [];
+  return intervals(['flight']).filter(function(f){
+    return flightRole(f.r) === 'operate' && f.b > M.t0 && f.a < M.t1;
+  }).sort(function(p,q){ return p.a - q.a; }).map(function(f){
+    var low = null, land = null;
+    M.pts.forEach(function(p){
+      if(p.t < f.a || p.t > f.b || p.sl) return;
+      if(!low || p.A < low.A) low = p;
+      land = p;
+    });
+    return {f:f, low:low, land:land};
+  }).filter(function(d){ return d.low; });
+}
+function renderFlSum(){
+  var el = $('#flSum'), now = Date.now(), off = S.home;
+  function n(v){ var r = Math.round(v); return '<span class="n'+(r < PAR.warnA ? ' lo' : '')+'">'+r+'</span>'; }
+  var h = flSumData().map(function(d){
+    var f = d.f, past = f.b < now;
+    return '<p'+(past?' class="past"':'')+'><b>'+esc(f.r.label||'Flight')+'</b>lowest '+n(d.low.A)+' at '+dowLbl(d.low.t,off)+' '+hm(d.low.t,off)+' '+zname(off)+
+           ' · landing '+n(d.land.A)+'</p>';
+  }).join('');
+  el.hidden = !h;
+  el.innerHTML = h;
 }
 
 /* ---------- stats ---------- */

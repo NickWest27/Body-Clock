@@ -1,6 +1,6 @@
 /* Offline cache for Body Clock. Serves the saved copy immediately and refreshes it in the background,
    so an update arrives the next time the app is opened. Change VERSION when you ship a new build. */
-const VERSION = '2026-10-14.14';
+const VERSION = '2026-10-15.15';
 const CACHE = 'body-clock-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 

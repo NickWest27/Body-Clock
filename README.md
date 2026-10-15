@@ -16,6 +16,10 @@ With no flight ahead, choose "No flight, just a wake-up time" and it aims at the
 
 A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.
 
+## Flight summary
+
+Under the readout, each Operate flight gets one line: the lowest alertness while you are awake on board, when it happens (home clock), and your alertness at landing. Numbers below 25 show in red. Time asleep on board, such as a relief rest, is left out, but sleep inertia after waking is counted.
+
 ## Warnings
 
 Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading and the warning box look ahead from now to 6 hours after your last landing. A list under the readout keeps every flagged stretch, past and future.
