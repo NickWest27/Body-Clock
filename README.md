@@ -22,7 +22,11 @@ Under the readout, each Operate flight gets one line: the lowest alertness while
 
 ## Warnings
 
-Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading and the warning box look ahead from now to 6 hours after your last landing. A list under the readout keeps every flagged stretch, past and future.
+Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading looks ahead from now to 6 hours after your last landing. One warning box under the readout lists every flagged stretch, with past stretches in grey, and says when to plan a sleep by. When only past stretches remain, the box turns grey and the Plan sleep button goes away.
+
+## Fatigue ratings
+
+Off by default. Turn on "Rate how tired you feel" in Settings to add Fatigue rating to the Add menu. Pick 1 to 7 on the Samn-Perelli scale (1 fully alert, 7 completely exhausted); the time defaults to now, on the home clock when you are in the air. Ratings show as numbered circles on the alertness line and in the Log. After 5 ratings the Trip summary shows the correlation between your ratings and the model's alertness (a perfect match is −1). Ratings carry over when you start a new trip or load the example, so the comparison builds across trips. Ratings the model has you asleep for are left out. Turning the setting off hides ratings but keeps them.
 
 ## Start a new trip
 

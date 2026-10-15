@@ -83,7 +83,25 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .mi-t{display:flex;flex-direction:column;line-height:1.25}
 .mi-t strong{font-weight:600;font-size:.92rem}
 .mi-t small{color:var(--muted);font-size:.78rem}
-.k-sleep{color:var(--sleep)} .k-flight{color:var(--flight)} .k-caff{color:var(--caff)}
+.k-sleep{color:var(--sleep)} .k-flight{color:var(--flight)} .k-caff{color:var(--caff)} .k-rate{color:var(--warn)}
+.lbl-s{display:none}
+.ro-vals.one{display:flex!important}
+.ro-vals.one div{flex-direction:row!important;align-items:baseline!important;gap:8px!important}
+@media (max-width:430px){.brand h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+.ro-st{font-family:var(--f-sans,inherit);font-size:.8rem;color:var(--muted);margin-left:8px;font-weight:400}
+.warn-box.quiet{border-color:var(--line)}
+.warn-box .wl b{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.warn-box .wl .past{color:var(--muted);font-weight:400}
+.warn-box .wl .soon{color:var(--ink)}
+.rt-opts{display:grid;gap:6px;margin-top:6px}
+.rt-opt{display:grid;grid-template-columns:28px 1fr;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);text-align:left;cursor:pointer;font:inherit;font-size:.88rem}
+.rt-opt b{font-family:var(--f-mono);font-size:1.05rem}
+.rt-opt[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ev.t-rating{border-left-color:var(--warn)}
+.t-rating .ev-ico{color:var(--warn)}
+.fat-sum{margin-top:16px;font-size:.86rem}
+.fat-sum h3{margin:0 0 4px;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.fat-sum p{margin:0 0 4px}
 .sum{margin:0;font-size:.82rem;color:var(--muted);font-family:var(--f-mono)}
 
 /* settings fields */
@@ -254,6 +272,7 @@ dialog.dlg::backdrop{background:rgba(8,14,22,.5)}
   dialog.dlg{margin:auto auto 0;width:100vw;max-width:100vw;border-radius:16px 16px 0 0}
   .tz input,.tz select{flex:1 1 100%}
   .btn .lbl{display:none}
+  #planBtn .lbl-s{display:inline}
   .btn{padding:6px 12px}
 }
 @media (max-width:520px){
@@ -344,7 +363,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <h1>Body Clock<span class="ov"> Overlay</span></h1>
     </div>
     <button class="btn" id="planBtn" type="button" aria-label="Plan sleep" title="Recommend a sleep window">
-      <svg class="ic" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M19 15v5M16.5 17.5h5"/></svg><span class="lbl">Plan sleep</span>
+      <svg class="ic" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M19 15v5M16.5 17.5h5"/></svg><span class="lbl">Plan sleep</span><span class="lbl-s">Plan</span>
     </button>
     <div class="addwrap">
       <button class="btn primary" id="addBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="addMenu">
@@ -354,6 +373,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <button type="button" role="menuitem" data-add="sleep"><span class="mi k-sleep"><svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></span><span class="mi-t"><strong>Sleep</strong><small>Starts at 8 h, then slide or resize</small></span></button>
         <button type="button" role="menuitem" data-add="flight"><span class="mi k-flight"><svg class="ic" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="mi-t"><strong>Flight</strong><small>Moves your local clock</small></span></button>
         <button type="button" role="menuitem" data-add="coffee"><span class="mi k-caff"><svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg></span><span class="mi-t"><strong>Coffee</strong><small>Caffeine dose, 100 mg</small></span></button>
+        <button type="button" role="menuitem" data-add="rating" id="addRating" hidden><span class="mi k-rate"><svg class="ic" viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 1 1 17 0"/><path d="M12 17l4.5-5"/><path d="M3.5 17h17"/></svg></span><span class="mi-t"><strong>Fatigue rating</strong><small>How tired you feel now, 1 to 7</small></span></button>
       </div>
     </div>
     <button class="btn" id="logBtn" type="button" aria-label="Log">
@@ -388,16 +408,13 @@ dialog.tall .dlg-body{flex:1;min-height:0}
     <p class="clipnote" id="clipNote" hidden>The chart shows the first 10 days of your range.</p>
     <div class="readout" id="readout">
       <div class="ro-when"><span id="roDate"></span><span>Home <b id="roHome"></b></span><span>Local <b id="roLocal"></b></span></div>
-      <dl class="ro-vals">
-        <div><dt>Alertness</dt><dd id="roA"></dd></div>
-        <div><dt>Clock gap</dt><dd id="roGap"></dd></div>
-        <div><dt>State</dt><dd id="roState"></dd></div>
+      <dl class="ro-vals one">
+        <div><dt>Alertness</dt><dd><span id="roA"></span><span class="ro-st" id="roSt"></span></dd></div>
       </dl>
       <div class="fl-sum" id="flSum" hidden></div>
-      <div class="warn-list" id="warnList" hidden></div>
       <div class="warn-box" id="warnBox" role="status" hidden>
         <div id="warnLines"></div>
-        <div class="warn-rec">Recommend you plan a sleep. <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
+        <div class="warn-rec" id="warnRec"><span id="warnRecT"></span> <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
       </div>
     </div>
     <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
@@ -415,7 +432,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
     <div class="dlg-body">
       <div id="tabEvents" role="tabpanel" aria-labelledby="tabBtnEvents">
         <div class="tl-head"><div class="chips" id="quickAdd" role="group" aria-label="Add an event">
-          <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button>
+          <button type="button" data-add="sleep">+ Sleep</button><button type="button" data-add="flight">+ Flight</button><button type="button" data-add="coffee">+ Coffee</button><button type="button" data-add="rating" id="qaRating" hidden>+ Rating</button>
         </div><span id="tlCount"></span></div>
         <ul class="evlist" id="rows"></ul>
         <div class="btnrow" style="margin-top:12px"><button class="btn danger" id="clrPlan" type="button" hidden></button></div>
@@ -485,6 +502,10 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         </div>
       </section>
       <section class="grp">
+        <h3>Fatigue ratings</h3>
+        <label class="toggle" for="fatOn"><input id="fatOn" type="checkbox" role="switch"><span class="track" aria-hidden="true"></span><span>Rate how tired you feel<small>Adds Fatigue rating to the Add menu. Rate 1 to 7 on the Samn-Perelli scale, for example at top of descent. After 5 or more ratings the Trip summary shows how well the model matches you. Ratings are kept when you start a new trip.</small></span></label>
+      </section>
+      <section class="grp">
         <h3>Your data</h3>
         <div class="btnrow"><button class="btn" id="expBtn" type="button">Back up trip</button><button class="btn" id="impBtn" type="button">Restore from file</button><input id="impFile" type="file" accept=".json,application/json" hidden></div>
         <p class="hint">Your trip is saved automatically in this browser. A backup file lets you keep a copy or move the trip to another device.</p>
@@ -512,7 +533,9 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>No flight ahead</dt>
       <dd>With "No flight, just a wake-up time" it searches single sleep windows for the 8 hours after the wake-up time you choose: half the average, half the lowest point.</dd>
       <dt>Warnings</dt>
-      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The list under the readout keeps every flagged stretch, past and future, with the past in grey. A planned sleep that fixes the problem makes the warning go away.</dd>
+      <dd>Shaded amber where, while you are awake, sleep pressure is above 70% (roughly 20 hours since a normal night) or alertness, before sleep inertia, is below 25. Shading, the amber bar in the sleep row and the warning box look ahead from now to 6 hours after your last landing, so the past is never shaded. Slide a sleep block over an amber stretch to fix it. The warning box under the readout lists every flagged stretch, with the past in grey. A planned sleep that fixes the problem makes the warning go away.</dd>
+      <dt>Fatigue ratings</dt>
+      <dd>Optional (Settings). The Samn-Perelli scale runs from 1 (fully alert, wide awake) to 7 (completely exhausted). Each rating is stored with the model's alertness at that moment. The Trip summary gives the correlation between the two over all your ratings, including earlier trips. A perfect match is −1, because higher alertness should go with a lower rating. It is a check on the model, not a calibration: the model does not change with your ratings.</dd>
       <dt>While asleep</dt>
       <dd>The dotted stretch of the alertness line is how alert you would be if you were awake at that moment. It is not a measure of the sleep itself. The value after waking can sit below the value at bedtime because bedtime is often near your body-clock peak and wake-up is often near its low, plus sleep inertia. Compare it with what the line would show had you stayed awake, not with the bedtime value.</dd>
       <dt>K: caffeine</dt>
@@ -555,6 +578,22 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       </div>
     </div>
     <div class="dlg-foot"><button class="btn" type="button" data-close>Close</button><button class="btn primary" id="plApply" type="button" hidden>Add to plan</button></div>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="rtDlg" aria-labelledby="rtTitle">
+  <div class="dlg-in">
+    <div class="dlg-head"><h2 id="rtTitle">Fatigue rating</h2><button class="icon-btn" type="button" data-close aria-label="Close">×</button></div>
+    <div class="dlg-body">
+      <div><label for="rtS">Time</label><div class="tz"><input id="rtS" type="datetime-local"><select id="rtZ" aria-label="Clock for the time"></select></div></div>
+      <div><span class="lab">How do you feel? Tap one to save.</span><div class="rt-opts" id="rtOpts"></div></div>
+      <p class="cap" id="rtCap"></p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn danger" id="rtDel" type="button">Delete</button>
+      <span></span>
+      <button class="btn primary" type="button" data-close>Done</button>
+    </div>
   </div>
 </dialog>
 
@@ -660,11 +699,22 @@ function blankTrip(){
   return {
     v:3, home:S.home, local:S.local, startLoc:'home', bed:S.bed, wake:S.wake, light:S.light, endAuto:true, landBed:S.landBed, balance:S.balance,
     show:JSON.parse(JSON.stringify(S.show)),
+    fatigue:!!S.fatigue, ratings:[], fatHist:fatArchive(),
     start:{t:iso(start), z:'home'},
     end:{t:iso(Math.ceil((now + 72*H + off*H)/H)*H), z:'home'},
     plan:null,
     rows:[]
   };
+}
+/* Ratings from the current trip, with the model's alertness, added to the history kept across trips. */
+function fatArchive(){
+  var hist = (S.fatHist || []).slice();
+  (S.ratings || []).forEach(function(r){
+    if(r.a == null) return;
+    var t = toAbs(r.s, r.sz);
+    if(!hist.some(function(h){ return h.t === t && h.v === r.v; })) hist.push({t:t, v:r.v, a:r.a});
+  });
+  return hist;
 }
 function validState(o){ return o && Array.isArray(o.rows) && o.start && o.end && o.show; }
 function load(){
@@ -697,10 +747,13 @@ function fixState(o){
   if(o.plan===undefined) o.plan = null;
   if(o.landBed===undefined) o.landBed = 2;
   if(o.balance!=='home' && o.balance!=='local') o.balance = 'balanced';
+  o.fatigue = !!o.fatigue;
+  if(!Array.isArray(o.ratings)) o.ratings = [];
+  if(!Array.isArray(o.fatHist)) o.fatHist = [];
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '15 Oct 2026 · build 15';
+var BUILD = '15 Oct 2026 · build 16';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1101,6 +1154,13 @@ function renderChart(){
     o.push('<path d="'+path('A','asleep')+'" fill="none" stroke="var(--alert)" stroke-opacity=".55" stroke-width="2.2" stroke-dasharray="1.5 4.5" stroke-linecap="round"/>');
     o.push('<path d="'+path('A','awake')+'" fill="none" stroke="var(--alert)" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>');
   }
+  if(S.fatigue) S.ratings.forEach(function(r){
+    var t = toAbs(r.s, r.sz);
+    if(!(t >= M.t0 && t <= M.t1)) return;
+    var p = ptAt(t), cx = x(t).toFixed(1), cy = y(p.A).toFixed(1);
+    o.push('<g><title>Fatigue '+r.v+': '+esc(SP[r.v-1])+' · model alertness '+Math.round(p.A)+'</title><circle cx="'+cx+'" cy="'+cy+'" r="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="2"/>'+
+           '<text x="'+cx+'" y="'+cy+'" dy="3.6" font-size="10.5" font-weight="700" text-anchor="middle" style="fill:var(--warn)">'+r.v+'</text></g>');
+  });
 
   var now = Date.now();
   if(now > M.t0 && now < M.t1){
@@ -1223,9 +1283,7 @@ function placeCursor(t){
   $('#roHome').textContent = hm(p.t, S.home) + ' ' + zname(S.home);
   $('#roLocal').textContent = localLbl(p);
   $('#roA').textContent = Math.round(p.A);
-  var gapH = p.E - p.loc;
-  $('#roGap').textContent = Math.abs(gapH) < 0.25 ? 'in sync' : f1(Math.abs(gapH)) + ' h ' + (gapH > 0 ? 'ahead' : 'behind');
-  $('#roState').innerHTML = p.sl ? 'Asleep' : 'Awake' + (p.W >= 1 ? ' <span class="inw">(inertia </span>' + MINUS + Math.round(p.W) + '<span class="inw">)</span>' : '');
+  $('#roSt').textContent = p.sl ? 'asleep' : (p.W >= 1 ? 'sleep inertia ' + MINUS + Math.round(p.W) : '');
 }
 function pointerToT(e){
   var svg = $('#chart'), r = svg.getBoundingClientRect();
@@ -1313,28 +1371,28 @@ function warnRange(r, useNow){
   return start + ' → ' + end + ' ' + zname(off) + (r.pa.fl ? ' home clock' : '');
 }
 function renderWarn(){
-  var box = $('#warnBox'), w = M && M.warn, lines = '', list = '';
-  function line(label, runs){
+  var box = $('#warnBox'), w = M && M.warn, h = '';
+  renderFlSum();
+  if(!w){ box.hidden = true; return; }
+  function row(label, past, fut){
+    var runs = past.filter(function(r){ return r.past; }).concat(fut);
     if(!runs.length) return '';
-    var shown = runs.slice(0,3).map(function(r){ return warnRange(r,true); }).join('; ');
-    if(runs.length > 3) shown += '; +' + (runs.length - 3) + ' more';
-    return '<p><span aria-hidden="true">‼️</span> <b>WARNING:</b> ' + label + ' ' + shown + '</p>';
-  }
-  function row(label, runs){
-    if(!runs.length) return '';
-    return '<p><b>' + label + '</b> ' + runs.map(function(r){
-      return '<span class="' + (r.past ? 'past' : 'soon') + '">' + warnRange(r,false) + '</span>';
+    return '<p class="wl"><b>' + label + '</b>' + runs.map(function(r){
+      return '<span class="' + (r.past ? 'past' : 'soon') + '">' + warnRange(r,true) + '</span>';
     }).join(' · ') + '</p>';
   }
-  if(w){
-    lines += line('Excessive sleep pressure', w.fpress); lines += line('Low alertness', w.flow);
-    list += row('Low alertness', w.low); list += row('High sleep pressure', w.press);
+  var fut = w.fpress.concat(w.flow).sort(function(p,q){ return p.a - q.a; }), live = fut.length > 0;
+  if(live) h += '<p><span aria-hidden="true">‼️</span> <b>WARNING</b></p>';
+  h += row('Low alertness', w.low, w.flow) + row('High sleep pressure', w.press, w.fpress);
+  box.hidden = !h;
+  box.classList.toggle('quiet', !live);
+  $('#warnLines').innerHTML = h;
+  $('#warnRec').hidden = !live;
+  if(live){
+    var f = fut[0], off = f.pa.fl ? S.home : f.pa.loc;
+    $('#warnRecT').textContent = f.now ? 'Plan a sleep now, or as soon as you can.'
+      : 'Plan a sleep before ' + dowLbl(f.a,off) + ' ' + hm(f.a,off) + ' ' + zname(off) + (f.pa.fl ? ' home clock' : '') + ', or slide one over the amber stretch.';
   }
-  renderFlSum();
-  box.hidden = !lines;
-  $('#warnLines').innerHTML = lines;
-  $('#warnList').hidden = !list;
-  $('#warnList').innerHTML = list;
 }
 
 /* Operate-flight summary: lowest awake alertness in flight and alertness at landing (last awake point). */
@@ -1417,6 +1475,17 @@ function renderStats(){
     });
     h += '</ul>';
   }
+  if(S.fatigue){
+    var st = rtStats(), fh = '<div class="fat-sum"><h3>Fatigue ratings</h3>';
+    if(st.n < 5) fh += '<p>' + st.n + ' rating' + (st.n === 1 ? '' : 's') + ' so far. After 5 the app can compare them with the model.</p>';
+    else if(st.flat) fh += '<p>' + st.n + ' ratings, but they are all the same, so there is nothing to compare yet.</p>';
+    else {
+      var rr = st.r, word = rr <= -0.5 ? 'Good match' : (rr <= -0.2 ? 'Partial match' : 'Poor match');
+      fh += '<p><b>' + word + '.</b> Correlation ' + (rr < 0 ? MINUS : '') + Math.abs(rr).toFixed(2) + ' over ' + st.n + ' ratings. A perfect match is ' + MINUS + '1, and 0 means no link.</p>';
+      if(st.n < 15) fh += '<p class="m">With fewer than about 15 ratings this figure can swing a lot.</p>';
+    }
+    h += fh + '</div>';
+  }
   box.innerHTML = h;
 }
 
@@ -1425,8 +1494,45 @@ var edId = null;
 var ICONS = {
   sleep:'<svg class="ic" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
   flight:'<svg class="ic" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>',
-  caffeine:'<svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg>'
+  caffeine:'<svg class="ic" viewBox="0 0 24 24"><path d="M5 9h11v5a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9zM16 10h1.5a2 2 0 0 1 0 4H16M8 3v2M12 3v2"/></svg>',
+  rating:'<svg class="ic" viewBox="0 0 24 24"><path d="M3.5 17a8.5 8.5 0 1 1 17 0"/><path d="M12 17l4.5-5"/><path d="M3.5 17h17"/></svg>'
 };
+var SP = ['Fully alert, wide awake','Very lively, responsive, but not at peak','Okay, somewhat fresh','A little tired, less than fresh','Moderately tired, let down','Extremely tired, very difficult to concentrate','Completely exhausted, unable to function effectively'];
+
+/* ---------- fatigue ratings ---------- */
+var RT = {id:null, s:null, sz:'home'};
+function rtById(id){ return S.ratings.filter(function(x){ return x.id === id; })[0]; }
+function openRating(id){
+  var r = id == null ? null : rtById(id);
+  if(r){ RT = {id:r.id, s:r.s, sz:r.sz}; }
+  else {
+    var now = Math.round(Date.now()/(5*60000))*5*60000;
+    var inM = M && now >= M.t0 && now <= M.t1;
+    var z = inM && !ptAt(now).fl ? zoneValueAt(now) : 'home';
+    RT = {id:null, s:iso(now + zoneOff(z)*H), sz:z};
+  }
+  $('#rtS').value = RT.s; fillZoneSelect($('#rtZ'), RT.sz);
+  $('#rtOpts').innerHTML = SP.map(function(d,i){
+    return '<button type="button" class="rt-opt" data-v="'+(i+1)+'" aria-pressed="'+(r && r.v === i+1)+'"><b>'+(i+1)+'</b><span>'+d+'</span></button>';
+  }).join('');
+  $('#rtDel').hidden = !r;
+  rtCap();
+  openDlg($('#rtDlg'));
+}
+function rtCap(){
+  var r = RT.id == null ? null : rtById(RT.id);
+  $('#rtCap').textContent = r && r.a != null ? 'Model alertness at this time: ' + r.a + '.' : '';
+}
+function rtStats(){
+  var pts = fatArchive();
+  var n = pts.length;
+  if(n < 5) return {n:n};
+  var mv = 0, ma = 0; pts.forEach(function(p){ mv += p.v; ma += p.a; }); mv /= n; ma /= n;
+  var sv = 0, sa = 0, c = 0;
+  pts.forEach(function(p){ sv += (p.v-mv)*(p.v-mv); sa += (p.a-ma)*(p.a-ma); c += (p.v-mv)*(p.a-ma); });
+  if(sv === 0 || sa === 0) return {n:n, flat:true};
+  return {n:n, r:c/Math.sqrt(sv*sa)};
+}
 function zoneOptionsHTML(val){
   var h = '<option value="home">Home · '+zname(S.home)+'</option><option value="local">Destination · '+zname(S.local)+'</option>';
   var known = false;
@@ -1480,7 +1586,18 @@ function renderList(){
     return (isNaN(x)?1e18:x) - (isNaN(y2)?1e18:y2);
   });
   var h = '';
-  list.forEach(function(r){
+  var items = list.map(function(r){ return {t:toAbs(r.s,r.sz), r:r}; });
+  if(S.fatigue) S.ratings.forEach(function(r){ items.push({t:toAbs(r.s,r.sz), rt:r}); });
+  items.sort(function(p,q){ return (isNaN(p.t)?1e18:p.t) - (isNaN(q.t)?1e18:q.t); });
+  items.forEach(function(it){
+    if(it.rt){
+      var q = it.rt, off = zoneOff(q.sz);
+      h += '<li><button type="button" class="ev t-rating" data-rid="'+q.id+'"><span class="ev-ico">'+ICONS.rating+'</span>'+
+        '<span class="ev-title">Fatigue '+q.v+'</span><span></span>'+
+        '<span class="ev-meta">'+dowLbl(it.t,off)+' '+hm(it.t,off)+' '+zname(off)+'<br>'+esc(SP[q.v-1])+(q.a != null ? ' · model '+q.a : ' · model has you asleep, so it is not compared')+'</span></button></li>';
+      return;
+    }
+    var r = it.r;
     var info = eventInfo(r);
     var ic = r.type==='flight' ? ICONS.flight : (r.type==='caffeine' ? ICONS.caffeine : ICONS.sleep);
     h += '<li><button type="button" class="ev t-'+r.type+'" data-id="'+r.id+'">'+
@@ -1489,10 +1606,10 @@ function renderList(){
       (r.type==='plan' ? '<span class="ev-badge">Planned</span>' : '<span></span>')+
       '<span class="ev-meta">'+info.when+(info.sub?'<br>'+info.sub:'')+'</span></button></li>';
   });
-  if(!list.length) h = '<li class="row-empty">Nothing here yet. Use Add to put in a sleep, a flight or a coffee.</li>';
+  if(!items.length) h = '<li class="row-empty">Nothing here yet. Use Add to put in a sleep, a flight or a coffee.</li>';
   ul.innerHTML = h;
   syncClrPlan();
-  $('#tlCount').textContent = list.length ? list.length + (list.length===1?' event':' events') + ' · tap to edit' : '';
+  $('#tlCount').textContent = items.length ? items.length + (items.length===1?' event':' events') + ' · tap to edit' : '';
   if(edId !== null){ var er = rowById(edId); if(er) $('#evCap').innerHTML = capHTML(er); }
 }
 function capHTML(r){ var i = eventInfo(r); return i.when + (i.sub ? ' · ' + i.sub : ''); }
@@ -1572,6 +1689,7 @@ function syncSettings(){
   fillZoneSelect($('#startZ'), S.start.z); fillZoneSelect($('#endZ'), S.end.z);
   $('#startT').value = S.start.t; $('#endT').value = S.end.t;
   $('#showDiff').checked = !!S.show.diff;
+  $('#fatOn').checked = !!S.fatigue;
   syncDerived();
 }
 function syncEndField(){
@@ -1592,6 +1710,7 @@ function syncDerived(){
   var gl = $('#ghostLeg'); if(gl) gl.hidden = !(ghost && M && ghost.t0===M.t0 && ghost.t1===M.t1);
   $('#diffLeg').hidden = !(S.show.diff && S.show.body && S.show.local);
   $('#warnLeg').hidden = !(M && M.warn && M.warn.bands.length);
+  $('#addRating').hidden = !S.fatigue; $('#qaRating').hidden = !S.fatigue;
   $('#sumLine').textContent = 'Home '+zname(S.home)+' · Destination '+zname(S.local)+' · Usual sleep '+S.bed+' to '+S.wake+' · Light '+S.light+'%';
   syncEndField();
 }
@@ -1599,6 +1718,10 @@ function syncDerived(){
 function render(){
   M = buildModel();
   if(M) M.warn = computeWarn(M);
+  S.ratings.forEach(function(r){
+    var t = toAbs(r.s, r.sz);
+    if(M && t >= M.t0 && t <= M.t1){ var p = ptAt(t); r.a = p.sl ? null : Math.round(p.A); } else r.a = null;
+  });
   syncDerived();
   renderChart();
   renderStats();
@@ -2182,7 +2305,32 @@ function bind(){
   /* timeline list and editor */
   $('#rows').addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('.ev');
-    if(b) openEditor(+b.dataset.id);
+    if(!b) return;
+    if(b.dataset.rid) openRating(+b.dataset.rid); else openEditor(+b.dataset.id);
+  });
+  $('#fatOn').addEventListener('change', function(){ S.fatigue = this.checked; render(); });
+  function rtSync(){
+    var r = RT.id == null ? null : rtById(RT.id);
+    if(r){ r.s = RT.s; r.sz = RT.sz; render(); rtCap(); }
+  }
+  $('#rtS').addEventListener('input', function(){ if(this.value){ RT.s = this.value; rtSync(); } });
+  $('#rtZ').addEventListener('change', function(){
+    /* keep the same moment, show it on the new clock */
+    var t = toAbs(RT.s, RT.sz); RT.sz = this.value; RT.s = iso(t + zoneOff(RT.sz)*H); $('#rtS').value = RT.s; rtSync();
+  });
+  $('#rtOpts').addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('.rt-opt'); if(!b) return;
+    var v = +b.dataset.v, r = RT.id == null ? null : rtById(RT.id);
+    if(!r){
+      var id = 1; S.ratings.forEach(function(x){ if(x.id >= id) id = x.id + 1; });
+      r = {id:id, s:RT.s, sz:RT.sz, v:v}; S.ratings.push(r); RT.id = id;
+    } else r.v = v;
+    render();
+    closeDlg($('#rtDlg'));
+  });
+  $('#rtDel').addEventListener('click', function(){
+    S.ratings = S.ratings.filter(function(x){ return x.id !== RT.id; });
+    closeDlg($('#rtDlg')); render();
   });
   function ed(fn){ return function(){ var r = rowById(edId); if(!r) return; fn.call(this, r); render(); }; }
   function cafSync(r){ if(r.type==='caffeine'){ r.e = r.s; r.ez = r.sz; } }
@@ -2226,7 +2374,7 @@ function bind(){
   $('#evAuto').addEventListener('click', function(){ var id = edId; closeDlg($('#evDlg')); openPlan(id); });
 
   /* dialogs: close buttons and backdrop taps */
-  ['#setDlg','#evDlg','#logDlg','#planDlg'].forEach(function(sel){
+  ['#setDlg','#evDlg','#logDlg','#planDlg','#rtDlg'].forEach(function(sel){
     var d = $(sel);
     d.addEventListener('click', function(e){ if(e.target === d) closeDlg(d); });
     d.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click', function(){ closeDlg(d); }); });
@@ -2238,7 +2386,7 @@ function bind(){
   document.querySelectorAll('#logDlg [role=tab]').forEach(function(b){ b.addEventListener('click', function(){ showTab(this.dataset.tab); }); });
   $('#quickAdd').addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-add]');
-    if(b) addEvent(b.dataset.add);
+    if(b){ if(b.dataset.add === 'rating') openRating(null); else addEvent(b.dataset.add); }
   });
   $('#planBtn').addEventListener('click', function(){ closeMenu(); openPlan(null); });
   $('#planDlg').addEventListener('close', function(){ PL.run++; planReset(); });
@@ -2291,7 +2439,8 @@ function bind(){
   menu.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-add]');
     if(!b) return;
-    closeMenu(); addEvent(b.dataset.add);
+    closeMenu();
+    if(b.dataset.add === 'rating') openRating(null); else addEvent(b.dataset.add);
   });
   document.addEventListener('click', function(e){ if(!menu.hidden && !e.target.closest('.addwrap')) closeMenu(); });
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !menu.hidden){ closeMenu(); addBtn.focus(); } });
@@ -2310,7 +2459,10 @@ function bind(){
     });
   }
   function swapTrip(next){ S = fixState(next); curT = null; ghost = null; syncSettings(); render(); }
-  twoClick($('#resetBtn'), 'Load example trip', 'Click again to replace', function(){ swapTrip(defaults()); });
+  twoClick($('#resetBtn'), 'Load example trip', 'Click again to replace', function(){
+    var fat = !!S.fatigue, hist = fatArchive(), d = defaults();
+    d.fatigue = fat; d.fatHist = hist; swapTrip(d);
+  });
   twoClick($('#newBtn'), 'Start new trip', 'Click again to clear', function(){ swapTrip(blankTrip()); });
 
   var svg = $('#chart');
