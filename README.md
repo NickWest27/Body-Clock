@@ -16,6 +16,14 @@ With no flight ahead, choose "No flight, just a wake-up time" and it aims at the
 
 A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.
 
+## Zoom the chart
+
+Pinch the chart with two fingers to zoom the time axis, and drag with two fingers to move along it. The buttons under the chart do the same: plus and minus zoom, the arrows move by half a screen, Fit shows the whole trip. On a computer, hold Ctrl and scroll. One finger still moves the pointer, drags blocks and scrolls the page. Tick labels get finer as you zoom, down to half hours, and the line under the chart shows which stretch is on screen (home clock).
+
+## Night and places
+
+Night shading is drawn where you are: for the city used for each zone (Atlanta for US Eastern, Dallas for US Central, São Paulo, London, Doha, Delhi and so on), and along the straight line between cities during a flight. The sun position is checked against an independent sunrise equation to within a minute. A custom UTC offset has no city, so it assumes 40°N, which makes nights too long near the equator and in the southern hemisphere. Pick a listed zone when you can.
+
 ## Flight summary
 
 Under the readout, each Operate flight gets one line: the lowest alertness while you are awake on board, when it happens (home clock), and your alertness at landing. Numbers below 25 show in red. Time asleep on board, such as a relief rest, is left out, but sleep inertia after waking is counted.

@@ -168,7 +168,7 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 .ro-vals dt{font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .ro-vals dd{margin:0;font-family:var(--f-mono);font-size:.92rem;font-weight:500;font-variant-numeric:tabular-nums}
 .chart-scroll{overflow-x:auto;border-radius:6px}
-#chart{display:block;touch-action:pan-x pan-y}
+#chart{display:block;touch-action:pan-y;-webkit-user-select:none;user-select:none}
 #chart .dg{touch-action:none}
 #chart .dg-edge{cursor:ew-resize}
 #chart .dg-move{cursor:grab}
@@ -176,6 +176,12 @@ svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-wid
 #chart.dragging,#chart.dragging .dg{cursor:grabbing}
 #chart text{font-family:var(--f-mono);fill:var(--muted)}
 .empty{margin:0;padding:40px 12px;text-align:center;color:var(--muted)}
+.viewbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 0}
+.vb-range{font-family:var(--f-mono);font-size:.74rem;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vb-btns{display:flex;gap:4px;flex:none}
+.vb{min-width:34px;height:34px;padding:0 8px;border:1px solid var(--line);border-radius:9px;background:var(--field);color:var(--ink);font:inherit;font-size:1.05rem;font-weight:600;line-height:1;cursor:pointer}
+.vb:disabled{opacity:.35;cursor:default}
+.vb-fit{font-size:.8rem}
 .clipnote{margin:8px 0 0;font-size:.8rem;color:var(--warn)}
 
 /* stats */
@@ -405,6 +411,16 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <svg id="chart" role="img" aria-label="Chart of alertness index, body clock rhythm and local day rhythm, with sleep, flight, location and caffeine markers"></svg>
       <p class="empty" id="chartEmpty" hidden>The chart end is before the chart start. Time travel is not modelled.</p>
     </div>
+    <div class="viewbar" id="viewBar">
+      <span class="vb-range" id="vbRange"></span>
+      <span class="vb-btns" role="group" aria-label="Zoom the chart">
+        <button class="vb" id="vbPrev" type="button" aria-label="Show earlier" disabled>‹</button>
+        <button class="vb" id="vbNext" type="button" aria-label="Show later" disabled>›</button>
+        <button class="vb" id="vbOut" type="button" aria-label="Zoom out" disabled>−</button>
+        <button class="vb" id="vbIn" type="button" aria-label="Zoom in">+</button>
+        <button class="vb vb-fit" id="vbFit" type="button" disabled>Fit</button>
+      </span>
+    </div>
     <p class="clipnote" id="clipNote" hidden>The chart shows the first 10 days of your range.</p>
     <div class="readout" id="readout">
       <div class="ro-when"><span id="roDate"></span><span>Home <b id="roHome"></b></span><span>Local <b id="roLocal"></b></span></div>
@@ -417,7 +433,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
         <div class="warn-rec" id="warnRec"><span id="warnRecT"></span> <button class="btn" id="warnPlan" type="button">Plan sleep</button></div>
       </div>
     </div>
-    <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length.</p>
+    <p class="tip">Tap a block to edit it. Drag it to slide it, or drag its edges to change its length. Pinch with two fingers to zoom, or use the buttons.</p>
   </section>
 
 </main>
@@ -461,7 +477,7 @@ dialog.tall .dlg-body{flex:1;min-height:0}
             <div class="zone"><select id="localSel"></select><input id="localOff" type="number" step="0.5" min="-12" max="14" aria-label="Destination UTC offset in hours"></div>
           </div>
         </div>
-        <p class="hint">Offsets assume daylight time, which applies to both ends of an October trip.</p>
+        <p class="hint">Offsets assume daylight time, which applies to both ends of an October trip. Night shading and daylight come from the city named for each zone. A custom offset assumes 40°N.</p>
       </section>
       <section class="grp">
         <h3>Where you start</h3>
@@ -545,9 +561,11 @@ dialog.tall .dlg-body{flex:1;min-height:0}
       <dt>Clock gap</dt>
       <dd>The difference between where your body clock sits and the clock where you are. When you are behind (the local clock is later than your body clock, as after flying east) the area between the two curves is red. When you are ahead (as after flying west) it is green. Gaps under 15 minutes are not shaded.</dd>
       <dt>Where you are</dt>
-      <dd>You start in the zone you pick. During a flight your position moves in a straight line from the departure city to the landing city, and the local clock and the sun move with it. Each zone uses a representative city: New York for US Eastern, Dallas for US Central, London for London, and so on. A custom offset assumes 40°N.</dd>
+      <dd>You start in the zone you pick. During a flight your position moves in a straight line from the departure city to the landing city, and the local clock and the sun move with it. Each zone uses a representative city for the sun: Atlanta for US Eastern, Dallas for US Central, São Paulo, London, Doha, Delhi and so on. A custom offset has no city, so it assumes 40°N, which makes nights too long near the equator or in the southern hemisphere. Pick a listed zone when you can.</dd>
       <dt>Night and low</dt>
-      <dd>Night is shaded when the sun is below the horizon at your position. Body-clock low marks the lowest tenth of the circadian wave.</dd>
+      <dd>Night is shaded when the sun is below the horizon where you are: at the city used for the zone you are in, or on the straight line between cities during a flight. Body-clock low marks the lowest tenth of the circadian wave.</dd>
+      <dt>Zoom</dt>
+      <dd>Pinch the chart with two fingers to zoom the time axis, and drag with two fingers to move along it. The buttons below the chart do the same: plus and minus zoom, the arrows move by half a screen, Fit shows the whole trip. On a computer, hold Ctrl and scroll. One finger still moves the pointer, drags blocks and scrolls the page. The tick labels get finer as you zoom, down to half hours.</dd>
       <dt>Chart end</dt>
       <dd>Set automatically to 12 h after your last flight lands, or after your last sleep row if that ends later.</dd>
     </dl>
@@ -630,9 +648,12 @@ var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','De
 var ZONES = [
   {n:'Hawaii',a:'HST',o:-10,lat:21.31,lon:-157.86},{n:'Pacific',a:'PDT',o:-7,lat:34.05,lon:-118.25},
   {n:'Mountain',a:'MDT',o:-6,lat:39.74,lon:-104.99},{n:'US Central',a:'CDT',o:-5,lat:32.78,lon:-96.8},
-  {n:'US Eastern',a:'EDT',o:-4,lat:40.71,lon:-74.0},{n:'UTC',a:'UTC',o:0,lat:51.48,lon:0},
+  {n:'US Eastern',a:'EDT',o:-4,lat:33.75,lon:-84.39},{n:'São Paulo',a:'BRT',o:-3,lat:-23.55,lon:-46.63},
+  {n:'UTC',a:'UTC',o:0,lat:51.48,lon:0},
   {n:'London',a:'BST',o:1,lat:51.51,lon:-0.13},{n:'Central Europe',a:'CEST',o:2,lat:50.11,lon:8.68},
-  {n:'Dubai',a:'GST',o:4,lat:25.2,lon:55.27},{n:'Singapore',a:'SGT',o:8,lat:1.35,lon:103.82},
+  {n:'Doha',a:'+03',o:3,lat:25.29,lon:51.53},
+  {n:'Dubai',a:'GST',o:4,lat:25.2,lon:55.27},{n:'Delhi',a:'IST',o:5.5,lat:28.61,lon:77.21},
+  {n:'Bangkok',a:'ICT',o:7,lat:13.76,lon:100.5},{n:'Singapore',a:'SGT',o:8,lat:1.35,lon:103.82},
   {n:'Tokyo',a:'JST',o:9,lat:35.68,lon:139.69},{n:'Sydney',a:'AEDT',o:11,lat:-33.87,lon:151.21}
 ];
 
@@ -753,7 +774,7 @@ function fixState(o){
   nid = 1; o.rows.forEach(function(r){ if(r.id >= nid) nid = r.id + 1; });
   return o;
 }
-var BUILD = '15 Oct 2026 · build 16';
+var BUILD = '16 Oct 2026 · build 17';
 var S = fixState(load());
 
 /* ---------- time helpers ---------- */
@@ -1034,6 +1055,7 @@ function ptAt(t){
 
 /* ---------- chart ---------- */
 var G = null, curT = null, drag = null, ghost = null;
+var VIEW = null, MINSP = 3*H;   /* VIEW = {a,b} in ms while zoomed in, null for the whole trip */
 var Lm = 54, Rm = 18, Tm = 32, PH = 250, NARROW = false;
 
 function renderChart(){
@@ -1043,19 +1065,26 @@ function renderChart(){
   svg.style.display = 'block'; empty.hidden = true;
   NARROW = wrap.clientWidth < 640;
   Lm = NARROW ? 44 : 54; Rm = NARROW ? 10 : 18; PH = NARROW ? 210 : 250;
-  var W = NARROW ? Math.max(300, wrap.clientWidth) : Math.max(760, wrap.clientWidth), PW = W - Lm - Rm;
+  var W = Math.max(300, wrap.clientWidth), PW = W - Lm - Rm;
+  var full = M.t1 - M.t0;
+  if(VIEW){
+    var vs = Math.min(full, Math.max(MINSP, VIEW.b - VIEW.a));
+    if(vs >= full*0.98) VIEW = null;
+    else { var va = Math.max(M.t0, Math.min(M.t1 - vs, VIEW.a)); VIEW = {a:va, b:va + vs}; }
+  }
+  var v0 = VIEW ? VIEW.a : M.t0, v1 = VIEW ? VIEW.b : M.t1;
   var laneH = 20, laneY = Tm + PH + 10, lane2 = laneY + laneH + 6, lane3 = lane2 + laneH + 6;
   var hasCaff = M.doses.length > 0 || S.rows.some(function(r){ return r.type==='caffeine'; });
   var lane4 = lane3 + laneH + 6, laneEnd = hasCaff ? lane4 + laneH : lane3 + laneH;
   var axisY = laneEnd + 18, dateY = axisY + 15, Ht = dateY + 8;
   var P = S.home;
-  var span = (M.t1 - M.t0)/H;
-  function x(t){ return Lm + (t - M.t0)/(M.t1 - M.t0)*PW; }
+  var span = (v1 - v0)/H;
+  function x(t){ return Lm + (t - v0)/(v1 - v0)*PW; }
   function y(v){ return Tm + PH*(1 - v/100); }
-  G = {W:W,PW:PW,Ht:Ht,laneEnd:laneEnd,x:x,y:y};
+  G = {W:W,PW:PW,Ht:Ht,laneEnd:laneEnd,x:x,y:y,v0:v0,v1:v1};
   var o = [];
 
-  o.push('<defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="var(--sleep)" fill-opacity=".07"/><line x1="0" y1="0" x2="0" y2="7" stroke="var(--sleep)" stroke-opacity=".55" stroke-width="2"/></pattern></defs>');
+  o.push('<defs><clipPath id="plotclip"><rect x="'+Lm+'" y="'+(Tm-4)+'" width="'+PW+'" height="'+(PH+8)+'"/></clipPath><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="var(--sleep)" fill-opacity=".07"/><line x1="0" y1="0" x2="0" y2="7" stroke="var(--sleep)" stroke-opacity=".55" stroke-width="2"/></pattern></defs>');
 
   [0,25,50,75,100].forEach(function(v){
     o.push('<line x1="'+Lm+'" x2="'+(W-Rm)+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line-soft)" stroke-width="1"/>');
@@ -1083,6 +1112,7 @@ function renderChart(){
   });
 
   if(S.show.diff && S.show.body && S.show.local){
+    o.push('<g clip-path="url(#plotclip)">');
     var gruns = [], gcur = null;
     for(var gi2=0; gi2<M.pts.length; gi2++){
       var gp = M.pts[gi2], gg = gp.E - gp.loc, gs = Math.abs(gg) < 0.25 ? 0 : (gg > 0 ? 1 : -1);
@@ -1096,6 +1126,7 @@ function renderChart(){
       for(var k2=r.e; k2>=r.a; k2--) d += 'L'+x(M.pts[k2].t).toFixed(1)+' '+y(M.pts[k2].cl).toFixed(1);
       o.push('<path d="'+d+'Z" style="fill:var('+(r.s>0?'--ahead':'--behind')+')" fill-opacity=".2" stroke="none"/>');
     });
+    o.push('</g>');
   }
 
   M.sleepAll.forEach(function(iv){
@@ -1105,22 +1136,24 @@ function renderChart(){
     o.push('<rect x="'+xa.toFixed(1)+'" y="'+Tm+'" width="'+(xb-xa).toFixed(1)+'" height="'+PH+'" fill="'+(plan?'url(#hatch)':'var(--sleep)')+'" fill-opacity="'+(plan?1:.17)+'"/>');
   });
 
-  var pxH = PW/span, step = 24, cand = [1,2,3,6,12,24];
-  for(var ci=0; ci<cand.length; ci++){ if(cand[ci]*pxH >= 40){ step = cand[ci]; break; } }
-  var first = Math.ceil((M.t0/H + P)/step)*step - P;
+  var pxH = PW/span, step = 24, cand = [0.5,1,2,3,6,12,24];
+  for(var ci=0; ci<cand.length; ci++){ if(cand[ci]*pxH >= (cand[ci] < 1 ? 44 : 34)){ step = cand[ci]; break; } }
+  var mins = step < 1;
+  function tickTxt(h){ if(!mins) return pad(Math.round(h)%24); var tot = Math.round(h*60)%1440; return pad(Math.floor(tot/60)) + ':' + pad(tot%60); }
+  var kFirst = Math.ceil((v0/H + P)/step - 1e-9), kLast = Math.floor((v1/H + P)/step + 1e-9);
   var dateLabels = [];
-  for(var th = first; th*H <= M.t1 + 1; th += step){
-    var tt = th*H, xx = x(tt);
-    var hr = tod(tt,P), isMid = Math.abs(hr) < 1e-6 || Math.abs(hr-24) < 1e-6;
+  for(var kk = kFirst; kk <= kLast; kk++){
+    var tt = (kk*step - P)*H, xx = x(tt);
+    var hr = tod(tt,P), isMid = Math.abs(hr) < 1e-4 || Math.abs(hr-24) < 1e-4;
     o.push('<line x1="'+xx.toFixed(1)+'" x2="'+xx.toFixed(1)+'" y1="'+Tm+'" y2="'+laneEnd+'" stroke="'+(isMid?'var(--line)':'var(--line-soft)')+'" stroke-width="1"/>');
-    o.push('<text x="'+xx.toFixed(1)+'" y="'+axisY+'" font-size="10.5" text-anchor="middle">'+pad(Math.round(hr)%24)+'</text>');
-    o.push('<text x="'+xx.toFixed(1)+'" y="'+(Tm-10)+'" font-size="10" text-anchor="middle" fill-opacity=".85">'+pad(Math.round(tod(tt,M.locAt(tt).off))%24)+'</text>');
+    o.push('<text x="'+xx.toFixed(1)+'" y="'+axisY+'" font-size="10.5" text-anchor="middle">'+tickTxt(hr)+'</text>');
+    o.push('<text x="'+xx.toFixed(1)+'" y="'+(Tm-10)+'" font-size="10" text-anchor="middle" fill-opacity=".85">'+tickTxt(tod(tt,M.locAt(tt).off))+'</text>');
     if(isMid) dateLabels.push(tt);
   }
   var dayPx = 24*pxH, shortDay = dayPx < 96, dayW = shortDay ? 44 : 70;
   function dLbl(t){ var s2 = dayLbl(t,P); return shortDay ? s2.replace(/ [A-Za-z]+$/,'') : s2; }
   var firstMid = dateLabels.length ? x(dateLabels[0]) : (W-Rm);
-  if(firstMid - Lm > dayW + 14) o.push('<text x="'+(Lm+2)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dLbl(M.t0)+'</text>');
+  if(firstMid - Lm > dayW + 14) o.push('<text x="'+(Lm+2)+'" y="'+dateY+'" font-size="10.5" style="fill:var(--ink)">'+dLbl(v0+1000)+'</text>');
   dateLabels.forEach(function(tt){
     var xx = x(tt);
     if(xx > W - Rm - dayW) return;
@@ -1134,7 +1167,8 @@ function renderChart(){
   function path(key, mode){
     /* mode 'awake': skip sleeping points. mode 'asleep': only sleeping points plus the awake point just before bedtime. */
     var d = '', pen = false;
-    for(var i=0;i<M.pts.length;i++){
+    var ia = Math.max(0, Math.floor((v0 - M.t0)/M.dt) - 1), ib = Math.min(M.pts.length-1, Math.ceil((v1 - M.t0)/M.dt) + 1);
+    for(var i=ia;i<=ib;i++){
       var p = M.pts[i], nx = M.pts[i+1];
       var use = mode === 'awake' ? !p.sl : (mode === 'asleep' ? (p.sl || (nx && nx.sl)) : true);
       if(!use){ pen = false; continue; }
@@ -1142,6 +1176,7 @@ function renderChart(){
     }
     return d;
   }
+  o.push('<g clip-path="url(#plotclip)">');
   if(ghost && S.show.alert && ghost.t0===M.t0 && ghost.t1===M.t1 && ghost.A.length===M.pts.length){
     var gd = '';
     for(var gi=0; gi<ghost.A.length; gi++) gd += (gi?'L':'M')+x(M.pts[gi].t).toFixed(1)+' '+y(ghost.A[gi]).toFixed(1);
@@ -1154,16 +1189,17 @@ function renderChart(){
     o.push('<path d="'+path('A','asleep')+'" fill="none" stroke="var(--alert)" stroke-opacity=".55" stroke-width="2.2" stroke-dasharray="1.5 4.5" stroke-linecap="round"/>');
     o.push('<path d="'+path('A','awake')+'" fill="none" stroke="var(--alert)" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>');
   }
+  o.push('</g>');
   if(S.fatigue) S.ratings.forEach(function(r){
     var t = toAbs(r.s, r.sz);
-    if(!(t >= M.t0 && t <= M.t1)) return;
+    if(!(t >= v0 && t <= v1)) return;
     var p = ptAt(t), cx = x(t).toFixed(1), cy = y(p.A).toFixed(1);
     o.push('<g><title>Fatigue '+r.v+': '+esc(SP[r.v-1])+' · model alertness '+Math.round(p.A)+'</title><circle cx="'+cx+'" cy="'+cy+'" r="8" fill="var(--surface)" stroke="var(--warn)" stroke-width="2"/>'+
            '<text x="'+cx+'" y="'+cy+'" dy="3.6" font-size="10.5" font-weight="700" text-anchor="middle" style="fill:var(--warn)">'+r.v+'</text></g>');
   });
 
   var now = Date.now();
-  if(now > M.t0 && now < M.t1){
+  if(now > v0 && now < v1){
     var xn = x(now);
     o.push('<line x1="'+xn.toFixed(1)+'" x2="'+xn.toFixed(1)+'" y1="'+Tm+'" y2="'+laneEnd+'" stroke="var(--ink)" stroke-width="1" stroke-dasharray="3 3"/>');
     o.push('<text x="'+(xn+4).toFixed(1)+'" y="'+(Tm+PH-6)+'" font-size="10" style="fill:var(--ink)">now</text>');
@@ -1213,7 +1249,7 @@ function renderChart(){
   if(hasCaff) S.rows.forEach(function(r){
     if(r.type!=='caffeine') return;
     var t = toAbs(r.s,r.sz), mg = Math.max(0, +r.mg||0);
-    if(isNaN(t) || t < M.t0 || t > M.t1) return;
+    if(isNaN(t) || t < v0 || t > v1) return;
     var xm = x(t);
     o.push('<circle cx="'+xm.toFixed(1)+'" cy="'+(lane4+laneH/2)+'" r="6" style="fill:var(--caff)"><title>'+esc(r.label||'Caffeine')+' · '+mg+' mg</title></circle>');
     o.push('<text x="'+(xm+10).toFixed(1)+'" y="'+(lane4+14)+'" font-size="10.5" style="fill:var(--ink)">'+mg+' mg</text>');
@@ -1236,7 +1272,7 @@ function renderChart(){
     if(r.type==='flight') return;
     if(r.type==='caffeine'){
       var tc2 = toAbs(r.s,r.sz);
-      if(isNaN(tc2) || tc2 < M.t0 || tc2 > M.t1) return;
+      if(isNaN(tc2) || tc2 < v0 || tc2 > v1) return;
       o.push('<rect class="dg dg-move" data-id="'+r.id+'" data-mode="move" x="'+(x(tc2)-9).toFixed(1)+'" y="'+lane4+'" width="18" height="'+laneH+'" fill="transparent"><title>Drag to move</title></rect>');
       return;
     }
@@ -1260,11 +1296,52 @@ function renderChart(){
   svg.setAttribute('height', Ht);
   svg.innerHTML = o.join('');
   placeCursor(curT);
+  syncViewBar();
+}
+
+/* ---------- zoom ---------- */
+function viewNow(){ return G ? {a:G.v0, b:G.v1} : (M ? {a:M.t0, b:M.t1} : null); }
+function setView(a, b){
+  if(!M) return;
+  var full = M.t1 - M.t0, sp = Math.min(full, Math.max(MINSP, b - a));
+  if(sp >= full*0.98) VIEW = null;
+  else { a = Math.max(M.t0, Math.min(M.t1 - sp, a)); VIEW = {a:a, b:a + sp}; }
+  var v = VIEW || {a:M.t0, b:M.t1};
+  if(curT != null && (curT < v.a || curT > v.b)){
+    var n = Date.now();
+    curT = (n > v.a && n < v.b) ? n : (v.a + v.b)/2;
+  }
+  renderChart();
+}
+function zoomBy(f, anchor){
+  var v = viewNow(); if(!v) return;
+  var sp = (v.b - v.a)*f;
+  var at = (anchor != null && anchor >= v.a && anchor <= v.b) ? anchor : (v.a + v.b)/2;
+  var rel = (at - v.a)/(v.b - v.a);
+  setView(at - rel*sp, at + (1-rel)*sp);
+}
+function panBy(frac){
+  var v = viewNow(); if(!v || !VIEW) return;
+  var d = (v.b - v.a)*frac; setView(v.a + d, v.b + d);
+}
+function syncViewBar(){
+  var bar = $('#viewBar');
+  if(!M || !G){ bar.hidden = true; return; }
+  bar.hidden = false;
+  var v = viewNow(), z = !!VIEW;
+  $('#vbRange').textContent = z ? rangeStr(v.a, v.b, S.home) : 'Pinch to zoom';
+  $('#vbRange').title = z ? 'Home clock, ' + zname(S.home) : '';
+  $('#vbPrev').disabled = !z || v.a <= M.t0 + 1;
+  $('#vbNext').disabled = !z || v.b >= M.t1 - 1;
+  $('#vbOut').disabled = !z;
+  $('#vbFit').disabled = !z;
+  $('#vbIn').disabled = (v.b - v.a) <= MINSP*1.01;
 }
 
 function defaultCursorT(){
-  var now = Date.now();
-  if(now > M.t0 && now < M.t1) return now;
+  var now = Date.now(), lo = G ? G.v0 : M.t0, hi = G ? G.v1 : M.t1;
+  if(now > lo && now < hi) return now;
+  if(VIEW) return (lo + hi)/2;
   var best = M.pts[0];
   M.pts.forEach(function(p){ if(!p.sl && (best.sl || p.A < best.A)) best = p; });
   return best.t;
@@ -1277,8 +1354,9 @@ function placeCursor(t){
   var xx = G.x(p.t);
   var yv = S.show.alert ? p.A : (S.show.body ? p.cb : (S.show.local ? p.cl : p.A));
   var line = $('#cLine'), dot = $('#cDot');
-  if(line){ line.setAttribute('x1', xx); line.setAttribute('x2', xx); }
-  if(dot){ dot.setAttribute('cx', xx); dot.setAttribute('cy', G.y(yv)); }
+  var offView = xx < Lm - 0.5 || xx > G.W - Rm + 0.5;
+  if(line){ line.setAttribute('x1', xx); line.setAttribute('x2', xx); line.style.display = offView ? 'none' : ''; }
+  if(dot){ dot.setAttribute('cx', xx); dot.setAttribute('cy', G.y(yv)); dot.style.display = offView ? 'none' : ''; }
   $('#roDate').textContent = dayLbl(p.t, S.home);
   $('#roHome').textContent = hm(p.t, S.home) + ' ' + zname(S.home);
   $('#roLocal').textContent = localLbl(p);
@@ -1289,13 +1367,13 @@ function pointerToT(e){
   var svg = $('#chart'), r = svg.getBoundingClientRect();
   var px = (e.clientX - r.left) * (G.W / r.width);
   if(px < Lm || px > G.W - Rm) return null;
-  return M.t0 + (px - Lm)/G.PW*(M.t1 - M.t0);
+  return G.v0 + (px - Lm)/G.PW*(G.v1 - G.v0);
 }
 function pointerT(e){
   var svg = $('#chart'), r = svg.getBoundingClientRect();
   var px = (e.clientX - r.left) * (G.W / r.width);
   px = Math.max(Lm, Math.min(G.W - Rm, px));
-  return M.t0 + (px - Lm)/G.PW*(M.t1 - M.t0);
+  return G.v0 + (px - Lm)/G.PW*(G.v1 - G.v0);
 }
 function rowById(id){ return S.rows.filter(function(x){ return x.id === id; })[0]; }
 function syncRowInputs(r){
@@ -2250,7 +2328,7 @@ function startRestore(file){
     if(!(st && st.v === 3 && validState(st))){ say('That file is not a Body Clock backup, or it comes from a different version.'); return; }
     var n = st.rows.length;
     say('Found a trip with ' + n + (n===1 ? ' event' : ' events') + '. Replace what is here? <button type="button" class="btn" id="rsYes">Replace</button><button type="button" class="btn quiet" id="rsNo">Cancel</button>', true);
-    $('#rsYes').onclick = function(){ S = fixState(st); curT = null; ghost = null; syncSettings(); render(); say('Trip restored.'); };
+    $('#rsYes').onclick = function(){ S = fixState(st); curT = null; ghost = null; VIEW = null; syncSettings(); render(); say('Trip restored.'); };
     $('#rsNo').onclick = function(){ say('Restore cancelled.'); };
   };
   rd.onerror = function(){ say('Could not read that file.'); };
@@ -2458,7 +2536,7 @@ function bind(){
       action();
     });
   }
-  function swapTrip(next){ S = fixState(next); curT = null; ghost = null; syncSettings(); render(); }
+  function swapTrip(next){ S = fixState(next); curT = null; ghost = null; VIEW = null; syncSettings(); render(); }
   twoClick($('#resetBtn'), 'Load example trip', 'Click again to replace', function(){
     var fat = !!S.fatigue, hist = fatArchive(), d = defaults();
     d.fatigue = fat; d.fatHist = hist; swapTrip(d);
@@ -2466,7 +2544,42 @@ function bind(){
   twoClick($('#newBtn'), 'Start new trip', 'Click again to clear', function(){ swapTrip(blankTrip()); });
 
   var svg = $('#chart');
+  /* two fingers zoom and pan the time axis; one finger moves the pointer, drags a block, or scrolls the page */
+  var tps = {}, pinch = null, pinched = false;
+  function tCount(){ return Object.keys(tps).length; }
+  function tPair(){ var ids = Object.keys(tps); return [tps[ids[0]], tps[ids[1]]]; }
+  function pxOf(clientX){ var r = svg.getBoundingClientRect(); return (clientX - r.left) * (G.W / r.width); }
+  function pinchGeom(){
+    var q = tPair();
+    return {d:Math.max(12, Math.hypot(q[0].x - q[1].x, q[0].y - q[1].y)), mx:Math.max(Lm, Math.min(G.W - Rm, pxOf((q[0].x + q[1].x)/2)))};
+  }
+  function startPinch(){
+    var g = pinchGeom();
+    pinch = {d0:g.d, a:G.v0, b:G.v1, tc:G.v0 + (g.mx - Lm)/G.PW*(G.v1 - G.v0), raf:0};
+    pinched = true;
+  }
+  function movePinch(){
+    if(!pinch || tCount() < 2 || !M || !G) return;
+    var g = pinchGeom(), sp = (pinch.b - pinch.a)*pinch.d0/g.d;
+    sp = Math.max(MINSP, Math.min(M.t1 - M.t0, sp));
+    var a = pinch.tc - (g.mx - Lm)/G.PW*sp;
+    setView(a, a + sp);
+  }
+  function liftTouch(e){
+    delete tps[e.pointerId];
+    if(pinch && tCount() < 2){ if(pinch.raf) cancelAnimationFrame(pinch.raf); pinch = null; }
+    if(tCount() === 0) pinched = false;
+  }
   svg.addEventListener('pointerdown', function(e){
+    if(e.pointerType !== 'mouse' && M && G){
+      tps[e.pointerId] = {x:e.clientX, y:e.clientY};
+      if(tCount() === 2 && !drag){
+        Object.keys(tps).forEach(function(id){ try{ svg.setPointerCapture(+id); }catch(err){} });
+        startPinch();
+        return;
+      }
+      if(tCount() > 1) return;
+    }
     var el = e.target;
     if(el.classList && el.classList.contains('dg') && M && G){
       var r = rowById(+el.dataset.id);
@@ -2481,7 +2594,15 @@ function bind(){
     }
     onPointer(e);
   });
-  svg.addEventListener('pointermove', function(e){ if(drag) dragMove(e); else onPointer(e); });
+  svg.addEventListener('pointermove', function(e){
+    if(tps[e.pointerId]){ tps[e.pointerId].x = e.clientX; tps[e.pointerId].y = e.clientY; }
+    if(pinch){
+      if(!pinch.raf) pinch.raf = requestAnimationFrame(function(){ if(pinch){ pinch.raf = 0; movePinch(); } });
+      return;
+    }
+    if(pinched) return;
+    if(drag) dragMove(e); else onPointer(e);
+  });
   function endDrag(e){
     if(!drag) return;
     var tapId = drag.moved ? null : drag.id;
@@ -2491,12 +2612,25 @@ function bind(){
     render();
     if(tapId !== null && e.type === 'pointerup') openEditor(tapId);
   }
+  /* desktop: ctrl + wheel (a trackpad pinch) zooms, sideways scroll pans a zoomed chart */
+  svg.addEventListener('wheel', function(e){
+    if(!M || !G) return;
+    if(e.ctrlKey || e.metaKey){ e.preventDefault(); zoomBy(Math.exp(e.deltaY*0.01), pointerToT(e)); }
+    else if(VIEW && Math.abs(e.deltaX) > Math.abs(e.deltaY)){ e.preventDefault(); panBy(e.deltaX/G.PW); }
+  }, {passive:false});
+  /* stop iOS from zooming the whole page when the chart is pinched */
+  ['gesturestart','gesturechange','gestureend'].forEach(function(n){ svg.addEventListener(n, function(e){ e.preventDefault(); }); });
+  $('#vbIn').addEventListener('click', function(){ zoomBy(0.5, curT); });
+  $('#vbOut').addEventListener('click', function(){ zoomBy(2, curT); });
+  $('#vbFit').addEventListener('click', function(){ setView(M.t0, M.t1); });
+  $('#vbPrev').addEventListener('click', function(){ panBy(-0.5); });
+  $('#vbNext').addEventListener('click', function(){ panBy(0.5); });
   svg.addEventListener('click', function(e){
     var el = e.target;
     if(el.classList && el.classList.contains('op')) openEditor(+el.dataset.id);
   });
-  svg.addEventListener('pointerup', endDrag);
-  svg.addEventListener('pointercancel', endDrag);
+  svg.addEventListener('pointerup', function(e){ liftTouch(e); endDrag(e); });
+  svg.addEventListener('pointercancel', function(e){ liftTouch(e); endDrag(e); });
 
   var rt = null, lastW = 0;
   function onResize(){
