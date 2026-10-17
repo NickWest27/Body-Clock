@@ -166,14 +166,14 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '17 Oct 2026 · build 18';
+var BUILD = '17 Oct 2026 · build 19';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
 function defaults(){
   return {v:1, home:'ATL', bed:'23:00', wake:'07:00', landBed:2, van:2, ready:0.75, balance:'balanced', light:50,
           night:{auto:true, start:'19:00', end:'23:00', gap:12, last:12},
-          dests:DEFAULT_DESTS.slice(), flights:[], lay:{}};
+          dests:DEFAULT_DESTS.slice(), flights:[], lay:{}, actual:[], skips:[]};
 }
 function load(){
   try{
@@ -188,6 +188,8 @@ function fix(o){
   Object.keys(d.night).forEach(function(k){ if(o.night[k] === undefined) o.night[k] = d.night[k]; });
   if(!Array.isArray(o.dests)) o.dests = d.dests;
   if(!o.lay || typeof o.lay !== 'object') o.lay = {};
+  if(!Array.isArray(o.actual)) o.actual = [];
+  if(!Array.isArray(o.skips)) o.skips = [];
   return o;
 }
 var S = load();
@@ -299,7 +301,7 @@ function ribbon(Pl, a, b, tz, opts){
 function events(Pl, from, max){
   var ev = [];
   Pl.sleeps.forEach(function(s){
-    if(s.kind === 'rest' || s.a < from) return;
+    if(s.kind === 'rest' || s.a < from || s.actual || s.open) return;
     var L = layOfBlock(Pl, s), tz = L ? L.ap.tz : Pl.E.home.tz;
     ev.push({t:s.a, tz:tz, title:s.kind === 'home' ? 'Sleep at home' : s.kind === 'nap' ? 'Nap' : 'Sleep', sub:'Wake ' + whenTxt(tz, s.b, s.a), color:'var(--sleep)', go:L ? 'lay/' + L.id : null});
   });
@@ -322,6 +324,16 @@ function eventRow(e, ref){
     : (e.color ? '<span class="dot" style="background:' + e.color + '"></span>' : '');
   var tag = e.go ? 'button type="button" data-go="' + e.go + '"' : 'div';
   return '<' + tag + ' class="row' + (e.go ? '' : ' static') + '"><span class="tcol">' + esc(whenTxt(e.tz, e.t, ref)) + '</span><span class="main"><span class="t1">' + esc(e.title) + '</span><span class="t3">' + esc(e.sub) + '</span></span>' + chip + '</' + (e.go ? 'button' : 'div') + '>';
+}
+
+/* the earliest planned sleep that is over but not yet confirmed */
+function pendingBlock(Pl){
+  var nw = now();
+  return Pl.sleeps.filter(function(s){
+    if(!s.lay || s.actual || s.open || s.b > nw) return false;
+    var L = layById(Pl, s.lay);
+    return L && s.a >= L.T - 1000;
+  })[0] || null;
 }
 
 /* ---------- why text for a planned block ---------- */
@@ -357,13 +369,25 @@ function viewNow(){
     return h;
   }
   /* what to do now */
-  var cur = Pl.sleeps.filter(function(s){ return s.a <= nw && nw < s.b; })[0];
-  var nextS = Pl.sleeps.filter(function(s){ return s.a > nw && s.kind !== 'rest'; })[0];
+  var cur = Pl.sleeps.filter(function(s){ return s.a <= nw && nw < s.b && !s.open && !s.actual; })[0];
+  var nextS = Pl.sleeps.filter(function(s){ return s.a > nw && s.kind !== 'rest' && !s.actual; })[0];
   var inF = Pl.flights.filter(function(f){ return f.a <= nw && nw < f.b; })[0];
-  var heroUsed = null;
+  var heroUsed = null, pend = pendingBlock(Pl);
+  if(pend && !Pl.open){
+    var pL = layOfBlock(Pl, pend), ptz = pL ? pL.ap.tz : homeTz, pk = pend.kind === 'nap' ? 'nap' : 'sleep';
+    h += '<section class="card" aria-label="Check what happened"><div class="hero-l" style="margin-bottom:8px">' + I.moon + 'Quick check</div>' +
+         '<div style="font-size:22px;font-weight:600;line-height:28px">Did you ' + pk + ' ' + (sameDay(ptz, pend.a, nw) ? '' : BC.dow(ptz, pend.a) + ' ') + BC.hm(ptz, pend.a) + '–' + BC.hm(ptz, pend.b) + '?</div>' +
+         '<p class="why">Your answer re-plans the rest of the ' + (pL ? 'layover' : 'day') + '.</p>' +
+         '<div class="two" style="margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><button class="btn small" type="button" data-act="yes" style="width:100%">Yes</button><button class="btn small sec" type="button" data-act="diff" style="width:100%">Other times</button><button class="btn small sec" type="button" data-act="no" style="width:100%">No</button></div></section>';
+  }
   h += '<section class="card" aria-label="Do this now">';
-  if(inF && !(cur && cur.kind !== 'rest')){
-    var rv = BC.restVariants(inF);
+  if(Pl.open){
+    var oL = Pl.layovers.filter(function(x){ return x.open === Pl.open; })[0], otz = oL ? oL.ap.tz : tz;
+    h += '<div class="hero-h"><div class="hero-l">' + I.moon + (Pl.open.kind === 'nap' ? 'Napping' : 'Asleep') + '</div><div class="lab" style="font-size:13px">since ' + BC.hm(otz, Pl.open.a) + '</div></div>' +
+         '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(otz, Pl.open.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + (Pl.openEnd ? BC.hm(otz, Pl.openEnd) : '–') + '</div></div></div>' +
+         '<p class="why">' + (oL ? 'Best wake-up for the flight, given what you have slept so far.' : 'Your usual length of sleep.') + ' Set your alarm for this.</p>' +
+         '<div style="margin-top:14px"><button class="btn" type="button" data-act="up">I’m up</button></div>';
+  } else if(inF && !(cur && cur.kind !== 'rest')){
     h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'In flight</div><div class="lab" style="font-size:13px">' + esc(inF.f.code + ' → ' + inF.t.code) + '</div></div>';
     if(inF.role === 'operate'){
       if(inF.restWin){
@@ -377,26 +401,32 @@ function viewNow(){
     if(s && (cur || s.a - nw < 18*H)){
       heroUsed = s;
       var sL = layOfBlock(Pl, s), stz = sL ? sL.ap.tz : (s.kind === 'rest' ? tz : homeTz);
-      var label = (s.kind === 'nap' ? 'Nap' : s.kind === 'rest' ? 'Crew rest' : 'Sleep') + (cur || s.a - nw < 30*60000 ? ' now' : '');
-      var lead = cur ? 'Asleep' : (s.a - nw < 30*60000 ? '' : 'Next · in ' + durTxt(s.a - nw));
-      h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead || durTxt(s.b - s.a)) + '</div></div>' +
+      var soon = cur || s.a - nw < 30*60000;
+      var label = (s.kind === 'nap' ? 'Nap' : s.kind === 'rest' ? 'Crew rest' : 'Sleep') + (soon ? ' now' : '');
+      var lead = soon ? durTxt(s.b - s.a) : 'Next · in ' + durTxt(s.a - nw);
+      h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead) + '</div></div>' +
            '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(stz, s.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + BC.hm(stz, s.b) + '</div></div></div>' +
            '<p class="why">' + esc(whyFor(Pl, s)) + (sL && stz !== tz ? ' ' + esc(sL.ap.city) + ' time.' : '') + '</p>';
+      if(s.kind !== 'rest' && (cur || s.a - nw < 3*H)){
+        h += '<div style="margin-top:14px"><button class="btn' + (soon ? '' : ' sec') + '" type="button" data-act="bedNow" data-kind="' + (s.kind === 'nap' ? 'nap' : 'main') + '">Going to bed' + (soon ? '' : ' now') + '</button></div>';
+      }
     } else {
       var nf = Pl.flights.filter(function(f){ return f.a > nw; })[0];
       if(nf){
         h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'Next flight</div><div class="lab" style="font-size:13px">in ' + esc(durTxt(nf.a - nw)) + '</div></div>' +
              '<div style="font-size:28px;font-weight:600">' + esc(nf.f.code + ' → ' + nf.t.code) + '</div><p class="why">Departs ' + esc(whenTxt(nf.f.tz, nf.a, nw)) + ' ' + esc(nf.f.city) + ' time.</p>';
       } else h += '<div class="hero-h"><div class="hero-l">' + I.moon + 'Trip done</div></div><p class="why" style="margin-top:0">Your usual night at home: bed ' + esc(S.bed) + ', wake ' + esc(S.wake) + '.</p>';
+      h += '<div style="margin-top:14px"><button class="btn sec" type="button" data-act="bedNow" data-kind="">Going to bed now</button></div>';
     }
   }
   h += '</section>';
   /* up next */
   var from = heroUsed ? heroUsed.a + 1 : nw;
-  var ev = events(Pl, from, 4);
-  if(ev.length){
-    h += '<section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') + '</section>';
-  }
+  var ev = events(Pl, Pl.open ? (Pl.openEnd || nw) : from, 4);
+  h += '<section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
+       (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.options.length > 1; })[0];
+         return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
+       '<button class="row" type="button" data-act="logSleep" style="color:var(--tint);min-height:48px">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Log a sleep you took</button></section>';
   /* ribbon */
   var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
   var a = Math.max(nw, E.t0), b = target && target.b - a <= 72*H ? target.b : Math.min(a + 36*H, Pl.R.t1);
@@ -451,8 +481,10 @@ function viewTrip(){
       }
     } else if(it.kind === 'lay'){
       var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
-      var sum = o ? o.blocks.map(function(x){ return (x.kind === 'main' ? 'Sleep ' : 'Nap ') + BC.hm(L.ap.tz, x.a); }) : [];
-      if(L.out && o) sum.splice(o.blocks[0].kind === 'nap' && o.blocks[0].a < L.out.ns ? 1 : 0, 0, 'Night out ' + BC.hm(L.ap.tz, L.out.ns));
+      var all = L.fixed.map(function(x){ return {a:x.a, k:x.kind}; }).concat(o ? o.blocks.map(function(x){ return {a:x.a, k:x.kind}; }) : []);
+      if(L.out) all.push({a:L.out.ns, k:'out'});
+      all.sort(function(p,q){ return p.a - q.a; });
+      var sum = all.map(function(x){ return (x.k === 'main' ? 'Sleep ' : x.k === 'out' ? 'Night out ' : 'Nap ') + BC.hm(L.ap.tz, x.a); });
       h += '<button class="row" type="button" data-go="lay/' + L.id + '"><span style="width:32px;height:32px;border-radius:8px;background:var(--sleep);color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + I.moon + '</span>' +
            '<span class="main"><span class="t1 b">' + esc(o ? o.name : 'Layover') + '</span><span class="t2">' + esc(sum.join(' · ')) + '</span></span>' + I.chev + '</button>';
     } else {
@@ -468,10 +500,10 @@ function noteFor(L, o){
   var m = o.m, parts = [];
   if(m.awakeAtBed != null && m.awakeAtBed >= 18) parts.push(Math.round(m.awakeAtBed) + ' hours awake by bedtime' + (L.out ? ', and drinks on top of that hit harder.' : '.'));
   var lateNap = o.blocks.filter(function(b){ return b.kind === 'nap' && b.a > L.ws + 1000; })[0];
-  if(lateNap){ var e = m.ease[o.blocks.indexOf(lateNap)]; if(e < 0.6) parts.push('The nap before the van may not come easily.'); else if(o.id === 'both') parts.push('The early wake-up keeps you sleepy enough for the afternoon nap.'); }
+  if(lateNap){ var e = m.ease[o.blocks.indexOf(lateNap)]; if(e < 0.6) parts.push('You may not be sleepy enough for the nap before the van. Lie down anyway: resting still helps a little.'); else if(o.blocks.some(function(b){ return b.kind === 'main'; })) parts.push('Waking at this time keeps you sleepy enough for the afternoon nap.'); }
   var main = o.blocks.filter(function(b){ return b.kind === 'main'; })[0];
   if(main && o.id === 'now'){ var em = m.ease[o.blocks.indexOf(main)]; if(em < 0.85) parts.push('The long nap makes tonight’s sleep harder to start.'); }
-  if(!parts.length) parts.push(o.id === 'none' ? 'One sleep, nothing else to time.' : 'Fits the layover well.');
+  if(!parts.length) parts.push(o.id === 'none' ? (o.blocks.length ? 'Nothing else to time.' : 'Nothing more to sleep before the van.') : 'Fits the layover well.');
   return parts.join(' ');
 }
 function viewLay(id){
@@ -483,19 +515,29 @@ function viewLay(id){
   h += '<div class="stack" style="gap:10px"><div class="list"><div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew night out</span></span>' +
        '<button class="sw" type="button" role="switch" aria-label="Crew night out" aria-checked="' + outOn + '" data-act="out" data-id="' + esc(id) + '"></button></div>';
   if(L.out){
-    h += '<div class="row static"><span class="main"><span class="t1">' + esc(BC.dow(tz, L.out.ns)) + ' evening</span></span><span class="val" style="color:var(--label)">' + BC.hm(tz, L.out.ns) + '–' + BC.hm(tz, L.out.ne) + '</span></div>' +
+    h += '<label class="row static"><span class="main"><span class="t1">Out from</span><span class="t3">' + esc(BC.dow(tz, L.out.ns)) + ' evening</span></span><input class="pill" type="time" id="loNs" data-id="' + esc(id) + '" value="' + BC.hm(tz, L.out.ns) + '"></label>' +
+         '<label class="row static"><span class="main"><span class="t1">Back by</span><span class="t3">Change it if the night ran late</span></span><input class="pill" type="time" id="loNe" data-id="' + esc(id) + '" value="' + BC.hm(tz, L.out.ne) + '"></label>' +
          '<div class="row static"><span class="main"><span class="t1">Last drink by</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.out.lastDrink) + ' ' + BC.hm(tz, L.out.lastDrink) + '</span></div>';
   }
   h += '</div><p class="foot" style="margin-top:-4px">' + (L.autoOut ? 'On by default: the evening is more than ' + S.night.gap + ' hours before duty.' : 'Off by default for this layover.') + ' Last drink is ' + S.night.last + ' hours before the van. Set your company rule and usual times in Settings.</p>';
-  h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (L.options.some(function(o){ return o.id === 'now'; }) ? 'Nap now or later?' : 'Pick a plan') + '</h2>';
+  var hist = L.fixed.map(function(x){ return {t:x.a, txt:(x.kind === 'main' ? 'Slept ' : 'Napped ') + BC.dow(tz, x.a) + ' ' + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b), act:'editSleep', id:x.id}; })
+    .concat(L.skips.map(function(x, i){ return {t:x.a, txt:'Skipped the ' + (x.kind === 'main' ? 'sleep' : 'nap') + ' at ' + BC.hm(tz, x.a), act:'unskip', id:String(x.a)}; }));
+  if(L.open) hist.push({t:L.open.a, txt:'In bed since ' + BC.dow(tz, L.open.a) + ' ' + BC.hm(tz, L.open.a), act:'editSleep', id:L.open.id});
+  hist.sort(function(p,q){ return p.t - q.t; });
+  if(hist.length){
+    h += '<h2 class="grp-h">What happened</h2><div class="list">' + hist.map(function(x){ return '<button class="row" type="button" data-act="' + x.act + '" data-id="' + esc(x.id) + '"><span style="color:var(--sleep)">' + I.moon + '</span><span class="main"><span class="t1">' + esc(x.txt) + '</span></span><span class="t3">' + (x.act === 'unskip' ? 'Undo' : 'Edit') + '</span></button>'; }).join('') + '</div>';
+  }
+  var replan = hist.length > 0;
+  h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (L.options.some(function(o){ return o.id === 'now'; }) && !replan ? 'Nap now or later?' : replan ? 'Rest of the layover' : 'Pick a plan') + '</h2>';
+  if(!L.options.length) h += '<p class="foot">Nothing left to plan here.</p>';
   function pos(v){ return Math.max(0, Math.min(100, (v - 20)/60*100)).toFixed(0) + '%'; }
   L.options.forEach(function(o){
     var m = o.m;
     h += '<button class="opt" type="button" aria-pressed="' + (o.id === sel) + '" data-act="pick" data-id="' + esc(id) + '" data-opt="' + o.id + '">' +
          '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : '') + '</span>' +
-         '<span style="font-size:15px;line-height:20px;color:var(--sec);font-variant-numeric:tabular-nums">' + esc(o.blocks.map(function(b){ return (b.kind === 'main' ? 'Sleep ' : 'Nap ') + (sameDay(tz, b.a, L.arr) ? '' : BC.dow(tz, b.a) + ' ') + BC.hm(tz, b.a) + '–' + BC.hm(tz, b.b); }).join(' · ')) + '</span>' +
+         '<span style="font-size:15px;line-height:20px;color:var(--sec);font-variant-numeric:tabular-nums">' + esc(o.blocks.length ? o.blocks.map(function(b){ return b.open ? 'Wake ' + (sameDay(tz, b.b, L.arr) ? '' : BC.dow(tz, b.b) + ' ') + BC.hm(tz, b.b) : (b.kind === 'main' ? 'Sleep ' : 'Nap ') + (sameDay(tz, b.a, L.arr) ? '' : BC.dow(tz, b.a) + ' ') + BC.hm(tz, b.a) + '–' + BC.hm(tz, b.b); }).join(' · ') : 'Stay up until the van') + '</span>' +
          '<span class="two" style="gap:14px">' +
-         (m.outMin != null ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Night out</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
+         (m.outMin != null && L.out && L.out.ne > now() ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Night out</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
                            : '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Lowest in flight</span><b>' + BC.word(m.fmin) + ' · ' + Math.round(m.fmin) + '</b></span><span class="meter"><i style="left:' + pos(m.fmin) + '"></i></span></span>') +
          '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Landing</span><b>' + BC.word(m.land) + ' · ' + Math.round(m.land) + '</b></span><span class="meter"><i style="left:' + pos(m.land) + '"></i></span></span></span>' +
          '<span style="font-size:13px;line-height:18px;color:var(--sec)">' + esc(noteFor(L, o)) + '</span></button>';
@@ -703,6 +745,49 @@ function saveFlight(){
   save(); V.flight = null; renderSheet(); render();
 }
 
+/* ---------- sleep sheet: log what you actually slept ---------- */
+function openSleep(id, preset){
+  var Pl = P(), nw = now(), L = Pl.E.locAt(Math.min(Math.max(nw, Pl.E.t0), Pl.E.t1)), tz = L.fl ? L.flight.t.tz : L.tz;
+  var x = id ? S.actual.filter(function(a){ return String(a.id) === String(id); })[0] : null;
+  var a = x ? x.a : preset ? preset.a : nw - 8*H, b = x ? (x.b == null ? null : x.b) : preset ? preset.b : nw;
+  var Lb = Pl.E.locAt(a); if(!Lb.fl && Lb.tz) tz = Lb.tz;
+  V.sleep = {id:x ? x.id : null, tz:tz, bed:BC.msToLocal(tz, a), wake:b == null ? '' : BC.msToLocal(tz, b), kind:x ? x.kind : preset ? (preset.kind === 'nap' ? 'nap' : 'main') : '', open:x && x.b == null, preset:preset || null};
+  V.sleepErr = ''; renderSleep();
+}
+function renderSleep(){
+  var box = $('#sheet');
+  if(!V.sleep){ box.innerHTML = ''; return; }
+  var sl = V.sleep, city = '';
+  Object.keys(AIRPORTS).some(function(c){ if(AIRPORTS[c][1] === sl.tz){ city = AIRPORTS[c][0]; return true; } return false; });
+  var h = '<div class="sheet" data-act="sleepBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log a sleep"><div class="grab"><span></span></div>' +
+      '<div class="sheet-h"><button class="navbtn" type="button" data-act="sleepCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (sl.id ? 'Edit sleep' : 'Log a sleep') + '</div><button class="navbtn r" type="button" data-act="sleepSave">Save</button></div>' +
+      '<div class="list"><label class="row static"><span class="main"><span class="t1">Fell asleep</span></span><input class="pill" type="datetime-local" id="slBed" value="' + esc(sl.bed) + '"></label>' +
+      '<label class="row static"><span class="main"><span class="t1">Woke up</span><span class="t3">' + (sl.open ? 'Leave empty if still asleep' : '') + '</span></span><input class="pill" type="datetime-local" id="slWake" value="' + esc(sl.wake) + '"></label></div>' +
+      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. Rough times are fine.</p>' +
+      '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:8px"><div style="margin-bottom:10px">It was</div><div class="seg" role="group" aria-label="Kind of sleep"><button type="button" data-act="slKind" data-v="nap" aria-pressed="' + (sl.kind === 'nap') + '">A nap</button><button type="button" data-act="slKind" data-v="main" aria-pressed="' + (sl.kind === 'main') + '">My main sleep</button></div></div>' +
+      '<p class="foot">The app keeps what you log as fact and re-plans everything after it.</p>';
+  if(V.sleepErr) h += '<p class="err">' + esc(V.sleepErr) + '</p>';
+  if(sl.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="sleepDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete this sleep') + '</button></div>';
+  h += '</div></div>';
+  box.innerHTML = h;
+}
+function nextActualId(){ var m = 0; S.actual.forEach(function(a){ if(a.id > m) m = a.id; }); return m + 1; }
+function saveSleep(){
+  var sl = V.sleep, a = BC.localToMs(sl.tz, sl.bed), b = sl.wake ? BC.localToMs(sl.tz, sl.wake) : null;
+  if(isNaN(a)){ V.sleepErr = 'Enter when you fell asleep.'; renderSleep(); return; }
+  if(b == null && !sl.open){ V.sleepErr = 'Enter when you woke up.'; renderSleep(); return; }
+  if(b != null && !(b > a)){ V.sleepErr = 'Waking up must be after falling asleep.'; renderSleep(); return; }
+  if(b != null && b - a > 16*H){ V.sleepErr = 'That is over 16 hours. Check the dates.'; renderSleep(); return; }
+  if(a > now() + 5*60000){ V.sleepErr = 'That is in the future. Log sleeps after you take them.'; renderSleep(); return; }
+  var kind = sl.kind || ((b || now()) - a >= 4*H ? 'main' : 'nap');
+  var rec = {id:sl.id || nextActualId(), a:a, b:b, kind:kind};
+  S.actual = S.actual.filter(function(x){ return x.id !== rec.id; });
+  /* a logged sleep replaces any skip it overlaps */
+  S.skips = S.skips.filter(function(x){ return !(x.a < (b || now()) && a < x.b); });
+  S.actual.push(rec); S.actual.sort(function(p,q){ return p.a - q.a; });
+  save(); V.sleep = null; V.confirmDel = false; renderSleep(); render();
+}
+
 /* ---------- classic import, backup ---------- */
 function classicData(){
   try{ var o = JSON.parse(localStorage.getItem(CLASSIC_KEY) || 'null'); return o && Array.isArray(o.rows) && o.rows.some(function(r){ return r.type === 'flight'; }) ? o : null; }catch(e){ return null; }
@@ -724,7 +809,7 @@ function importClassic(){
     flights.push(rec);
   });
   if(o.bed) S.bed = o.bed; if(o.wake) S.wake = o.wake; if(o.landBed != null) S.landBed = o.landBed; if(o.balance) S.balance = o.balance;
-  S.flights = flights; S.lay = {}; save();
+  S.flights = flights; S.lay = {}; S.actual = []; S.skips = []; save();
   return 'Imported ' + flights.length + ' flight' + (flights.length === 1 ? '' : 's') + '.' + (skipped.length ? ' Not imported, unknown airport: ' + skipped.join(', ') + '. Add those by hand.' : '');
 }
 function exampleTrip(){
@@ -733,7 +818,7 @@ function exampleTrip(){
     {id:2, from:'DFW', to:'GRU', dep:'2026-10-15T20:45', arr:'2026-10-16T09:00', role:null, rest:3, restUTC:{s:'02:00', e:'05:00'}},
     {id:3, from:'GRU', to:'DFW', dep:'2026-10-17T22:00', arr:'2026-10-18T06:30', role:null, rest:3},
     {id:4, from:'DFW', to:'ATL', dep:'2026-10-18T09:30', arr:'2026-10-18T12:42', role:null, rest:0}];
-  S.lay = {}; save();
+  S.lay = {}; S.actual = []; S.skips = []; save();
 }
 async function backup(){
   var text = JSON.stringify({app:'body-clock', v:1, saved:new Date().toISOString(), state:S}, null, 1);
@@ -829,6 +914,34 @@ document.addEventListener('click', function(e){
     (S.lay[id] || (S.lay[id] = {})).choice = pick; save(); go('trip'); return;
   }
   if(act === 'cv'){ V.chartView = b.dataset.v; render(); return; }
+  if(act === 'bedNow'){
+    if(S.actual.some(function(x){ return x.b == null; })) return;
+    var k = b.dataset.kind || (+BC.hm(placeTz(P(), now()), now()).slice(0,2) >= 18 || +BC.hm(placeTz(P(), now()), now()).slice(0,2) < 5 ? 'main' : 'nap');
+    S.actual.push({id:nextActualId(), a:now(), b:null, kind:k}); save(); render(); window.scrollTo(0, 0); return;
+  }
+  if(act === 'up'){
+    var op = S.actual.filter(function(x){ return x.b == null; })[0]; if(!op) return;
+    if(now() - op.a < 10*60000) S.actual = S.actual.filter(function(x){ return x !== op; }); else op.b = now();
+    save(); render(); return;
+  }
+  if(act === 'yes' || act === 'no' || act === 'diff'){
+    var pb = pendingBlock(P()); if(!pb) return;
+    if(act === 'yes'){ S.actual.push({id:nextActualId(), a:pb.a, b:pb.b, kind:pb.kind === 'nap' ? 'nap' : 'main'}); save(); render(); }
+    else if(act === 'no'){ S.skips.push({a:pb.a, b:pb.b, kind:pb.kind === 'nap' ? 'nap' : 'main'}); save(); render(); }
+    else openSleep(null, pb);
+    return;
+  }
+  if(act === 'logSleep'){ openSleep(null); return; }
+  if(act === 'editSleep'){ openSleep(id); return; }
+  if(act === 'unskip'){ S.skips = S.skips.filter(function(x){ return String(x.a) !== String(id); }); save(); render(); return; }
+  if(act === 'sleepBg' && e.target === b){ V.sleep = null; renderSleep(); return; }
+  if(act === 'sleepCancel'){ V.sleep = null; V.confirmDel = false; renderSleep(); return; }
+  if(act === 'sleepSave'){ saveSleep(); return; }
+  if(act === 'slKind'){ V.sleep.kind = b.dataset.v; renderSleep(); return; }
+  if(act === 'sleepDel'){
+    if(!V.confirmDel){ V.confirmDel = true; renderSleep(); return; }
+    S.actual = S.actual.filter(function(x){ return x.id !== V.sleep.id; }); save(); V.sleep = null; V.confirmDel = false; renderSleep(); render(); return;
+  }
   if(act === 'rest' || act === 'clearRest'){
     var raw = S.flights.filter(function(x){ return String(x.id) === String(id); })[0]; if(!raw) return;
     if(act === 'rest') raw.rest = Math.max(0, Math.min(8, (+raw.rest || 0) + parseFloat(b.dataset.d)));
@@ -840,7 +953,7 @@ document.addEventListener('click', function(e){
   if(act === 'restore'){ $('#impFile').click(); return; }
   if(act === 'import'){ V.flash = importClassic(); if(V.view === 'now'){ render(); } else render(); return; }
   if(act === 'example'){ exampleTrip(); V.flash = 'Example trip loaded: Atlanta, Dallas, São Paulo and back.'; render(); return; }
-  if(act === 'clear'){ if(!V.confirmClear){ V.confirmClear = true; render(); setTimeout(function(){ if(V.confirmClear){ V.confirmClear = false; render(); } }, 3500); return; } S.flights = []; S.lay = {}; save(); V.confirmClear = false; V.flash = 'All flights removed.'; render(); return; }
+  if(act === 'clear'){ if(!V.confirmClear){ V.confirmClear = true; render(); setTimeout(function(){ if(V.confirmClear){ V.confirmClear = false; render(); } }, 3500); return; } S.flights = []; S.lay = {}; S.actual = []; S.skips = []; save(); V.confirmClear = false; V.flash = 'All flights removed.'; render(); return; }
   if(act === 'update'){ checkUpdate(); return; }
   if(act === 'destEdit'){ V.destEdit = !V.destEdit; render(); return; }
   if(act === 'destRm'){ S.dests = S.dests.filter(function(c){ return c !== b.dataset.code; }); save(); render(); return; }
@@ -870,6 +983,12 @@ function autoArr(){
 }
 document.addEventListener('change', function(e){
   var t = e.target, id = t.id;
+  if(V.sleep && (id === 'slBed' || id === 'slWake')){ V.sleep[id === 'slBed' ? 'bed' : 'wake'] = t.value; return; }
+  if(id === 'loNs' || id === 'loNe'){
+    var cfgL = S.lay[t.dataset.id] || (S.lay[t.dataset.id] = {});
+    if(t.value) cfgL[id === 'loNs' ? 'ns' : 'ne'] = t.value;
+    save(); render(); return;
+  }
   if(V.flight && (id === 'fDep' || id === 'fArr')){ V.flight[id === 'fDep' ? 'dep' : 'arr'] = t.value; if(id === 'fDep') autoArr(); renderSheet(); return; }
   var map = {sHome:'home', sBed:'bed', sWake:'wake', sBal:'balance'};
   if(map[id]){ if(t.value) S[map[id]] = t.value; save(); render(); return; }
@@ -897,15 +1016,16 @@ document.addEventListener('input', function(e){
 });
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && V.flight){ V.flight = null; renderSheet(); }
+  if(e.key === 'Escape' && V.sleep){ V.sleep = null; renderSleep(); }
   if(e.key === 'Enter' && e.target.id === 'dAdd'){ var btn = document.querySelector('[data-act=destAdd]'); if(btn) btn.click(); }
 });
 
 /* keep the Now screen current */
-setInterval(function(){ if(!document.hidden && !V.flight && (V.view === 'now' || V.view === 'chart')) render(); }, 60000);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden && !V.flight) render(); });
+setInterval(function(){ if(!document.hidden && !V.flight && !V.sleep && (V.view === 'now' || V.view === 'chart')) render(); }, 60000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden && !V.flight && !V.sleep) render(); });
 
-window.addEventListener('hashchange', function(){ var hsh = (location.hash || '').replace(/^#/, ''); if(hsh && hsh !== V.view + (V.arg ? '/' + V.arg : '')) go(hsh); });
-var start = (location.hash || '').replace(/^#/, '');
+window.addEventListener('hashchange', function(){ var hsh = decodeURIComponent((location.hash || '').replace(/^#/, '')); if(hsh && hsh !== V.view + (V.arg ? '/' + V.arg : '')) go(hsh); });
+var start = decodeURIComponent((location.hash || '').replace(/^#/, ''));
 if(start && !/^flight/.test(start)) go(start); else render();
 })();
 </script>
