@@ -620,7 +620,7 @@ function viewSettings(){
   h += '<h2 class="grp-h">About</h2><div class="list">' +
        '<div class="row static"><span class="main"><span class="t1">Version</span></span><span class="val">' + esc(BUILD) + '</span></div>' +
        '<button class="row" type="button" data-act="update" style="color:var(--tint)">' + esc(V.updLabel || 'Update app') + '</button>' +
-       '<a class="row" href="classic/" style="color:var(--tint)">Open the classic app</a></div>';
+       '<a class="row" href="' + (location.pathname.indexOf('/next/') >= 0 ? '../' : 'classic/') + '" style="color:var(--tint)">Open the classic app</a></div>';
   if(V.updMsg) h += '<p class="msg">' + esc(V.updMsg) + '</p>';
   h += '<details class="how" style="margin-top:18px"><summary>How the plan works</summary>' +
        '<p>The model is the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. Alertness here is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
@@ -764,7 +764,7 @@ function restoreFile(file){
 /* ---------- update ---------- */
 async function cleanReload(){
   try{ if(navigator.serviceWorker){ var reg = await navigator.serviceWorker.getRegistration(location.pathname); if(reg && reg.scope.indexOf('/classic/') < 0) await reg.unregister(); } }catch(e){}
-  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('bc2-') === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('bc2-' + (location.pathname.indexOf('/next/') >= 0 ? 'next-' : 'main-')) === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
   location.replace(location.pathname + '?u=' + Date.now());
 }
 async function checkUpdate(){

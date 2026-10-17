@@ -2,7 +2,9 @@
    so an update arrives the next time the app is opened. Change VERSION when you ship a new build.
    The classic app under classic/ has its own service worker and cache, which this one leaves alone. */
 const VERSION = '2026-10-17.18';
-const CACHE = 'bc2-' + VERSION;
+/* one cache per install location, so a preview copy under next/ and the main app never touch each other */
+const PREFIX = 'bc2-' + (self.registration.scope.indexOf('/next/') >= 0 ? 'next-' : 'main-');
+const CACHE = PREFIX + VERSION;
 const ASSETS = ['./', './index.html', './engine.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function(e){
@@ -11,8 +13,8 @@ self.addEventListener('install', function(e){
 self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
-      /* our older builds, and the caches of the old app that used to live here (body-clock-2026...) */
-      return Promise.all(keys.filter(function(k){ return (k.indexOf('bc2-') === 0 && k !== CACHE) || /^body-clock-\d/.test(k); }).map(function(k){ return caches.delete(k); }));
+      /* only our own older builds; the classic app's caches are left alone */
+      return Promise.all(keys.filter(function(k){ return k.indexOf(PREFIX) === 0 && k !== CACHE; }).map(function(k){ return caches.delete(k); }));
     }).then(function(){ return self.clients.claim(); })
   );
 });
