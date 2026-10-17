@@ -7,8 +7,9 @@ Live at https://nickwest27.github.io/Body-Clock/ (add it to your home screen fro
 ## Screens
 
 - **Now**: what to do now (for example "Nap now, bed 11:00, wake 13:00", with the reason), the next few things coming up, and a colour ribbon of your alertness until you land. During an operating flight it shows your crew rest times for your Watch.
-- **Trip**: your flights by day, how alert you will be at each landing, crew rest, and the plan for each layover.
+- **Trip**: one timeline of the whole trip, past and future, with a Now line: flights, crew rest, sleeps and naps you logged, sleeps the app plans, the crew night out and each layover's plan. Tap a flight or a logged sleep to change it; tap a planned sleep to open it in the calculator. + adds a flight or a sleep you took.
 - **Layover**: the main decision, nap now or later. The app compares nap now, nap later, both and no nap, each with your main sleep moved earlier or later, and suggests one. It shows how you will feel on the night out and at landing.
+- **Calculator**: pick a bedtime and a wake-up (or tap Best wake-up for this bedtime) and see how easy falling asleep will be, how you will feel on waking, at the van, lowest on the next flight and at landing, each against the current plan. It re-plans the rest of the layover around that sleep. Use as my plan keeps it; Log as a sleep I took records it.
 - **Alertness**: the chart until you land or for the whole trip.
 - **Crew rest**: enter the rest times in UTC, as the crew gives them. You get Lie down and Alarm times on your Watch (assumed to be on departure time) and a timer length.
 - **Settings**: home airport, usual bedtime and wake time, landing to hotel bed, van and get-ready times, layover balance, the crew night out rules, destinations, backups.

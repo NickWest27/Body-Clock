@@ -357,7 +357,7 @@ function layoversOf(E){
     var on = cfg.out === true ? (ne < we - 4*H) : cfg.out === false ? false : autoOn;
     out.push({id:id, i:i, ap:ap, inF:a, outF:b, arr:a.b, dep:b.a, ws:ws, we:we, duty:duty,
               out:on ? {ns:ns, ne:ne, lastDrink:duty - lastRule, auto:cfg.out == null} : null,
-              autoOut:autoOn, choice:cfg.choice || null});
+              autoOut:autoOn, choice:cfg.choice || null, custom:Array.isArray(cfg.custom) ? cfg.custom : null});
   }
   return out;
 }
@@ -498,6 +498,11 @@ function planLayover(E, L, base, fx){
       });
     });
   });
+  if(L.custom){
+    var cb = L.custom.filter(function(x){ return x.b > x.a && x.a >= T - MIN && x.a >= L.arr && x.b <= L.dep; })
+      .map(function(x){ var k = blk(x.a, x.b, x.kind === 'nap' ? 'nap' : 'main'); if(k.kind === 'main' && L.out && k.a - L.out.ne < 3*H && k.a >= L.out.ne - H) k.alc = true; return k; });
+    if(cb.length || L.custom.length){ var rc = evalPlan(E, L, base, cb, scoreRest); if(rc) opts.custom = {id:'custom', blocks:cb, res:rc}; }
+  }
   var replan = fx.fixed.length || fx.skips.length || fx.open;
   function nameOf(k){
     if(openNap && openNap.a < cut) return k === 'now' ? 'Keep napping' : 'Short nap now, nap later';
@@ -506,11 +511,11 @@ function planLayover(E, L, base, fx){
     if(k === 'later') return mainF ? 'Nap before the van' : openMain ? 'Wake earlier, nap later' : 'Sleep, then nap before the van';
     return NAMES[k];
   }
-  var list = ['now', 'later', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
+  var list = ['custom', 'now', 'later', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
     var o = opts[k];
-    return {id:k, name:nameOf(k), blocks:o.blocks, m:o.res};
+    return {id:k, name:k === 'custom' ? 'Your plan' : nameOf(k), blocks:o.blocks, m:o.res};
   });
-  var good = list.filter(function(o){ return !o.m.bad; });
+  var good = list.filter(function(o){ return !o.m.bad && o.id !== 'custom'; });
   var pool = good.length ? good : list;
   var sug = pool.length ? pool.reduce(function(p, q){ return q.m.net > p.m.net ? q : p; }, pool[0]) : null;
   return {options:list, suggested:sug ? sug.id : null};
@@ -518,9 +523,10 @@ function planLayover(E, L, base, fx){
 
 /* ---------- the whole trip ---------- */
 var cache = {key:null, val:null};
-function plan(S, now){
+function plan(S, now, opt){
+  var noCache = opt && opt.noCache;
   var key = JSON.stringify([S.home, S.bed, S.wake, S.landBed, S.van, S.ready, S.balance, S.light, S.night, S.flights, S.lay, S.actual, S.skips]) + '|' + Math.floor(now/(5*MIN));
-  if(cache.key === key) return cache.val;
+  if(!noCache && cache.key === key) return cache.val;
   var E = env(S, now);
   var actual = (S.actual || []).filter(function(x){ return x.a > 0; }).map(function(x){ return {id:x.id, a:x.a, b:x.b == null ? null : x.b, kind:x.kind || ((x.b || now) - x.a >= 4*H ? 'main' : 'nap'), actual:true}; });
   var skips = (S.skips || []).slice();
@@ -543,7 +549,8 @@ function plan(S, now){
     var b = home.concat(rests.filter(function(r){ return r.b <= L.ws; }), done.map(function(x){ return {a:x.a, b:x.b}; }), chosen);
     var P = planLayover(E, L, b, {fixed:fixed, open:op, skips:sk, T:T, now:now});
     L.options = P.options; L.suggested = P.suggested;
-    var pick = L.options.filter(function(o){ return o.id === L.choice; })[0] || L.options.filter(function(o){ return o.id === P.suggested; })[0];
+    var want = L.choice || (L.custom ? 'custom' : null);
+    var pick = L.options.filter(function(o){ return o.id === want; })[0] || L.options.filter(function(o){ return o.id === P.suggested; })[0];
     L.picked = pick ? pick.id : null;
     if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, alc:x.alc, kind:x.kind, lay:L.id, open:x.open, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
   });
@@ -564,11 +571,70 @@ function plan(S, now){
   var openEnd = null;
   if(open){ var oc = sleeps.filter(function(x){ return x.open; })[0]; openEnd = oc ? oc.b : null; }
   var val = {E:E, R:R, flights:E.F, layovers:Ls, sleeps:sleeps, open:open, openEnd:openEnd};
-  cache = {key:key, val:val};
+  if(!noCache) cache = {key:key, val:val};
   return val;
 }
 
+/* ---------- sleep calculator ---------- */
+/* Replace whatever is planned over [w.a, w.b] with that sleep and measure the result. Logged sleeps
+   that overlap it are replaced too, so you can also ask "what if I had slept then". */
+function contextFor(Pl, t){
+  var L = Pl.layovers.filter(function(x){ return t >= x.arr - H && t < x.dep; })[0] || null;
+  var f = Pl.flights.filter(function(x){ return x.role === 'operate' && x.a > t; })[0] || null;
+  return {L:L, f:f};
+}
+function metricsOf(R, w, ctx){
+  function A(t){ return ptAt(R, t).A; }
+  var out = {wake15:A(w.b + 15*MIN), wake60:A(w.b + 60*MIN)};
+  var q = ptAt(R, w.a - R.dt); out.ease = (q.S - 0.5*q.cb)/R.Pref;
+  if(ctx.L) out.van = A(ctx.L.duty);
+  if(ctx.f){
+    var mn = 101, land = null;
+    R.pts.forEach(function(p){ if(p.t >= ctx.f.a && p.t <= ctx.f.b && !p.sl){ if(p.A < mn) mn = p.A; land = p.A; } });
+    out.fmin = mn < 101 ? mn : null; out.land = land;
+    var sum = 0, n = 0, ls = 0, ln = 0, m2 = 101, from = ctx.L ? ctx.L.we : w.b;
+    R.pts.forEach(function(p){ if(p.t >= from && p.t <= ctx.f.b && !p.sl){ sum += p.A; n++; if(p.A < m2) m2 = p.A; if(p.t >= ctx.f.b - 1.5*H){ ls += p.A; ln++; } } });
+    out.score = n ? 0.3*sum/n + 0.3*m2 + 0.4*(ln ? ls/ln : sum/n) : null;
+  } else {
+    var s2 = 0, n2 = 0;
+    R.pts.forEach(function(p){ if(p.t >= w.b + 30*MIN && p.t <= w.b + 12*H && !p.sl){ s2 += p.A; n2++; } });
+    out.score = n2 ? s2/n2 : null;
+  }
+  return out;
+}
+/* A copy of the state where everything up to the sleep in question is taken as done: planned sleeps that
+   end before it count as slept, and the sleep itself is logged. The planner then fills in the rest. */
+function stateWith(S, Pl, w, L){
+  var S2 = JSON.parse(JSON.stringify(S));
+  S2.actual = (S2.actual || []).filter(function(x){ return x.b != null && !(x.a < (w.b || w.a + H) && w.a < x.b); });
+  var id = 1000;
+  Pl.sleeps.forEach(function(s){ if(L && s.lay === L.id && !s.actual && !s.open && s.b <= w.a) S2.actual.push({id:id++, a:s.a, b:s.b, kind:s.kind === 'nap' ? 'nap' : 'main'}); });
+  S2.actual.push({id:id++, a:w.a, b:w.b == null ? null : w.b, kind:w.kind});
+  if(L && S2.lay && S2.lay[L.id]){ delete S2.lay[L.id].custom; delete S2.lay[L.id].choice; }
+  return S2;
+}
+function whatIf(S, now, w){
+  var Pl = plan(S, now), ctx = contextFor(Pl, w.a), base = metricsOf(Pl.R, w, ctx);
+  var P2 = plan(stateWith(S, Pl, w, ctx.L), Math.max(w.b, now) + MIN, {noCache:true});
+  var L2 = ctx.L ? P2.layovers.filter(function(x){ return x.id === ctx.L.id; })[0] : null;
+  var rest = null;
+  if(L2){ var o = L2.options.filter(function(x){ return x.id === L2.picked; })[0]; if(o) rest = {name:o.name, blocks:o.blocks.filter(function(b){ return b.a >= w.b; })}; }
+  return {m:metricsOf(P2.R, w, ctx), base:base, ctx:ctx, rest:rest,
+          wakeBy:ctx.L ? ctx.L.we : (ctx.f ? ctx.f.a - ((+S.van || 2) + (+S.ready || 0.75))*H : null)};
+}
+function bestWake(S, now, a, kind){
+  var Pl = plan(S, now), ctx = contextFor(Pl, a);
+  if(ctx.L){
+    var P2 = plan(stateWith(S, Pl, {a:a, b:null, kind:kind}, ctx.L), a + MIN, {noCache:true});
+    if(P2.openEnd) return P2.openEnd;
+  }
+  var len = kind === 'nap' ? 2*H : ((((hhmmToH(S.wake) - hhmmToH(S.bed)) % 24) + 24) % 24 || 8)*H;
+  var cap = ctx.f ? ctx.f.a - ((+S.van || 2) + (+S.ready || 0.75))*H : a + 12*H;
+  return Math.min(a + len, cap);
+}
+
 return {
+  whatIf:whatIf, bestWake:bestWake, contextFor:contextFor,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, run:run, ptAt:ptAt, word:word, color:color, sunElev:sunElev, restVariants:restVariants

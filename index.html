@@ -39,7 +39,7 @@ button{font:inherit;color:inherit}
 .wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 100px)}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;background:var(--bar);border-top:1px solid var(--sep);padding-bottom:env(safe-area-inset-bottom);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .tabbar-in{display:flex;justify-content:space-around;width:100%;max-width:560px;padding-top:7px;height:56px}
-.tab{display:flex;flex-direction:column;align-items:center;gap:2px;width:100px;min-height:44px;border:0;background:none;color:var(--sec);font-size:10px;font-weight:600;cursor:pointer}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;width:84px;min-height:44px;border:0;background:none;color:var(--sec);font-size:10px;font-weight:600;cursor:pointer}
 .tab[aria-current=page]{color:var(--tint)}
 .tab svg{width:26px;height:26px}
 .nav{display:flex;align-items:center;justify-content:space-between;min-height:44px;margin:-6px -8px 0}
@@ -146,6 +146,11 @@ figure{margin:0}
 details.how{background:var(--card);border-radius:16px;padding:12px 16px}
 details.how summary{cursor:pointer;font-size:17px}
 details.how p{font-size:15px;line-height:21px;color:var(--sec)}
+.nowline{display:flex;align-items:center;gap:8px;margin:16px 4px 4px;color:var(--tint);font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.nowline::after{content:"";flex:1;height:2px;border-radius:1px;background:var(--tint)}
+.past{opacity:.6}
+.tag{font-size:12px;font-weight:600;color:var(--sec);text-transform:uppercase;letter-spacing:.03em}
+.ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;color:#fff}
 .rm{flex:none;width:24px;height:24px;border-radius:50%;border:0;background:var(--danger);color:#fff;font-size:18px;line-height:24px;padding:0;cursor:pointer}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
@@ -156,6 +161,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <nav class="tabbar" aria-label="Tabs"><div class="tabbar-in">
   <button class="tab" type="button" data-go="now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Now</button>
   <button class="tab" type="button" data-go="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>Trip</button>
+  <button class="tab" type="button" data-go="calc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18M5 18v-5a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v5M7 10V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3"/><path d="M12 13v2M9 14h6" opacity="0"/></svg>Calculator</button>
   <button class="tab" type="button" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Settings</button>
 </div></nav>
 <div id="sheet"></div>
@@ -166,7 +172,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '17 Oct 2026 · build 19';
+var BUILD = '17 Oct 2026 · build 20';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -209,6 +215,7 @@ var I = {
 };
 function wordHTML(a, withNum){
   if(a == null) return '';
+  a = Math.round(a);
   return '<span class="word"><span class="dot" style="background:' + BC.color(a) + '"></span>' + BC.word(a) + (withNum ? ' · ' + Math.round(a) : '') + '</span>';
 }
 function durTxt(ms){ var m = Math.round(ms/60000), h = Math.floor(m/60), r = m % 60; return h + ' h' + (r ? ' ' + BC.pad(r) + ' min' : ''); }
@@ -426,6 +433,7 @@ function viewNow(){
   h += '<section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
        (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.options.length > 1; })[0];
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
+       '<button class="row" type="button" data-go="calc" style="color:var(--tint);min-height:48px">' + I.moon + 'What if I sleep at another time?</button>' +
        '<button class="row" type="button" data-act="logSleep" style="color:var(--tint);min-height:48px">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Log a sleep you took</button></section>';
   /* ribbon */
   var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
@@ -445,54 +453,125 @@ function tripTitle(Pl){
   var dates = d1[2] === d2[2] ? d1[1] + '–' + d2[1] + ' ' + d2[2] : d1[1] + ' ' + d1[2] + ' – ' + d2[1] + ' ' + d2[2];
   return dates + ' · ' + E.home.city + ' ⇄ ' + far;
 }
+function timelineItems(Pl){
+  var items = [];
+  Pl.flights.forEach(function(f){ items.push({t:f.a, tz:f.f.tz, kind:'flight', f:f}); });
+  Pl.sleeps.forEach(function(sl){
+    if(sl.kind === 'rest') return;
+    var L = layOfBlock(Pl, sl), tz = L ? L.ap.tz : Pl.E.locAt(sl.a + 1).tz;
+    items.push({t:sl.a, tz:tz, kind:'sleep', s:sl, L:L});
+  });
+  Pl.layovers.forEach(function(L){
+    items.push({t:L.arr + 1, tz:L.ap.tz, kind:'lay', L:L});
+    if(L.out) items.push({t:L.out.ns, tz:L.ap.tz, kind:'out', L:L});
+  });
+  return items.sort(function(p,q){ return p.t - q.t; });
+}
+function tlRow(Pl, it, nw){
+  var past = (it.kind === 'sleep' ? it.s.b : it.kind === 'flight' ? it.f.b : it.kind === 'out' ? it.L.out.ne : it.L.dep) < nw, cls = 'row' + (past ? ' past' : ''), tz = it.tz;
+  function row(go, icoBg, ico, t1, t2, right){
+    return '<button class="' + cls + '" type="button" ' + go + '><span class="tcol" style="width:56px">' + BC.hm(tz, it.t) + '</span>' +
+      '<span class="ico" style="background:' + icoBg + '">' + ico + '</span><span class="main"><span class="t1">' + t1 + '</span><span class="t3">' + t2 + '</span></span>' + (right || '') + '</button>';
+  }
+  if(it.kind === 'flight'){
+    var f = it.f, right = f.role === 'operate' ? wordHTML(f.landA) : '<span class="chip">Commute</span>';
+    var h = row('data-go="flight/' + f.id + '"', 'var(--flight)', I.plane.replace('stroke="currentColor"', 'stroke="var(--card)"'), '<b>' + esc(f.f.code + ' → ' + f.t.code) + '</b>',
+      'Lands ' + whenTxt(f.t.tz, f.b, f.a) + ' ' + BC.zabbr(f.t.tz, f.b) + ' · ' + durTxt(f.b - f.a), right);
+    if(f.role === 'operate'){
+      h += f.restWin ? '<button class="subrow' + (past ? ' past' : '') + '" type="button" data-go="rest/' + f.id + '" style="padding-left:84px"><span style="color:var(--sleep)">' + I.moon + '</span>Crew rest ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + ' UTC · Watch ' + BC.hm(f.f.tz, f.restWin[0]) + '–' + BC.hm(f.f.tz, f.restWin[1]) + '</button>'
+                     : '<button class="subrow link" type="button" data-go="rest/' + f.id + '" style="padding-left:84px">' + I.timer + 'Crew rest: set alarm once you know it</button>';
+    }
+    return h;
+  }
+  if(it.kind === 'sleep'){
+    var sl = it.s, nap = sl.kind === 'nap', dur = durTxt(sl.b - sl.a);
+    if(sl.actual) return row('data-act="editSleep" data-id="' + sl.id + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), (nap ? 'Napped' : 'Slept') + ' until ' + whenTxt(tz, sl.b, sl.a), 'Logged · ' + dur, '<span class="tag">Edit</span>');
+    if(sl.open){ var op = Pl.open; return row('data-act="editSleep" data-id="' + (op ? op.id : '') + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), 'In bed now', 'Suggested wake ' + whenTxt(tz, sl.b, sl.a), ''); }
+    var calc = 'data-go="calc/' + sl.a + '_' + sl.b + '_' + (nap ? 'nap' : 'main') + '"';
+    if(sl.kind === 'home') return row(calc, 'var(--fill)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), 'Sleep at home until ' + whenTxt(tz, sl.b, sl.a), 'Your usual night · ' + dur, I.chev);
+    var pend = past || (sl.a < nw);
+    return row(calc, 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), (pend ? 'Planned, not confirmed · ' : 'Planned · ') + dur, I.chev);
+  }
+  if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
+    'Crew night out until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
+  var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
+  return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span></span><span class="tag" style="color:var(--tint)">Plans</span>' + I.chev + '</button>';
+}
 function viewTrip(){
-  var Pl = P(), h = '';
+  var Pl = P(), h = '', nw = now();
   h += '<div class="hdr"><div><h1>Trip</h1>' + (Pl.flights.length ? '<div class="sub">' + esc(tripTitle(Pl)) + '</div>' : '') + '</div>' +
-       '<button class="plus" type="button" data-go="flight/new" aria-label="Add flight">' + I.plus + '</button></div>';
+       '<button class="plus" type="button" data-act="addMenu" aria-label="Add a flight or a sleep">' + I.plus + '</button></div>';
   if(!Pl.flights.length){
     h += '<section class="card empty"><p style="margin-top:0">No flights yet. Tap + to add one.</p></section>';
     return h;
   }
   var F = Pl.flights, a = F[0].a - 6*H, b = Math.min(Pl.R.t1, F[F.length-1].b + 18*H);
   h += '<button class="card" type="button" data-go="chart" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px 12px;margin-top:8px">' + ribbon(Pl, a, b, Pl.E.home.tz, {out:Pl.layovers.some(function(x){ return x.out; })}) + '</button>';
-  /* items by local day */
-  var items = [];
-  F.forEach(function(f){ items.push({t:f.a, tz:f.f.tz, kind:'flight', f:f}); });
-  Pl.layovers.forEach(function(L){ items.push({t:L.arr + 1, tz:L.ap.tz, kind:'lay', L:L}); });
-  var lastHome = Pl.sleeps.filter(function(s){ return s.kind === 'home' && s.a > F[F.length-1].b; })[0];
-  if(lastHome) items.push({t:lastHome.a, tz:Pl.E.home.tz, kind:'home', s:lastHome});
-  items.sort(function(p,q){ return p.t - q.t; });
-  var day = null, open = false;
+  var items = timelineItems(Pl), day = null, open = false, nowDone = false;
   items.forEach(function(it){
+    if(!nowDone && it.t > nw){
+      if(open){ h += '</div>'; open = false; }
+      h += '<div class="nowline">Now · ' + BC.hm(placeTz(Pl, nw), nw) + '</div>';
+      nowDone = true;
+    }
     var dk = BC.dayKey(it.tz, it.t);
+    if(dk === day && !open){ h += '<div class="list">'; open = true; }
     if(dk !== day){
       if(open) h += '</div>';
       day = dk;
-      h += '<h2 class="grp-h day">' + esc(BC.dayLong(it.tz, it.t)) + (it.kind === 'lay' ? ' · ' + esc(it.L.ap.city) : '') + '</h2><div class="list">';
+      h += '<h2 class="grp-h day">' + esc(BC.dayLong(it.tz, it.t)) + '</h2><div class="list">';
       open = true;
     }
-    if(it.kind === 'flight'){
-      var f = it.f, right = f.role === 'operate' ? wordHTML(f.landA) : '<span class="chip">Commute</span>';
-      h += '<button class="row" type="button" data-go="flight/' + f.id + '"><span class="main"><span class="t1 b">' + esc(f.f.code + ' → ' + f.t.code) + '</span><span class="t2">' +
-           BC.hm(f.f.tz, f.a) + ' ' + BC.zabbr(f.f.tz, f.a) + ' – ' + BC.hm(f.t.tz, f.b) + ' ' + BC.zabbr(f.t.tz, f.b) + '</span></span>' + right + '</button>';
-      if(f.role === 'operate'){
-        h += f.restWin ? '<button class="subrow" type="button" data-go="rest/' + f.id + '"><span style="color:var(--sleep)">' + I.moon + '</span>Crew rest ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + ' UTC</button>'
-                       : '<button class="subrow link" type="button" data-go="rest/' + f.id + '">' + I.timer + 'Crew rest: set alarm once you know it</button>';
-      }
-    } else if(it.kind === 'lay'){
-      var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
-      var all = L.fixed.map(function(x){ return {a:x.a, k:x.kind}; }).concat(o ? o.blocks.map(function(x){ return {a:x.a, k:x.kind}; }) : []);
-      if(L.out) all.push({a:L.out.ns, k:'out'});
-      all.sort(function(p,q){ return p.a - q.a; });
-      var sum = all.map(function(x){ return (x.k === 'main' ? 'Sleep ' : x.k === 'out' ? 'Night out ' : 'Nap ') + BC.hm(L.ap.tz, x.a); });
-      h += '<button class="row" type="button" data-go="lay/' + L.id + '"><span style="width:32px;height:32px;border-radius:8px;background:var(--sleep);color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + I.moon + '</span>' +
-           '<span class="main"><span class="t1 b">' + esc(o ? o.name : 'Layover') + '</span><span class="t2">' + esc(sum.join(' · ')) + '</span></span>' + I.chev + '</button>';
-    } else {
-      h += '<div class="row static"><span class="main"><span class="t1 b">Home</span><span class="t2">Bed ' + BC.hm(it.tz, it.s.a) + ' · Wake ' + BC.hm(it.tz, it.s.b) + '</span></span><span style="color:var(--sleep)">' + I.moon + '</span></div>';
-    }
+    h += tlRow(Pl, it, nw);
   });
   if(open) h += '</div>';
-  h += '<p class="foot">Times are local to each airport. Tap a flight to change it.</p>';
+  if(!nowDone) h += '<div class="nowline">Now · ' + BC.hm(placeTz(Pl, nw), nw) + '</div>';
+  h += '<p class="foot">Times are local to where you are. Logged sleeps are what you told the app; planned ones are its suggestion. Tap a planned sleep to try other times in the calculator.</p>';
+  return h;
+}
+
+/* ---------- calculator ---------- */
+function easeWord(e){ return e >= 0.85 ? 'Easy' : e >= 0.6 ? 'OK' : 'Hard'; }
+function viewCalc(){
+  var Pl = P(), nw = now(), E = Pl.E, h = '<h1 style="margin:4px 4px 2px">Sleep calculator</h1>';
+  if(!Pl.flights.length) return h + '<p class="msg">Add your trip first, so the calculator knows your next flight.</p>';
+  if(!V.calc){
+    var a0, b0, k0;
+    if(V.calcArg){ var pa = V.calcArg.split('_'); a0 = +pa[0]; b0 = +pa[1]; k0 = pa[2]; }
+    else {
+      var nx = Pl.sleeps.filter(function(x){ return x.a > nw && !x.actual && !x.open && x.kind !== 'rest'; })[0];
+      if(nx && nx.a - nw < 18*H){ a0 = nx.a; b0 = nx.b; k0 = nx.kind === 'nap' ? 'nap' : 'main'; }
+      else { a0 = Math.ceil(nw/(15*60000))*15*60000; k0 = 'main'; b0 = a0 + 8*H; }
+    }
+    var Lx = E.locAt(a0), tz0 = Lx.fl ? Lx.flight.f.tz : Lx.tz;
+    V.calc = {tz:tz0, bed:BC.msToLocal(tz0, a0), wake:BC.msToLocal(tz0, b0), kind:k0};
+  }
+  var c = V.calc, a = BC.localToMs(c.tz, c.bed), b = BC.localToMs(c.tz, c.wake), city = '';
+  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === c.tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  h += '<div class="sub" style="margin:0 4px 10px">Try a bedtime and a wake-up and see how the rest of the trip changes. ' + esc(city ? city + ' time.' : '') + '</div>';
+  h += '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span></span><input class="pill" type="datetime-local" id="cBed" value="' + esc(c.bed) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Wake</span></span><input class="pill" type="datetime-local" id="cWake" value="' + esc(c.wake) + '"></label>' +
+       '<div class="row static"><span class="main"><span class="t2">' + (b > a ? durTxt(b - a) + ' asleep' : 'Wake must be after bed') + '</span></span><div class="seg" role="group" aria-label="Nap or main sleep" style="width:170px"><button type="button" data-act="cKind" data-v="nap" aria-pressed="' + (c.kind === 'nap') + '">Nap</button><button type="button" data-act="cKind" data-v="main" aria-pressed="' + (c.kind === 'main') + '">Main sleep</button></div></div></div>';
+  h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cBest">Best wake-up for this bedtime</button></div>';
+  if(!(b > a) || b - a > 16*H){ return h + '<p class="err">Pick a wake-up after bedtime, within 16 hours.</p>'; }
+  var r = BC.whatIf(S, nw, {a:a, b:b, kind:c.kind}), m = r.m, bs = r.base, ctx = r.ctx;
+  function delta(v, w){ if(v == null || w == null) return ''; var d = Math.round(v) - Math.round(w); return '<span class="t3" style="margin-left:6px">' + (Math.abs(d) < 2 ? 'same as plan' : (d > 0 ? '+' : '−') + Math.abs(d) + ' vs plan') + '</span>'; }
+  function res(label, sub, v, base){ return '<div class="row static"><span class="main"><span class="t1">' + esc(label) + '</span>' + (sub ? '<span class="t3">' + esc(sub) + '</span>' : '') + '</span><span style="display:flex;flex-direction:column;align-items:flex-end">' + wordHTML(v, true) + delta(v, base) + '</span></div>'; }
+  h += '<h2 class="grp-h">What happens</h2><div class="list">';
+  h += '<div class="row static"><span class="main"><span class="t1">Falling asleep</span><span class="t3">' + (a < nw ? 'At that time' : 'How sleepy you will be at bedtime') + '</span></span><span class="word">' + easeWord(m.ease) + '</span></div>';
+  h += res('15 min after waking', 'Includes grogginess', m.wake15, null);
+  if(ctx.L && ctx.L.duty > b) h += res('At the van', BC.dow(ctx.L.ap.tz, ctx.L.duty) + ' ' + BC.hm(ctx.L.ap.tz, ctx.L.duty), m.van, bs.van);
+  if(ctx.f){ h += res('Lowest on ' + ctx.f.f.code + ' → ' + ctx.f.t.code, null, m.fmin, bs.fmin); h += res('Landing at ' + ctx.f.t.code, BC.dow(ctx.f.t.tz, ctx.f.b) + ' ' + BC.hm(ctx.f.t.tz, ctx.f.b), m.land, bs.land); }
+  h += '</div>';
+  if(r.rest){
+    h += '<p class="foot">After this sleep the app would suggest: <b>' + esc(r.rest.name) + '</b>' + (r.rest.blocks.length ? ' (' + esc(r.rest.blocks.map(function(x){ return (x.kind === 'main' ? 'sleep ' : 'nap ') + BC.hm(ctx.L.ap.tz, x.a) + '–' + BC.hm(ctx.L.ap.tz, x.b); }).join(', ')) + ')' : '') + '. The results above include it.</p>';
+  }
+  if(r.wakeBy && b > r.wakeBy) h += '<p class="err">That wake-up is after you need to be up for the van (' + BC.hm(c.tz, r.wakeBy) + ').</p>';
+  h += '<div class="stack" style="gap:10px;margin-top:12px">';
+  if(a > nw - 5*60000 && ctx.L) h += '<button class="btn" type="button" data-act="cUse">Use as my plan</button>';
+  if(b <= nw) h += '<button class="btn" type="button" data-act="cLog">Log as a sleep I took</button>';
+  else if(a <= nw) h += '<button class="btn sec" type="button" data-act="cLog">Log it: I fell asleep at ' + BC.hm(c.tz, a) + '</button>';
+  h += '</div><p class="foot">The numbers compare choices; they are not a measurement. "vs plan" is against the app’s current plan for the same moments.</p>';
   return h;
 }
 
@@ -872,6 +951,9 @@ async function checkUpdate(){
 function go(path){
   var parts = String(path).split('/'), view = parts[0], arg = parts.slice(1).join('/') || null;
   if(view === 'flight'){ openFlight(arg); return; }
+  if(view === 'sleepnew'){ openSleep(null); return; }
+  if(view === 'calc'){ V.calc = null; V.calcArg = arg; }
+  if(view === 'trip') V.scrollNow = true;
   if(view === 'rest' || view === 'lay' || view === 'chart') V.from = V.view;
   V.view = view; V.arg = arg; V.flash = ''; V.confirmClear = false; V.destMsg = '';
   if(view === 'lay') V.layPick[arg] = null;
@@ -887,11 +969,13 @@ function render(){
     else if(V.view === 'rest') h = viewRest(V.arg);
     else if(V.view === 'settings') h = viewSettings();
     else if(V.view === 'dest') h = viewDest();
+    else if(V.view === 'calc') h = viewCalc();
     else { V.view = 'now'; h = viewNow(); }
   }catch(err){ h = '<p class="err">Something went wrong drawing this screen: ' + esc(err.message) + '</p>'; if(window.console) console.error(err); }
   app.innerHTML = '<div class="stack">' + h + '</div>';
-  var tab = {now:'now', chart:'now', trip:'trip', lay:'trip', rest:V.from === 'now' ? 'now' : 'trip', settings:'settings', dest:'settings'}[V.view];
+  var tab = {now:'now', chart:'now', trip:'trip', lay:'trip', rest:V.from === 'now' ? 'now' : 'trip', settings:'settings', dest:'settings', calc:'calc'}[V.view];
   document.querySelectorAll('.tab').forEach(function(t){ if(t.dataset.go === tab) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
+  if(V.view === 'trip' && V.scrollNow){ V.scrollNow = false; var nl = document.querySelector('.nowline'); if(nl) setTimeout(function(){ nl.scrollIntoView({block:'center'}); }, 0); }
 }
 
 /* ---------- events ---------- */
@@ -911,7 +995,7 @@ document.addEventListener('click', function(e){
   if(act === 'pick'){ V.layPick[id] = b.dataset.opt; render(); return; }
   if(act === 'use'){
     var Pl2 = P(), L2 = layById(Pl2, id), pick = V.layPick[id] || L2.picked;
-    (S.lay[id] || (S.lay[id] = {})).choice = pick; save(); go('trip'); return;
+    var cfgU = S.lay[id] || (S.lay[id] = {}); cfgU.choice = pick; if(pick !== 'custom') delete cfgU.custom; save(); go('trip'); return;
   }
   if(act === 'cv'){ V.chartView = b.dataset.v; render(); return; }
   if(act === 'bedNow'){
@@ -932,6 +1016,34 @@ document.addEventListener('click', function(e){
     return;
   }
   if(act === 'logSleep'){ openSleep(null); return; }
+  if(act === 'addMenu'){
+    $('#sheet').innerHTML = '<div class="sheet" data-act="menuBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Add"><div class="grab"><span></span></div><div class="stack" style="gap:10px;margin-top:14px">' +
+      '<button class="btn" type="button" data-act="menuFlight">Add a flight</button><button class="btn sec" type="button" data-act="menuSleep">Log a sleep you took</button><button class="btn sec" type="button" data-act="menuBg2">Cancel</button></div></div></div>';
+    return;
+  }
+  if(act === 'menuBg' && e.target === b || act === 'menuBg2'){ $('#sheet').innerHTML = ''; return; }
+  if(act === 'menuFlight'){ $('#sheet').innerHTML = ''; openFlight('new'); return; }
+  if(act === 'menuSleep'){ $('#sheet').innerHTML = ''; openSleep(null); return; }
+  if(act === 'cKind'){ V.calc.kind = b.dataset.v; render(); return; }
+  if(act === 'cBest'){
+    var ca = BC.localToMs(V.calc.tz, V.calc.bed), bw = BC.bestWake(S, now(), ca, V.calc.kind);
+    if(bw) V.calc.wake = BC.msToLocal(V.calc.tz, bw);
+    render(); return;
+  }
+  if(act === 'cUse' || act === 'cLog'){
+    var c2 = V.calc, a2 = BC.localToMs(c2.tz, c2.bed), b2 = BC.localToMs(c2.tz, c2.wake);
+    if(act === 'cLog'){
+      var openNow = b2 > now();
+      S.actual = S.actual.filter(function(x){ return !(x.a < b2 && a2 < (x.b || now())); });
+      S.actual.push({id:nextActualId(), a:a2, b:openNow ? null : b2, kind:c2.kind}); S.actual.sort(function(p,q){ return p.a - q.a; });
+      save(); go('now'); return;
+    }
+    var r2 = BC.whatIf(S, now(), {a:a2, b:b2, kind:c2.kind}), Lc = r2.ctx.L;
+    if(!Lc) return;
+    var cfg2 = S.lay[Lc.id] || (S.lay[Lc.id] = {});
+    cfg2.custom = [{a:a2, b:b2, kind:c2.kind}].concat(r2.rest ? r2.rest.blocks.map(function(x){ return {a:x.a, b:x.b, kind:x.kind}; }) : []);
+    cfg2.choice = 'custom'; save(); go('now'); return;
+  }
   if(act === 'editSleep'){ openSleep(id); return; }
   if(act === 'unskip'){ S.skips = S.skips.filter(function(x){ return String(x.a) !== String(id); }); save(); render(); return; }
   if(act === 'sleepBg' && e.target === b){ V.sleep = null; renderSleep(); return; }
@@ -983,6 +1095,15 @@ function autoArr(){
 }
 document.addEventListener('change', function(e){
   var t = e.target, id = t.id;
+  if(V.calc && (id === 'cBed' || id === 'cWake')){
+    if(t.value){
+      if(id === 'cBed'){ var oldA = BC.localToMs(V.calc.tz, V.calc.bed), oldB = BC.localToMs(V.calc.tz, V.calc.wake), na = BC.localToMs(V.calc.tz, t.value); V.calc.bed = t.value; if(!isNaN(oldA) && !isNaN(oldB) && !isNaN(na)) V.calc.wake = BC.msToLocal(V.calc.tz, na + (oldB - oldA)); }
+      else V.calc.wake = t.value;
+      var dl = BC.localToMs(V.calc.tz, V.calc.wake) - BC.localToMs(V.calc.tz, V.calc.bed);
+      if(dl >= 4*H) V.calc.kind = 'main'; else if(dl > 0 && dl < 3*H) V.calc.kind = 'nap';
+    }
+    render(); return;
+  }
   if(V.sleep && (id === 'slBed' || id === 'slWake')){ V.sleep[id === 'slBed' ? 'bed' : 'wake'] = t.value; return; }
   if(id === 'loNs' || id === 'loNe'){
     var cfgL = S.lay[t.dataset.id] || (S.lay[t.dataset.id] = {});
