@@ -1,13 +1,13 @@
 {
-  "name": "Body Clock Overlay",
+  "name": "Body Clock",
   "short_name": "Body Clock",
-  "description": "Plan sleep, flights and caffeine around your body clock.",
+  "description": "Plans your sleep around long-haul trips: nap now or later, crew rest alarms, alertness at landing.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0B131C",
-  "theme_color": "#0B131C",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
   "icons": [
     {
       "src": "icon-192.png",

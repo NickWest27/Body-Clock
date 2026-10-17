@@ -1,8 +1,9 @@
 /* Offline cache for Body Clock. Serves the saved copy immediately and refreshes it in the background,
-   so an update arrives the next time the app is opened. Change VERSION when you ship a new build. */
-const VERSION = '2026-10-16.17';
-const CACHE = 'body-clock-' + VERSION;
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+   so an update arrives the next time the app is opened. Change VERSION when you ship a new build.
+   The classic app under classic/ has its own service worker and cache, which this one leaves alone. */
+const VERSION = '2026-10-17.18';
+const CACHE = 'bc2-' + VERSION;
+const ASSETS = ['./', './index.html', './engine.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS); }).then(function(){ return self.skipWaiting(); }));
@@ -10,7 +11,8 @@ self.addEventListener('install', function(e){
 self.addEventListener('activate', function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
-      return Promise.all(keys.filter(function(k){ return k.indexOf('body-clock-') === 0 && k !== CACHE; }).map(function(k){ return caches.delete(k); }));
+      /* our older builds, and the caches of the old app that used to live here (body-clock-2026...) */
+      return Promise.all(keys.filter(function(k){ return (k.indexOf('bc2-') === 0 && k !== CACHE) || /^body-clock-\d/.test(k); }).map(function(k){ return caches.delete(k); }));
     }).then(function(){ return self.clients.claim(); })
   );
 });
@@ -19,7 +21,7 @@ self.addEventListener('fetch', function(e){
   if(req.method !== 'GET') return;
   var url = new URL(req.url);
   if(url.origin !== self.location.origin) return;
-  /* update checks from the Update app button go straight to the network, never the saved copy */
+  if(url.pathname.indexOf('/classic/') >= 0) return;
   if(url.searchParams.has('check')) return;
   e.respondWith(
     caches.open(CACHE).then(function(cache){
