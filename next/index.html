@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Body Clock (new)</title>
+<meta name="description" content="Plans your sleep around long-haul trips: nap now or later, crew rest alarms and alertness at landing.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BC New">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<style>
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --label:#000000; --sec:#5F5F66; --ter:#8A8A90; --sep:rgba(60,60,67,.18);
+  --fill:rgba(118,118,128,.12); --bar:rgba(249,249,249,.94); --tint:#0A66D8; --sleep:#5856D6; --sleepbg:rgba(88,86,214,.14);
+  --flight:#1C1C1E; --day:#F7DC94; --nite:#2E3160; --nitebg:rgba(46,49,96,.10); --out:#C2378A; --outbg:rgba(194,55,138,.12);
+  --switch:#248A3D; --danger:#C4161C;
+  --scale:linear-gradient(90deg,#C4161C 0%,#E2531A 17%,#EE8A12 33%,#D8B10F 50%,#7DB843 67%,#2E9E5B 83%,#1F7A4D 100%);
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --card:#1C1C1E; --label:#FFFFFF; --sec:#A1A1A8; --ter:#7C7C82; --sep:rgba(84,84,88,.6);
+    --fill:rgba(118,118,128,.24); --bar:rgba(22,22,24,.94); --tint:#3E9BFF; --sleep:#8D8BFF; --sleepbg:rgba(94,92,230,.28);
+    --flight:#E5E5EA; --day:#8A7440; --nite:#262A55; --nitebg:rgba(120,130,255,.12); --out:#F06BB8; --outbg:rgba(240,107,184,.18);
+    --switch:#30D158; --danger:#FF6961;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--label);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.3}
+a{color:var(--tint);text-decoration:none}
+button{font:inherit;color:inherit}
+.wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 100px)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;background:var(--bar);border-top:1px solid var(--sep);padding-bottom:env(safe-area-inset-bottom);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.tabbar-in{display:flex;justify-content:space-around;width:100%;max-width:560px;padding-top:7px;height:56px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;width:100px;min-height:44px;border:0;background:none;color:var(--sec);font-size:10px;font-weight:600;cursor:pointer}
+.tab[aria-current=page]{color:var(--tint)}
+.tab svg{width:26px;height:26px}
+.nav{display:flex;align-items:center;justify-content:space-between;min-height:44px;margin:-6px -8px 0}
+.back{display:inline-flex;align-items:center;gap:2px;min-height:44px;padding:0 8px;border:0;background:none;color:var(--tint);font-size:17px;cursor:pointer}
+.navbtn{min-height:44px;padding:0 8px;border:0;background:none;color:var(--tint);font-size:17px;cursor:pointer}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--sec)}
+h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing:.01em}
+.sub{margin-top:2px;font-size:15px;color:var(--sec)}
+.hdr{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:0 4px 6px}
+.plus{width:44px;height:44px;border-radius:50%;background:var(--fill);border:0;display:flex;align-items:center;justify-content:center;color:var(--tint);cursor:pointer;flex:none}
+.stack{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border-radius:22px;padding:18px 20px 16px}
+.list{background:var(--card);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:10px 16px;min-height:52px;width:100%;border:0;background:none;text-align:left;color:var(--label);cursor:pointer;font-size:17px}
+.row+.row,.row+.subrow+.row{border-top:1px solid var(--sep)}
+.row.static{cursor:default}
+.row .main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.row .t1{font-size:17px}
+.row .t1.b{font-weight:600}
+.row .t2{font-size:15px;color:var(--sec);font-variant-numeric:tabular-nums}
+.row .t3{font-size:13px;color:var(--sec)}
+.row .val{font-size:17px;color:var(--sec);text-align:right}
+.subrow{display:flex;align-items:center;gap:10px;padding:0 16px 12px;font-size:15px;color:var(--sec);border:0;background:none;width:100%;text-align:left;cursor:pointer;min-height:32px}
+.subrow.link{color:var(--tint)}
+.chev{width:18px;height:18px;flex:none;color:var(--ter)}
+.grp-h{margin:18px 16px 6px;font-size:13px;color:var(--sec);text-transform:uppercase}
+.grp-h.day{margin:18px 4px 6px;font-weight:600;letter-spacing:.02em}
+.foot{margin:6px 16px 0;font-size:13px;line-height:18px;color:var(--sec)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--fill);color:var(--sec);font-size:13px;font-weight:600;white-space:nowrap;border:0}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+.word{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;white-space:nowrap}
+.hero-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hero-l{display:flex;align-items:center;gap:6px;color:var(--sleep);font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.hero-l.fl{color:var(--sec)}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.big{font-size:44px;line-height:50px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.lab{font-size:15px;color:var(--sec)}
+.why{margin:12px 0 0;font-size:15px;line-height:20px;color:var(--sec)}
+.tcol{width:80px;flex:none;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.btn{display:flex;align-items:center;justify-content:center;min-height:50px;border-radius:14px;border:0;background:var(--tint);color:#fff;font-size:17px;font-weight:600;width:100%;cursor:pointer}
+.btn.sec{background:var(--fill);color:var(--tint)}
+.btn.small{min-height:40px;width:auto;padding:0 16px;font-size:15px}
+.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;padding:2px;border-radius:9px;background:var(--fill)}
+.seg button{min-height:32px;border:0;border-radius:7px;background:transparent;font-size:13px;font-weight:600;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.sw{position:relative;width:51px;height:31px;border:0;border-radius:16px;background:var(--fill);cursor:pointer;padding:0;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:left .2s}
+.sw[aria-checked=true]{background:var(--switch)}
+.sw[aria-checked=true]::after{left:22px}
+.pill{padding:6px 10px;border-radius:8px;background:var(--fill);font-size:17px;font-variant-numeric:tabular-nums;border:0;color:var(--label)}
+input.pill,select.pill{-webkit-appearance:none;appearance:none;font:inherit;font-size:17px}
+input[type=time].pill,input[type=datetime-local].pill{min-height:36px}
+select.pill{padding-right:10px;max-width:60vw}
+.opt{display:flex;flex-direction:column;gap:10px;width:100%;padding:14px 16px;border-radius:16px;background:var(--card);border:2px solid transparent;text-align:left;cursor:pointer}
+.opt[aria-pressed=true]{border-color:var(--tint)}
+.radio{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--ter);display:flex;align-items:center;justify-content:center}
+.opt[aria-pressed=true] .radio{border-color:var(--tint)}
+.opt[aria-pressed=true] .radio::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--tint)}
+.badge{padding:2px 7px;border-radius:6px;background:var(--sleepbg);color:var(--sleep);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.meter{position:relative;height:6px;border-radius:3px;background:var(--scale)}
+.meter i{position:absolute;top:-4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--card);border:3px solid var(--label)}
+.rib{position:relative;height:66px}
+.rib .ns{position:absolute;left:0;right:0;top:0;height:6px;border-radius:3px;background:var(--day);overflow:hidden}
+.rib .ns i{position:absolute;top:0;bottom:0;background:var(--nite)}
+.rib .al{position:absolute;left:0;right:0;top:10px;height:18px;border-radius:9px;overflow:hidden}
+.rib .al i{position:absolute;top:0;bottom:0;background:var(--sleep)}
+.rib .tk{position:absolute;top:0;height:32px;width:1px;background:var(--sep)}
+.rib .tk.mid{width:2px;background:var(--label);opacity:.5}
+.rib .ev{position:absolute;top:32px;height:4px;border-radius:2px}
+.rib .now{position:absolute;top:-2px;width:3px;height:34px;border-radius:2px;background:var(--tint)}
+.rib .lb{position:absolute;top:42px;font-size:12px;color:var(--sec);transform:translateX(-50%);white-space:nowrap}
+.rib .lb.d{font-weight:600;color:var(--label)}
+.rib .lb.n{font-weight:600;color:var(--tint)}
+.legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--sec)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw10{width:10px;height:10px;border-radius:3px;display:inline-block}
+.stepper{display:flex;border-radius:8px;background:var(--fill);overflow:hidden;flex:none}
+.stepper button{width:46px;height:34px;border:0;background:none;font-size:20px;cursor:pointer}
+.stepper span{width:1px;background:var(--sep);margin:6px 0}
+.watch{background:var(--sleep);color:#fff;border-radius:22px;padding:18px 20px}
+.watch .lab{color:rgba(255,255,255,.85)}
+.codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.code{display:flex;flex-direction:column;gap:2px;background:var(--card);border-radius:16px;padding:12px 14px}
+.code input{width:100%;border:0;background:none;padding:0;font:inherit;font-size:34px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--label);outline:none}
+.code .t3{font-size:13px;color:var(--sec);min-height:17px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{min-height:34px;padding:0 14px;border-radius:999px;border:0;background:var(--fill);font-size:15px;font-weight:600;cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--tint);color:#fff}
+.err{margin:8px 16px 0;font-size:15px;color:var(--danger)}
+.msg{margin:8px 16px 0;font-size:15px;color:var(--sec)}
+.empty{text-align:center;padding:28px 20px}
+.empty p{color:var(--sec);margin:8px 0 18px}
+.sheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center}
+.sheet-in{background:var(--bg);width:100%;max-width:560px;max-height:calc(100% - env(safe-area-inset-top) - 10px);border-radius:14px 14px 0 0;overflow:auto;padding:0 16px calc(env(safe-area-inset-bottom) + 24px)}
+.grab{display:flex;justify-content:center;padding-top:6px}
+.grab span{width:36px;height:5px;border-radius:3px;background:var(--ter);opacity:.5}
+.sheet-h{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;height:48px;margin:0 -8px}
+.sheet-h .ttl{justify-self:center;font-weight:600}
+.sheet-h .r{justify-self:end;font-weight:600}
+figure{margin:0}
+.chart{background:var(--card);border-radius:16px;padding:14px 0 10px;overflow:hidden}
+.chart svg{display:block;width:100%;height:auto}
+.chart text{font-family:inherit}
+details.how{background:var(--card);border-radius:16px;padding:12px 16px}
+details.how summary{cursor:pointer;font-size:17px}
+details.how p{font-size:15px;line-height:21px;color:var(--sec)}
+.rm{flex:none;width:24px;height:24px;border-radius:50%;border:0;background:var(--danger);color:#fff;font-size:18px;line-height:24px;padding:0;cursor:pointer}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main class="wrap" id="app" aria-live="polite"></main>
+<nav class="tabbar" aria-label="Tabs"><div class="tabbar-in">
+  <button class="tab" type="button" data-go="now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Now</button>
+  <button class="tab" type="button" data-go="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>Trip</button>
+  <button class="tab" type="button" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Settings</button>
+</div></nav>
+<div id="sheet"></div>
+<input type="file" id="impFile" accept=".json,application/json" hidden>
+
+<script src="airports.js"></script>
+<script src="engine.js"></script>
+<script>
+(function(){
+'use strict';
+var BUILD = '17 Oct 2026 · build 18';
+var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
+
+/* ---------- state ---------- */
+function defaults(){
+  return {v:1, home:'ATL', bed:'23:00', wake:'07:00', landBed:2, van:2, ready:0.75, balance:'balanced', light:50,
+          night:{auto:true, start:'19:00', end:'23:00', gap:12, last:12},
+          dests:DEFAULT_DESTS.slice(), flights:[], lay:{}};
+}
+function load(){
+  try{
+    var o = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if(o && o.v === 1 && Array.isArray(o.flights)) return fix(o);
+  }catch(e){}
+  return defaults();
+}
+function fix(o){
+  var d = defaults();
+  Object.keys(d).forEach(function(k){ if(o[k] === undefined) o[k] = d[k]; });
+  Object.keys(d.night).forEach(function(k){ if(o.night[k] === undefined) o.night[k] = d.night[k]; });
+  if(!Array.isArray(o.dests)) o.dests = d.dests;
+  if(!o.lay || typeof o.lay !== 'object') o.lay = {};
+  return o;
+}
+var S = load();
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function nextId(){ var m = 0; S.flights.forEach(function(f){ if(f.id > m) m = f.id; }); return m + 1; }
+
+/* ---------- helpers ---------- */
+function $(s){ return document.querySelector(s); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+var I = {
+  chev:'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+  moon:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+  plane:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>',
+  timer:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg>',
+  plus:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
+};
+function wordHTML(a, withNum){
+  if(a == null) return '';
+  return '<span class="word"><span class="dot" style="background:' + BC.color(a) + '"></span>' + BC.word(a) + (withNum ? ' · ' + Math.round(a) : '') + '</span>';
+}
+function durTxt(ms){ var m = Math.round(ms/60000), h = Math.floor(m/60), r = m % 60; return h + ' h' + (r ? ' ' + BC.pad(r) + ' min' : ''); }
+function hrsTxt(h){ var hh = Math.floor(h), m = Math.round((h - hh)*60); return hh + ' h' + (m ? ' ' + m : ''); }
+function sameDay(tz, a, b){ return BC.dayKey(tz, a) === BC.dayKey(tz, b); }
+function whenTxt(tz, t, ref){ return (sameDay(tz, t, ref) ? '' : BC.dow(tz, t) + ' ') + BC.hm(tz, t); }
+function navBar(backTo, backLabel, right){
+  return '<div class="nav"><button class="back" type="button" data-go="' + backTo + '">' + I.back + esc(backLabel) + '</button>' + (right || '<span></span>') + '</div>';
+}
+function now(){ return Date.now(); }
+
+/* ---------- plan (cached in the engine) ---------- */
+function P(){ return BC.plan(S, now()); }
+function flightById(Pl, id){ return Pl.flights.filter(function(f){ return String(f.id) === String(id); })[0]; }
+function layById(Pl, id){ return Pl.layovers.filter(function(l){ return l.id === id; })[0]; }
+function layOfBlock(Pl, s){ return s.lay ? layById(Pl, s.lay) : null; }
+function placeTz(Pl, t){ var L = Pl.E.locAt(t); return L.tz; }
+
+/* ---------- ribbon ---------- */
+function ribbon(Pl, a, b, tz, opts){
+  opts = opts || {};
+  var R = Pl.R, span = b - a, pc = function(t){ return ((t - a)/span*100).toFixed(2) + '%'; };
+  var h = '<div class="rib">';
+  /* day and night */
+  h += '<div class="ns">';
+  var run = null;
+  R.pts.forEach(function(p){
+    if(p.t < a || p.t > b) return;
+    if(p.ni && run === null) run = p.t;
+    if(!p.ni && run !== null){ h += '<i style="left:' + pc(run) + ';width:' + ((p.t - run)/span*100).toFixed(2) + '%"></i>'; run = null; }
+  });
+  if(run !== null) h += '<i style="left:' + pc(run) + ';right:0"></i>';
+  h += '</div>';
+  /* alertness, colour carried through sleep so the sleep overlay has clean edges */
+  var stops = [], last = null, n = 72;
+  for(var i=0;i<=n;i++){
+    var t = a + span*i/n, p = BC.ptAt(R, t);
+    if(!p.sl || last === null) last = p.A;
+    if(p.t > R.t1) break;
+    stops.push(BC.color(last) + ' ' + (i/n*100).toFixed(1) + '%');
+  }
+  h += '<div class="al" style="background:linear-gradient(90deg,' + stops.join(',') + ')">';
+  Pl.sleeps.forEach(function(s){
+    if(s.b <= a || s.a >= b) return;
+    var x0 = Math.max(s.a, a), x1 = Math.min(s.b, b);
+    h += '<i style="left:' + pc(x0) + ';width:' + ((x1 - x0)/span*100).toFixed(2) + '%"></i>';
+  });
+  h += '</div>';
+  /* ticks on the clock given */
+  var stepH = span <= 60*H ? 6 : span <= 120*H ? 12 : 24, labels = [];
+  var t0 = BC.localToMs(tz, BC.dateStr(tz, a) + 'T00:00');
+  for(var k=0; k<200; k++){
+    var tt = t0 + k*stepH*H;
+    var hr = +BC.hm(tz, tt).slice(0,2);
+    if(tt > b) break;
+    if(tt < a + span*0.02 || tt > b - span*(opts.endLabel ? 0.1 : 0.04)) continue;
+    var mid = hr === 0;
+    h += '<i class="tk' + (mid ? ' mid' : '') + '" style="left:' + pc(tt) + '"></i>';
+    labels.push({t:tt, txt:mid ? BC.dow(tz, tt) : BC.hm(tz, tt), d:mid});
+  }
+  /* night outs and flights */
+  Pl.layovers.forEach(function(L){
+    if(!L.out || L.out.ne <= a || L.out.ns >= b) return;
+    var x0 = Math.max(L.out.ns, a), x1 = Math.min(L.out.ne, b);
+    h += '<i class="ev" style="left:' + pc(x0) + ';width:' + ((x1 - x0)/span*100).toFixed(2) + '%;background:var(--out)"></i>';
+  });
+  Pl.flights.forEach(function(f){
+    if(f.b <= a || f.a >= b) return;
+    var x0 = Math.max(f.a, a), x1 = Math.min(f.b, b);
+    h += '<i class="ev" style="left:' + pc(x0) + ';width:' + ((x1 - x0)/span*100).toFixed(2) + '%;background:var(--flight)"></i>';
+  });
+  var nw = now(), hasNow = nw >= a && nw <= b;
+  if(hasNow) h += '<i class="now" style="left:' + pc(nw) + '"></i>';
+  var nowX = hasNow ? (nw - a)/span : -1;
+  if(hasNow) h += '<span class="lb n" style="left:' + pc(nw) + ';' + (nowX < 0.05 ? 'transform:none' : '') + '">Now</span>';
+  labels.forEach(function(l){
+    var x = (l.t - a)/span;
+    if(hasNow && Math.abs(x - nowX) < 0.08) return;
+    h += '<span class="lb' + (l.d ? ' d' : '') + '" style="left:' + pc(l.t) + '">' + esc(l.txt) + '</span>';
+  });
+  if(opts.endLabel) h += '<span class="lb" style="left:auto;right:0;transform:none">' + esc(opts.endLabel) + '</span>';
+  h += '</div>';
+  h += '<div class="legend"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span>' +
+       '<span><span class="sw10" style="background:var(--sleep)"></span>Sleep</span><span><span class="sw10" style="background:var(--nite)"></span>Night</span>' +
+       (opts.out ? '<span><span class="sw10" style="background:var(--out)"></span>Night out</span>' : '') + '</div>';
+  return h;
+}
+
+/* ---------- events in time order ---------- */
+function events(Pl, from, max){
+  var ev = [];
+  Pl.sleeps.forEach(function(s){
+    if(s.kind === 'rest' || s.a < from) return;
+    var L = layOfBlock(Pl, s), tz = L ? L.ap.tz : Pl.E.home.tz;
+    ev.push({t:s.a, tz:tz, title:s.kind === 'home' ? 'Sleep at home' : s.kind === 'nap' ? 'Nap' : 'Sleep', sub:'Wake ' + whenTxt(tz, s.b, s.a), color:'var(--sleep)', go:L ? 'lay/' + L.id : null});
+  });
+  Pl.layovers.forEach(function(L){
+    if(!L.out || L.out.ns < from) return;
+    ev.push({t:L.out.ns, tz:L.ap.tz, title:'Crew night out', sub:'Back by ' + BC.hm(L.ap.tz, L.out.ne) + ' · last drink by ' + BC.dow(L.ap.tz, L.out.lastDrink) + ' ' + BC.hm(L.ap.tz, L.out.lastDrink), color:'var(--out)', go:'lay/' + L.id});
+  });
+  Pl.flights.forEach(function(f){
+    var L = Pl.layovers.filter(function(x){ return x.outF.id === f.id; })[0];
+    var t = L ? L.duty : f.a;
+    if(f.b < from || t < from - 0) { if(!(f.a >= from)) return; }
+    var title = (L ? 'Van · ' : '') + f.f.code + ' → ' + f.t.code + (L ? ' ' + BC.hm(f.f.tz, f.a) : '');
+    ev.push({t:L ? L.duty : f.a, tz:f.f.tz, title:title, sub:'Lands ' + whenTxt(f.t.tz, f.b, f.a) + ' ' + f.t.city + ' time', flight:f, go:'flight/' + f.id});
+  });
+  ev.sort(function(p,q){ return p.t - q.t; });
+  return ev.slice(0, max);
+}
+function eventRow(e, ref){
+  var chip = e.flight && e.flight.role === 'operate' ? '<span class="word" aria-label="Alertness at landing ' + BC.word(e.flight.landA) + ', ' + Math.round(e.flight.landA) + '"><span class="dot" style="background:' + BC.color(e.flight.landA) + '"></span>' + BC.word(e.flight.landA) + '</span>'
+    : (e.color ? '<span class="dot" style="background:' + e.color + '"></span>' : '');
+  var tag = e.go ? 'button type="button" data-go="' + e.go + '"' : 'div';
+  return '<' + tag + ' class="row' + (e.go ? '' : ' static') + '"><span class="tcol">' + esc(whenTxt(e.tz, e.t, ref)) + '</span><span class="main"><span class="t1">' + esc(e.title) + '</span><span class="t3">' + esc(e.sub) + '</span></span>' + chip + '</' + (e.go ? 'button' : 'div') + '>';
+}
+
+/* ---------- why text for a planned block ---------- */
+function whyFor(Pl, s){
+  var L = layOfBlock(Pl, s);
+  if(s.kind === 'home') return 'Back on your usual night at home.';
+  if(!L) return '';
+  var opt = L.picked, isArr = s.kind === 'nap' && s.a <= L.ws + 1000, isLate = s.kind === 'nap' && !isArr;
+  if(isArr && opt === 'both') return 'Short on purpose: enough for ' + (L.out ? 'tonight' : 'the evening') + ', and you will still be sleepy enough to nap again before the van.';
+  if(isArr) return 'A proper nap now keeps you going ' + (L.out ? 'through the night out.' : 'until bedtime.');
+  if(isLate) return 'Last sleep before the van. Lie down even if sleep is slow to come.';
+  if(s.kind === 'main' && L.out) return 'Straight to bed after the night out.';
+  return 'Your main sleep for this layover.';
+}
+
+/* ---------- views ---------- */
+var V = {view:'now', arg:null, layPick:{}, showNum:{}, chartView:'land', destEdit:false, flight:null, flash:''};
+
+function viewNow(){
+  var Pl = P(), nw = now(), E = Pl.E, h = '';
+  var L = (nw >= E.t0 && nw <= E.t1) ? E.locAt(nw) : {tz:E.home.tz, ap:E.home, fl:false};
+  var tz = L.tz, homeTz = E.home.tz;
+  var place = L.fl ? 'In flight · ' + L.flight.f.city : (L.ap ? L.ap.city : E.home.city);
+  h += '<header style="padding:4px 4px 0"><div class="eyebrow">' + esc(BC.dayLong(tz, nw)) + '</div><h1>Now</h1>' +
+       '<div class="sub">' + esc(place) + ' ' + BC.hm(tz, nw) + (BC.offH(tz, nw) !== BC.offH(homeTz, nw) ? ' · ' + esc(E.home.city) + ' ' + BC.hm(homeTz, nw) : '') + '</div></header>';
+  if(V.flash) h += '<p class="msg" style="margin:0 4px">' + esc(V.flash) + '</p>';
+  if(!Pl.flights.length){
+    var hasClassic = classicData();
+    h += '<section class="card empty"><h2 style="margin:0;font-size:22px">No trip yet</h2><p>Add your flights with airport codes. The app plans your sleep around them.</p>' +
+         '<div class="stack" style="gap:10px"><button class="btn" type="button" data-go="flight/new">Add a flight</button>' +
+         (hasClassic ? '<button class="btn sec" type="button" data-act="import">Import trip from the classic app</button>' : '') +
+         '<button class="btn sec" type="button" data-act="example">Load example trip</button></div></section>';
+    return h;
+  }
+  /* what to do now */
+  var cur = Pl.sleeps.filter(function(s){ return s.a <= nw && nw < s.b; })[0];
+  var nextS = Pl.sleeps.filter(function(s){ return s.a > nw && s.kind !== 'rest'; })[0];
+  var inF = Pl.flights.filter(function(f){ return f.a <= nw && nw < f.b; })[0];
+  var heroUsed = null;
+  h += '<section class="card" aria-label="Do this now">';
+  if(inF && !(cur && cur.kind !== 'rest')){
+    var rv = BC.restVariants(inF);
+    h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'In flight</div><div class="lab" style="font-size:13px">' + esc(inF.f.code + ' → ' + inF.t.code) + '</div></div>';
+    if(inF.role === 'operate'){
+      if(inF.restWin){
+        h += '<div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[1]) + '</div></div></div>' +
+             '<p class="why">On your Watch (' + esc(inF.f.city) + ' time). UTC ' + BC.hm('UTC', inF.restWin[0]) + '–' + BC.hm('UTC', inF.restWin[1]) + '.</p>';
+      } else h += '<p class="why" style="margin-top:0">Enter your crew rest once you know it, and get the times for your Watch.</p>';
+      h += '<div style="margin-top:14px"><button class="btn" type="button" data-go="rest/' + inF.id + '">' + (inF.restWin ? 'Change crew rest' : 'Set crew rest alarm') + '</button></div>';
+    } else h += '<p class="why" style="margin-top:0">Lands ' + BC.hm(inF.t.tz, inF.b) + ' ' + esc(inF.t.city) + ' time.</p>';
+  } else {
+    var s = cur || nextS;
+    if(s && (cur || s.a - nw < 18*H)){
+      heroUsed = s;
+      var sL = layOfBlock(Pl, s), stz = sL ? sL.ap.tz : (s.kind === 'rest' ? tz : homeTz);
+      var label = (s.kind === 'nap' ? 'Nap' : s.kind === 'rest' ? 'Crew rest' : 'Sleep') + (cur || s.a - nw < 30*60000 ? ' now' : '');
+      var lead = cur ? 'Asleep' : (s.a - nw < 30*60000 ? '' : 'Next · in ' + durTxt(s.a - nw));
+      h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead || durTxt(s.b - s.a)) + '</div></div>' +
+           '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(stz, s.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + BC.hm(stz, s.b) + '</div></div></div>' +
+           '<p class="why">' + esc(whyFor(Pl, s)) + (sL && stz !== tz ? ' ' + esc(sL.ap.city) + ' time.' : '') + '</p>';
+    } else {
+      var nf = Pl.flights.filter(function(f){ return f.a > nw; })[0];
+      if(nf){
+        h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'Next flight</div><div class="lab" style="font-size:13px">in ' + esc(durTxt(nf.a - nw)) + '</div></div>' +
+             '<div style="font-size:28px;font-weight:600">' + esc(nf.f.code + ' → ' + nf.t.code) + '</div><p class="why">Departs ' + esc(whenTxt(nf.f.tz, nf.a, nw)) + ' ' + esc(nf.f.city) + ' time.</p>';
+      } else h += '<div class="hero-h"><div class="hero-l">' + I.moon + 'Trip done</div></div><p class="why" style="margin-top:0">Your usual night at home: bed ' + esc(S.bed) + ', wake ' + esc(S.wake) + '.</p>';
+    }
+  }
+  h += '</section>';
+  /* up next */
+  var from = heroUsed ? heroUsed.a + 1 : nw;
+  var ev = events(Pl, from, 4);
+  if(ev.length){
+    h += '<section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') + '</section>';
+  }
+  /* ribbon */
+  var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
+  var a = Math.max(nw, E.t0), b = target && target.b - a <= 72*H ? target.b : Math.min(a + 36*H, Pl.R.t1);
+  if(b - a > 2*H){
+    h += '<button class="card" type="button" data-go="chart" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px 12px">' +
+         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:17px;font-weight:600">' + (target && b === target.b ? 'Until you land' : 'Next 36 hours') + '</span>' + I.chev + '</div>' +
+         ribbon(Pl, a, b, tz, {endLabel:target && b === target.b ? 'Land' : '', out:Pl.layovers.some(function(x){ return x.out && x.out.ne > a && x.out.ns < b; })}) + '</button>';
+  }
+  return h;
+}
+
+function tripTitle(Pl){
+  var E = Pl.E, F = Pl.flights, tz = E.home.tz;
+  var far = Pl.layovers.length ? Pl.layovers[0].ap.city : F[F.length-1].t.city;
+  var d1 = BC.dayShort(tz, F[0].a).split(' '), d2 = BC.dayShort(tz, F[F.length-1].b).split(' ');
+  var dates = d1[2] === d2[2] ? d1[1] + '–' + d2[1] + ' ' + d2[2] : d1[1] + ' ' + d1[2] + ' – ' + d2[1] + ' ' + d2[2];
+  return dates + ' · ' + E.home.city + ' ⇄ ' + far;
+}
+function viewTrip(){
+  var Pl = P(), h = '';
+  h += '<div class="hdr"><div><h1>Trip</h1>' + (Pl.flights.length ? '<div class="sub">' + esc(tripTitle(Pl)) + '</div>' : '') + '</div>' +
+       '<button class="plus" type="button" data-go="flight/new" aria-label="Add flight">' + I.plus + '</button></div>';
+  if(!Pl.flights.length){
+    h += '<section class="card empty"><p style="margin-top:0">No flights yet. Tap + to add one.</p></section>';
+    return h;
+  }
+  var F = Pl.flights, a = F[0].a - 6*H, b = Math.min(Pl.R.t1, F[F.length-1].b + 18*H);
+  h += '<button class="card" type="button" data-go="chart" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px 12px;margin-top:8px">' + ribbon(Pl, a, b, Pl.E.home.tz, {out:Pl.layovers.some(function(x){ return x.out; })}) + '</button>';
+  /* items by local day */
+  var items = [];
+  F.forEach(function(f){ items.push({t:f.a, tz:f.f.tz, kind:'flight', f:f}); });
+  Pl.layovers.forEach(function(L){ items.push({t:L.arr + 1, tz:L.ap.tz, kind:'lay', L:L}); });
+  var lastHome = Pl.sleeps.filter(function(s){ return s.kind === 'home' && s.a > F[F.length-1].b; })[0];
+  if(lastHome) items.push({t:lastHome.a, tz:Pl.E.home.tz, kind:'home', s:lastHome});
+  items.sort(function(p,q){ return p.t - q.t; });
+  var day = null, open = false;
+  items.forEach(function(it){
+    var dk = BC.dayKey(it.tz, it.t);
+    if(dk !== day){
+      if(open) h += '</div>';
+      day = dk;
+      h += '<h2 class="grp-h day">' + esc(BC.dayLong(it.tz, it.t)) + (it.kind === 'lay' ? ' · ' + esc(it.L.ap.city) : '') + '</h2><div class="list">';
+      open = true;
+    }
+    if(it.kind === 'flight'){
+      var f = it.f, right = f.role === 'operate' ? wordHTML(f.landA) : '<span class="chip">Commute</span>';
+      h += '<button class="row" type="button" data-go="flight/' + f.id + '"><span class="main"><span class="t1 b">' + esc(f.f.code + ' → ' + f.t.code) + '</span><span class="t2">' +
+           BC.hm(f.f.tz, f.a) + ' ' + BC.zabbr(f.f.tz, f.a) + ' – ' + BC.hm(f.t.tz, f.b) + ' ' + BC.zabbr(f.t.tz, f.b) + '</span></span>' + right + '</button>';
+      if(f.role === 'operate'){
+        h += f.restWin ? '<button class="subrow" type="button" data-go="rest/' + f.id + '"><span style="color:var(--sleep)">' + I.moon + '</span>Crew rest ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + ' UTC</button>'
+                       : '<button class="subrow link" type="button" data-go="rest/' + f.id + '">' + I.timer + 'Crew rest: set alarm once you know it</button>';
+      }
+    } else if(it.kind === 'lay'){
+      var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
+      var sum = o ? o.blocks.map(function(x){ return (x.kind === 'main' ? 'Sleep ' : 'Nap ') + BC.hm(L.ap.tz, x.a); }) : [];
+      if(L.out && o) sum.splice(o.blocks[0].kind === 'nap' && o.blocks[0].a < L.out.ns ? 1 : 0, 0, 'Night out ' + BC.hm(L.ap.tz, L.out.ns));
+      h += '<button class="row" type="button" data-go="lay/' + L.id + '"><span style="width:32px;height:32px;border-radius:8px;background:var(--sleep);color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + I.moon + '</span>' +
+           '<span class="main"><span class="t1 b">' + esc(o ? o.name : 'Layover') + '</span><span class="t2">' + esc(sum.join(' · ')) + '</span></span>' + I.chev + '</button>';
+    } else {
+      h += '<div class="row static"><span class="main"><span class="t1 b">Home</span><span class="t2">Bed ' + BC.hm(it.tz, it.s.a) + ' · Wake ' + BC.hm(it.tz, it.s.b) + '</span></span><span style="color:var(--sleep)">' + I.moon + '</span></div>';
+    }
+  });
+  if(open) h += '</div>';
+  h += '<p class="foot">Times are local to each airport. Tap a flight to change it.</p>';
+  return h;
+}
+
+function noteFor(L, o){
+  var m = o.m, parts = [];
+  if(m.awakeAtBed != null && m.awakeAtBed >= 18) parts.push(Math.round(m.awakeAtBed) + ' hours awake by bedtime' + (L.out ? ', and drinks on top of that hit harder.' : '.'));
+  var lateNap = o.blocks.filter(function(b){ return b.kind === 'nap' && b.a > L.ws + 1000; })[0];
+  if(lateNap){ var e = m.ease[o.blocks.indexOf(lateNap)]; if(e < 0.6) parts.push('The nap before the van may not come easily.'); else if(o.id === 'both') parts.push('The early wake-up keeps you sleepy enough for the afternoon nap.'); }
+  var main = o.blocks.filter(function(b){ return b.kind === 'main'; })[0];
+  if(main && o.id === 'now'){ var em = m.ease[o.blocks.indexOf(main)]; if(em < 0.85) parts.push('The long nap makes tonight’s sleep harder to start.'); }
+  if(!parts.length) parts.push(o.id === 'none' ? 'One sleep, nothing else to time.' : 'Fits the layover well.');
+  return parts.join(' ');
+}
+function viewLay(id){
+  var Pl = P(), L = layById(Pl, id), h = navBar('trip', 'Trip');
+  if(!L){ return h + '<p class="msg">This layover has changed. Go back to the trip.</p>'; }
+  var tz = L.ap.tz, sel = V.layPick[id] || L.picked;
+  h += '<header style="padding:0 4px 6px"><h1>' + esc(L.ap.city) + '</h1><div class="sub">Land ' + BC.dow(tz, L.arr) + ' ' + BC.hm(tz, L.arr) + ' · Van ' + BC.dow(tz, L.duty) + ' ' + BC.hm(tz, L.duty) + ' · ' + Math.round((L.duty - L.arr)/H) + ' h</div></header>';
+  var outOn = !!L.out;
+  h += '<div class="stack" style="gap:10px"><div class="list"><div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew night out</span></span>' +
+       '<button class="sw" type="button" role="switch" aria-label="Crew night out" aria-checked="' + outOn + '" data-act="out" data-id="' + esc(id) + '"></button></div>';
+  if(L.out){
+    h += '<div class="row static"><span class="main"><span class="t1">' + esc(BC.dow(tz, L.out.ns)) + ' evening</span></span><span class="val" style="color:var(--label)">' + BC.hm(tz, L.out.ns) + '–' + BC.hm(tz, L.out.ne) + '</span></div>' +
+         '<div class="row static"><span class="main"><span class="t1">Last drink by</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.out.lastDrink) + ' ' + BC.hm(tz, L.out.lastDrink) + '</span></div>';
+  }
+  h += '</div><p class="foot" style="margin-top:-4px">' + (L.autoOut ? 'On by default: the evening is more than ' + S.night.gap + ' hours before duty.' : 'Off by default for this layover.') + ' Last drink is ' + S.night.last + ' hours before the van. Set your company rule and usual times in Settings.</p>';
+  h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (L.options.some(function(o){ return o.id === 'now'; }) ? 'Nap now or later?' : 'Pick a plan') + '</h2>';
+  function pos(v){ return Math.max(0, Math.min(100, (v - 20)/60*100)).toFixed(0) + '%'; }
+  L.options.forEach(function(o){
+    var m = o.m;
+    h += '<button class="opt" type="button" aria-pressed="' + (o.id === sel) + '" data-act="pick" data-id="' + esc(id) + '" data-opt="' + o.id + '">' +
+         '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : '') + '</span>' +
+         '<span style="font-size:15px;line-height:20px;color:var(--sec);font-variant-numeric:tabular-nums">' + esc(o.blocks.map(function(b){ return (b.kind === 'main' ? 'Sleep ' : 'Nap ') + (sameDay(tz, b.a, L.arr) ? '' : BC.dow(tz, b.a) + ' ') + BC.hm(tz, b.a) + '–' + BC.hm(tz, b.b); }).join(' · ')) + '</span>' +
+         '<span class="two" style="gap:14px">' +
+         (m.outMin != null ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Night out</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
+                           : '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Lowest in flight</span><b>' + BC.word(m.fmin) + ' · ' + Math.round(m.fmin) + '</b></span><span class="meter"><i style="left:' + pos(m.fmin) + '"></i></span></span>') +
+         '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Landing</span><b>' + BC.word(m.land) + ' · ' + Math.round(m.land) + '</b></span><span class="meter"><i style="left:' + pos(m.land) + '"></i></span></span></span>' +
+         '<span style="font-size:13px;line-height:18px;color:var(--sec)">' + esc(noteFor(L, o)) + '</span></button>';
+  });
+  h += '<p class="foot">Times are ' + esc(L.ap.city) + ' time. Landing is your alertness at ' + esc(L.outF.t.code) + ', with your crew rest ' + (L.outF.restWin ? 'as entered' : L.outF.rest ? 'assumed mid-flight' : 'left out (none entered)') + '.</p>';
+  h += '<button class="btn" type="button" data-act="use" data-id="' + esc(id) + '" style="margin-top:6px">' + (sel === L.picked && (S.lay[id] || {}).choice ? 'Plan in use' : 'Use this plan') + '</button></div>';
+  return h;
+}
+
+function chartSVG(Pl, a, b, tz){
+  var W = 358, Hh = 180, R = Pl.R, span = b - a;
+  function X(t){ return ((t - a)/span*W).toFixed(1); }
+  function Y(v){ return (Hh - v/100*Hh).toFixed(1); }
+  var s = '<svg role="img" aria-label="Alertness chart" viewBox="0 0 ' + W + ' 226" width="' + W + '" height="226"><defs><linearGradient id="lg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="' + W + '" y2="0">';
+  for(var i=0;i<=48;i++){ var p = BC.ptAt(R, a + span*i/48); s += '<stop offset="' + (i/48*100).toFixed(1) + '%" stop-color="' + BC.color(p.A) + '"/>'; }
+  s += '</linearGradient></defs>';
+  function runs(test){ var out = [], r = null; R.pts.forEach(function(p){ if(p.t < a || p.t > b) return; if(test(p) && r === null) r = p.t; if(!test(p) && r !== null){ out.push([r, p.t]); r = null; } }); if(r !== null) out.push([r, b]); return out; }
+  runs(function(p){ return p.ni; }).forEach(function(r){ s += '<rect x="' + X(r[0]) + '" y="0" width="' + (X(r[1]) - X(r[0])).toFixed(1) + '" height="' + Hh + '" fill="var(--nitebg)"/>'; });
+  Pl.layovers.forEach(function(L){ if(L.out && L.out.ne > a && L.out.ns < b) s += '<rect x="' + X(Math.max(a, L.out.ns)) + '" y="0" width="' + (X(Math.min(b, L.out.ne)) - X(Math.max(a, L.out.ns))).toFixed(1) + '" height="' + Hh + '" fill="var(--outbg)"/>'; });
+  Pl.sleeps.forEach(function(sl){ if(sl.b > a && sl.a < b) s += '<rect x="' + X(Math.max(a, sl.a)) + '" y="0" width="' + (X(Math.min(b, sl.b)) - X(Math.max(a, sl.a))).toFixed(1) + '" height="' + Hh + '" fill="var(--sleepbg)"/>'; });
+  [[55,'Sharp'],[40,'Okay'],[25,'Drowsy']].forEach(function(l){ s += '<line x1="0" x2="' + W + '" y1="' + Y(l[0]) + '" y2="' + Y(l[0]) + '" stroke="var(--sep)" stroke-dasharray="3 4"/><text x="6" y="' + (Y(l[0]) - 6) + '" font-size="11" fill="var(--sec)" font-weight="600" paint-order="stroke" stroke="var(--card)" stroke-width="3">' + l[1] + '</text>'; });
+  s += '<text x="6" y="' + (+Y(25) + 17) + '" font-size="11" fill="var(--sec)" font-weight="600" paint-order="stroke" stroke="var(--card)" stroke-width="3">Very tired</text>';
+  var d = '', pen = false;
+  R.pts.forEach(function(p){ if(p.t < a || p.t > b || p.sl){ pen = false; return; } d += (pen ? 'L' : 'M') + X(p.t) + ' ' + Y(p.A); pen = true; });
+  s += '<path d="' + d + '" fill="none" stroke="url(#lg)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>';
+  Pl.flights.forEach(function(f){ if(f.b > a && f.a < b) s += '<rect x="' + X(Math.max(a, f.a)) + '" y="186" width="' + (X(Math.min(b, f.b)) - X(Math.max(a, f.a))).toFixed(1) + '" height="6" rx="3" fill="var(--flight)"/>'; });
+  Pl.layovers.forEach(function(L){ if(L.out && L.out.ne > a && L.out.ns < b) s += '<rect x="' + X(Math.max(a, L.out.ns)) + '" y="186" width="' + (X(Math.min(b, L.out.ne)) - X(Math.max(a, L.out.ns))).toFixed(1) + '" height="6" rx="3" fill="var(--out)"/>'; });
+  var stepH = span <= 60*H ? 6 : span <= 120*H ? 12 : 24, t0 = BC.localToMs(tz, BC.dateStr(tz, a) + 'T00:00');
+  for(var k=0;k<200;k++){
+    var tt = t0 + k*stepH*H; if(tt > b) break; if(tt < a + span*0.03 || tt > b - span*0.03) continue;
+    var mid = BC.hm(tz, tt) === '00:00';
+    s += '<line x1="' + X(tt) + '" x2="' + X(tt) + '" y1="' + (mid ? 0 : 180) + '" y2="196" stroke="' + (mid ? 'var(--ter)' : 'var(--sep)') + '"' + (mid ? ' stroke-opacity=".6"' : '') + '/>';
+    s += '<text x="' + X(tt) + '" y="218" font-size="12" text-anchor="middle" fill="' + (mid ? 'var(--label)' : 'var(--sec)') + '"' + (mid ? ' font-weight="600"' : '') + '>' + (mid ? BC.dow(tz, tt) : BC.hm(tz, tt)) + '</text>';
+  }
+  var nw = now();
+  if(nw >= a && nw <= b){ var pn = BC.ptAt(R, nw); s += '<line x1="' + X(nw) + '" x2="' + X(nw) + '" y1="0" y2="196" stroke="var(--tint)" stroke-width="2"/><circle cx="' + X(nw) + '" cy="' + Y(pn.A) + '" r="4.5" fill="var(--card)" stroke="var(--tint)" stroke-width="2.5"/>'; }
+  return s + '</svg>';
+}
+function viewChart(){
+  var Pl = P(), nw = now(), E = Pl.E, h = navBar('now', 'Now');
+  h += '<h1 style="margin:0 4px 12px">Alertness</h1>';
+  if(!Pl.flights.length) return h + '<p class="msg">Add a trip first.</p>';
+  var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
+  var land = V.chartView === 'land' && target;
+  var F = Pl.flights, a, b, tz;
+  if(land){ a = Math.max(nw, E.t0); b = target.b; tz = E.locAt(a).tz; }
+  else { a = F[0].a - 6*H; b = Math.min(Pl.R.t1, F[F.length-1].b + 18*H); tz = E.home.tz; }
+  h += '<div class="seg" role="group" aria-label="Time span" style="margin-bottom:12px"><button type="button" data-act="cv" data-v="land" aria-pressed="' + !!land + '"' + (target ? '' : ' disabled') + '>Until you land</button><button type="button" data-act="cv" data-v="trip" aria-pressed="' + !land + '">Whole trip</button></div>';
+  h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Night out</span><span style="margin-left:auto">' + (land ? esc(E.locAt(a).fl ? 'Departure' : (E.locAt(a).ap || E.home).city) + ' time' : 'Days on home time') + '</span></div></figure>';
+  var rows = [];
+  Pl.layovers.forEach(function(L){
+    if(!L.out || L.out.ne < a || L.out.ns > b) return;
+    var o = L.options.filter(function(x){ return x.id === L.picked; })[0];
+    if(o && o.m.outMin != null) rows.push(['Night out', BC.dow(L.ap.tz, L.out.ns) + ' ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), o.m.outMin]);
+  });
+  F.forEach(function(f){
+    if(f.role !== 'operate' || f.b < a || f.a > b) return;
+    if(f.minA != null) rows.push(['Lowest on ' + f.f.code + ' → ' + f.t.code, BC.dow(f.f.tz, f.a) + ' ' + BC.hm(f.f.tz, f.a) + ' departure', f.minA]);
+    if(f.landA != null) rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b) + ' ' + BC.zabbr(f.t.tz, f.b), f.landA]);
+  });
+  if(rows.length) h += '<div class="list" style="margin-top:14px">' + rows.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span>' + wordHTML(r[2]) + '</div>'; }).join('') + '</div>';
+  return h;
+}
+
+function viewRest(id){
+  var Pl = P(), f = flightById(Pl, id), raw = S.flights.filter(function(x){ return String(x.id) === String(id); })[0];
+  var h = navBar(V.from === 'now' ? 'now' : 'trip', V.from === 'now' ? 'Now' : 'Trip');
+  if(!f || !raw) return h + '<p class="msg">Flight not found.</p>';
+  var r = raw.restUTC || {};
+  h += '<header style="padding:0 4px 6px"><h1>Crew rest</h1><div class="sub">' + esc(f.f.code + ' → ' + f.t.code + ' · ' + BC.dow(f.f.tz, f.a) + ' ' + BC.hm(f.f.tz, f.a)) + '</div></header>';
+  h += '<h2 class="grp-h">Your rest, as given (UTC)</h2><div class="list">' +
+       '<label class="row static"><span class="main"><span class="t1">Start</span></span><input class="pill" type="time" step="300" id="rs" value="' + esc(r.s || '') + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">End</span></span><input class="pill" type="time" step="300" id="re" value="' + esc(r.e || '') + '"></label></div>';
+  if(f.restWin){
+    h += '<h2 class="grp-h">On your Watch</h2><section class="watch"><div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(f.f.tz, f.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(f.f.tz, f.restWin[1]) + '</div></div></div>' +
+         '<div style="height:1px;background:rgba(255,255,255,.3);margin:14px 0"></div><div style="display:flex;justify-content:space-between;font-size:17px"><span class="lab" style="font-size:17px">Or set a timer</span><b style="font-variant-numeric:tabular-nums">' + durTxt(f.restWin[1] - f.restWin[0]) + '</b></div></section>' +
+         '<p class="foot">Watch on ' + esc(f.f.city) + ' time, the clock you left on. UTC ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + '. Give yourself a few minutes to shake off grogginess before you are back on duty.</p>' +
+         '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="clearRest" data-id="' + f.id + '">Clear crew rest</button></div>';
+  } else if(r.s || r.e){
+    h += '<p class="err">Those times do not fall inside this flight (' + BC.hm('UTC', f.a) + '–' + BC.hm('UTC', f.b) + ' UTC).</p>';
+  } else {
+    h += '<p class="foot">Enter the times once the crew rest plan is set onboard. Until then the plan assumes ' + (f.rest ? hrsTxt(f.rest) + ' in the middle of the flight' : 'no crew rest') + '.</p>';
+  }
+  if(!f.restWin){
+    h += '<h2 class="grp-h">Before you know the times</h2><div class="list"><div class="row static"><span class="main"><span class="t1">Expected rest</span></span><span class="val" style="color:var(--label)">' + (f.rest ? hrsTxt(f.rest) : 'None') + '</span>' +
+         '<span class="stepper"><button type="button" data-act="rest" data-id="' + f.id + '" data-d="-0.5" aria-label="Less">−</button><span></span><button type="button" data-act="rest" data-id="' + f.id + '" data-d="0.5" aria-label="More">+</button></span></div></div>';
+  }
+  return h;
+}
+
+function viewSettings(){
+  var h = '<h1 style="margin:4px 4px 8px">Settings</h1>';
+  var homeOpts = S.dests.concat(Object.keys(AIRPORTS).filter(function(c){ return S.dests.indexOf(c) < 0; }).sort());
+  function sel(id, val, opts){ return '<select class="pill" id="' + id + '">' + opts.map(function(o){ return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(val) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; }
+  function num(id, val, min, max, step){ return '<input class="pill" type="number" inputmode="decimal" id="' + id + '" value="' + esc(val) + '" min="' + min + '" max="' + max + '" step="' + step + '" style="width:84px;text-align:right">'; }
+  h += '<h2 class="grp-h">Home</h2><div class="list"><label class="row static"><span class="main"><span class="t1">Home airport</span></span>' + sel('sHome', S.home, homeOpts.map(function(c){ return [c, c + ' · ' + AIRPORTS[c][0]]; })) + '</label></div>' +
+       '<p class="foot">Your body clock starts on this city’s time, with its sunrise and sunset.</p>';
+  h += '<h2 class="grp-h">Your usual sleep at home</h2><div class="list">' +
+       '<label class="row static"><span class="main"><span class="t1">Bedtime</span></span><input class="pill" type="time" id="sBed" value="' + esc(S.bed) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Wake up</span></span><input class="pill" type="time" id="sWake" value="' + esc(S.wake) + '"></label></div>';
+  h += '<h2 class="grp-h">Trips</h2><div class="list">' +
+       '<label class="row static"><span class="main"><span class="t1">Landing to hotel bed</span><span class="t3">hours</span></span>' + num('sLand', S.landBed, 0, 6, 0.25) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Van before departure</span><span class="t3">hours</span></span>' + num('sVan', S.van, 0.5, 4, 0.25) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Time to get ready</span><span class="t3">minutes</span></span>' + num('sReady', Math.round(S.ready*60), 0, 180, 5) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Layover sleep</span></span>' + sel('sBal', S.balance, [['home','Keep home time'],['balanced','Balanced'],['local','Follow local time']]) + '</label>' +
+       '<button class="row" type="button" data-go="dest"><span class="main"><span class="t1">Destinations</span></span><span class="val">' + S.dests.length + ' airports</span>' + I.chev + '</button></div>' +
+       '<p class="foot">Balanced splits the difference between your home night and the local night.</p>';
+  h += '<h2 class="grp-h">Crew night out</h2><div class="list">' +
+       '<div class="row static"><span class="main"><span class="t1">Plan one automatically</span></span><button class="sw" type="button" role="switch" aria-label="Plan a crew night out automatically" aria-checked="' + (S.night.auto !== false) + '" data-act="nightAuto"></button></div>' +
+       '<label class="row static"><span class="main"><span class="t1">Usual evening starts</span></span><input class="pill" type="time" id="sNs" value="' + esc(S.night.start) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Back by</span></span><input class="pill" type="time" id="sNe" value="' + esc(S.night.end) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">When duty is at least</span><span class="t3">hours after the evening</span></span>' + num('sGap', S.night.gap, 8, 24, 1) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Last drink before duty</span><span class="t3">hours</span></span>' + num('sLast', S.night.last, 8, 24, 1) + '</label></div>' +
+       '<p class="foot">Use your company’s rule. The FAA minimum is 8 hours.</p>';
+  h += '<h2 class="grp-h">Your data</h2><div class="list">' +
+       '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
+       '<button class="row" type="button" data-act="restore" style="color:var(--tint)">Restore from file</button>' +
+       (classicData() ? '<button class="row" type="button" data-act="import" style="color:var(--tint)">Import trip from the classic app</button>' : '') +
+       '<button class="row" type="button" data-act="example" style="color:var(--tint)">Load example trip</button>' +
+       '<button class="row" type="button" data-act="clear" style="color:var(--danger)">' + (V.confirmClear ? 'Tap again to remove all flights' : 'Start new trip') + '</button></div>';
+  if(V.flash) h += '<p class="msg">' + esc(V.flash) + '</p>';
+  h += '<h2 class="grp-h">About</h2><div class="list">' +
+       '<div class="row static"><span class="main"><span class="t1">Version</span></span><span class="val">' + esc(BUILD) + '</span></div>' +
+       '<button class="row" type="button" data-act="update" style="color:var(--tint)">' + esc(V.updLabel || 'Update app') + '</button>' +
+       '<a class="row" href="' + (location.pathname.indexOf('/next/') >= 0 ? '../' : 'classic/') + '" style="color:var(--tint)">Open the classic app</a></div>';
+  if(V.updMsg) h += '<p class="msg">' + esc(V.updMsg) + '</p>';
+  h += '<details class="how" style="margin-top:18px"><summary>How the plan works</summary>' +
+       '<p>The model is the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. Alertness here is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
+       '<p>For each layover the app tries naps after landing, naps before the van, both or neither, with your main sleep moved earlier or later, and scores each plan on alertness from wake-up to landing, the last 90 minutes counting most. Plans that need you to fall asleep when you probably cannot, or that leave you up for long stretches under high sleep pressure, lose points. On a night out it also wants you at least Okay for the evening.</p>' +
+       '<p>Drinks are modelled only as somewhat less restful sleep afterwards, which probably flatters a big night. Crew rest you enter is used as it is; until then the plan assumes your expected rest in the middle of the flight. The numbers are for comparing plans, not a fitness-for-duty measure.</p></details>';
+  return h;
+}
+
+function viewDest(){
+  var h = navBar('settings', 'Settings', '<button class="navbtn" type="button" data-act="destEdit" style="font-weight:' + (V.destEdit ? 600 : 400) + '">' + (V.destEdit ? 'Done' : 'Edit') + '</button>');
+  h += '<h1 style="margin:0 4px 10px">Destinations</h1>';
+  h += '<div class="list"><div class="row static"><label for="dAdd" class="t1" style="color:var(--sec)">Add</label><input id="dAdd" placeholder="Airport code, like LIS" maxlength="3" autocapitalize="characters" autocomplete="off" style="flex:1;min-width:0;border:0;background:none;font:inherit;font-size:17px;text-transform:uppercase;color:var(--label);padding:8px 0;outline:none"><button class="btn small" type="button" data-act="destAdd">Add</button></div></div>';
+  if(V.destMsg) h += '<p class="err">' + esc(V.destMsg) + '</p>';
+  h += '<p class="foot">Your quick picks when adding flights. Each code brings its time zone, daylight saving and sun times.</p>';
+  h += '<h2 class="grp-h">Your list · ' + S.dests.length + '</h2><div class="list">';
+  S.dests.forEach(function(c){
+    var a = AIRPORTS[c];
+    h += '<div class="row static">' + (V.destEdit ? '<button class="rm" type="button" data-act="destRm" data-code="' + c + '" aria-label="Remove ' + c + '">−</button>' : '') +
+         '<span style="width:44px;font-weight:600;letter-spacing:.02em">' + c + '</span><span class="main"><span class="t2" style="font-size:17px">' + esc(a ? a[0] : '') + '</span></span><span class="val" style="font-size:15px">' + (a ? BC.zabbr(a[1], now()) : '') + '</span></div>';
+  });
+  h += '</div><div style="margin-top:14px"><button class="btn sec" type="button" data-act="destReset">Reset to the starting list</button></div>' +
+       '<p class="foot">The starting list is American’s 787 network as of 2026 plus the hubs, from public route news. Aircraft change, so check it against your own flying.</p>';
+  return h;
+}
+
+/* ---------- flight sheet ---------- */
+function openFlight(id){
+  var raw = id === 'new' ? null : S.flights.filter(function(f){ return String(f.id) === String(id); })[0];
+  if(raw) V.flight = JSON.parse(JSON.stringify(raw));
+  else {
+    var last = S.flights.slice().sort(function(p,q){ return (p.dep < q.dep ? -1 : 1); }).pop(), Fs = BC.flightsOf(S), lf = Fs[Fs.length-1];
+    var from = lf ? lf.t.code : S.home, tz = (BC.airport(from) || BC.airport('ATL')).tz;
+    var base = lf ? lf.b + 24*H : now() + 24*H, d = BC.dateStr(tz, base);
+    V.flight = {id:null, from:from, to:'', dep:d + 'T' + (lf ? BC.hm(tz, lf.b + 24*H).slice(0,2) : '09') + ':00', arr:'', role:null, rest:0};
+  }
+  V.flightErr = '';
+  renderSheet();
+}
+function flightDerived(fl){
+  var f = BC.airport(fl.from), t = BC.airport(fl.to), a = f ? BC.localToMs(f.tz, fl.dep) : NaN, b = t ? BC.localToMs(t.tz, fl.arr) : NaN;
+  return {f:f, t:t, a:a, b:b, dur:(b > a) ? b - a : null};
+}
+function renderSheet(){
+  var box = $('#sheet');
+  if(!V.flight){ box.innerHTML = ''; return; }
+  var fl = V.flight, d = flightDerived(fl), auto = d.dur != null ? (d.dur >= 5*H ? 'operate' : 'commute') : 'operate', role = fl.role || auto;
+  var chips = S.dests.filter(function(c){ return c !== fl.from; }).slice(0, 10);
+  var h = '<div class="sheet" data-act="sheetBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="' + (fl.id ? 'Edit flight' : 'New flight') + '">' +
+      '<div class="grab"><span></span></div><div class="sheet-h"><button class="navbtn" type="button" data-act="sheetCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (fl.id ? 'Flight' : 'New Flight') + '</div><button class="navbtn r" type="button" data-act="sheetSave">' + (fl.id ? 'Done' : 'Add') + '</button></div>';
+  h += '<div class="stack" style="gap:8px">';
+  h += '<div class="codes"><label class="code"><span class="eyebrow">From</span><input id="fFrom" value="' + esc(fl.from) + '" maxlength="3" autocomplete="off" autocapitalize="characters" list="dl"><span class="t3">' + (d.f ? esc(d.f.city) + ' · ' + BC.zabbr(d.f.tz, isNaN(d.a) ? now() : d.a) : fl.from ? 'Unknown code' : '') + '</span></label>' +
+       '<label class="code"><span class="eyebrow">To</span><input id="fTo" value="' + esc(fl.to) + '" maxlength="3" autocomplete="off" autocapitalize="characters" list="dl"><span class="t3">' + (d.t ? esc(d.t.city) + ' · ' + BC.zabbr(d.t.tz, isNaN(d.b) ? now() : d.b) : fl.to ? 'Unknown code' : '') + '</span></label></div>' +
+       '<datalist id="dl">' + S.dests.map(function(c){ return '<option value="' + c + '">' + esc(AIRPORTS[c] ? AIRPORTS[c][0] : '') + '</option>'; }).join('') + '</datalist>';
+  h += '<div class="chips" role="group" aria-label="Your destinations">' + chips.map(function(c){ return '<button type="button" data-act="toChip" data-code="' + c + '" aria-pressed="' + (c === fl.to) + '">' + c + '</button>'; }).join('') + '</div>';
+  h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(d.f.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(d.t.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
+       '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div></div>' +
+       '<p class="foot">Times are local at each airport, as on your schedule.</p>';
+  h += '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:6px"><div style="margin-bottom:10px">Your role</div><div class="seg" role="group" aria-label="Your role"><button type="button" data-act="role" data-v="operate" aria-pressed="' + (role === 'operate') + '">Operate</button><button type="button" data-act="role" data-v="commute" aria-pressed="' + (role === 'commute') + '">Commute</button></div></div>';
+  if(role === 'operate'){
+    h += '<div class="list"><div class="row static"><span class="main"><span class="t1">Crew rest</span><span class="t3">Timing is set onboard</span></span><span class="val" style="color:var(--label)">' + (fl.rest ? hrsTxt(+fl.rest) : 'None') + '</span>' +
+         '<span class="stepper"><button type="button" data-act="frest" data-d="-0.5" aria-label="Less crew rest">−</button><span></span><button type="button" data-act="frest" data-d="0.5" aria-label="More crew rest">+</button></span></div></div>';
+  }
+  h += '<p class="foot">Flights over 5 hours start as Operate. Until you enter the actual crew rest, the plan assumes the expected rest in the middle of the flight.</p>';
+  if(V.flightErr) h += '<p class="err">' + esc(V.flightErr) + '</p>';
+  if(fl.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="sheetDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete flight') + '</button></div>';
+  h += '</div></div></div>';
+  box.innerHTML = h;
+}
+function saveFlight(){
+  var fl = V.flight, d = flightDerived(fl);
+  if(!d.f || !d.t){ V.flightErr = 'Use airport codes the app knows, like DFW or GRU. Add more under Settings › Destinations.'; renderSheet(); return; }
+  if(isNaN(d.a) || isNaN(d.b)){ V.flightErr = 'Enter both the departure and arrival times.'; renderSheet(); return; }
+  if(!(d.b > d.a)){ V.flightErr = 'Arrival must be after departure. Check the dates, remembering each time is local.'; renderSheet(); return; }
+  if(d.b - d.a > 22*H){ V.flightErr = 'That is over 22 hours. Check the arrival date.'; renderSheet(); return; }
+  var rec = {id:fl.id || nextId(), from:d.f.code, to:d.t.code, dep:fl.dep, arr:fl.arr, role:fl.role || null, rest:+fl.rest || 0};
+  if(fl.restUTC) rec.restUTC = fl.restUTC;
+  var i = S.flights.findIndex(function(x){ return x.id === rec.id; });
+  if(i >= 0) S.flights[i] = rec; else S.flights.push(rec);
+  save(); V.flight = null; renderSheet(); render();
+}
+
+/* ---------- classic import, backup ---------- */
+function classicData(){
+  try{ var o = JSON.parse(localStorage.getItem(CLASSIC_KEY) || 'null'); return o && Array.isArray(o.rows) && o.rows.some(function(r){ return r.type === 'flight'; }) ? o : null; }catch(e){ return null; }
+}
+function importClassic(){
+  var o = classicData(); if(!o) return 'Nothing to import.';
+  function zoneOff(z){ return z === 'home' ? o.home : z === 'local' ? o.local : parseFloat(String(z).slice(2)) || 0; }
+  function abs(t, z){ return BC.parseLocal(t) - zoneOff(z)*H; }
+  var flights = [], skipped = [], id = 1;
+  var sleepsIn = o.rows.filter(function(r){ return r.type === 'sleep' || r.type === 'plan'; }).map(function(r){ return [abs(r.s, r.sz), abs(r.e, r.ez)]; });
+  o.rows.filter(function(r){ return r.type === 'flight'; }).forEach(function(r){
+    var m = /([A-Z]{3})\W*(?:to|-|→|>)?\W*([A-Z]{3})/.exec((r.label || '').toUpperCase());
+    var f = m && BC.airport(m[1]), t = m && BC.airport(m[2]);
+    if(!f || !t){ skipped.push(r.label || 'Flight'); return; }
+    var a = abs(r.s, r.sz), b = abs(r.e, r.ez);
+    var rec = {id:id++, from:f.code, to:t.code, dep:BC.msToLocal(f.tz, a), arr:BC.msToLocal(t.tz, b), role:r.role || null, rest:+r.rest || 0};
+    var inside = sleepsIn.filter(function(s){ return s[0] >= a && s[1] <= b; })[0];
+    if(inside && (rec.role || (b - a >= 5*H ? 'operate' : 'commute')) === 'operate') rec.restUTC = {s:BC.isoUTC(inside[0]).slice(11), e:BC.isoUTC(inside[1]).slice(11)};
+    flights.push(rec);
+  });
+  if(o.bed) S.bed = o.bed; if(o.wake) S.wake = o.wake; if(o.landBed != null) S.landBed = o.landBed; if(o.balance) S.balance = o.balance;
+  S.flights = flights; S.lay = {}; save();
+  return 'Imported ' + flights.length + ' flight' + (flights.length === 1 ? '' : 's') + '.' + (skipped.length ? ' Not imported, unknown airport: ' + skipped.join(', ') + '. Add those by hand.' : '');
+}
+function exampleTrip(){
+  S.flights = [
+    {id:1, from:'ATL', to:'DFW', dep:'2026-10-15T16:00', arr:'2026-10-15T17:30', role:null, rest:0},
+    {id:2, from:'DFW', to:'GRU', dep:'2026-10-15T20:45', arr:'2026-10-16T09:00', role:null, rest:3, restUTC:{s:'02:00', e:'05:00'}},
+    {id:3, from:'GRU', to:'DFW', dep:'2026-10-17T22:00', arr:'2026-10-18T06:30', role:null, rest:3},
+    {id:4, from:'DFW', to:'ATL', dep:'2026-10-18T09:30', arr:'2026-10-18T12:42', role:null, rest:0}];
+  S.lay = {}; save();
+}
+async function backup(){
+  var text = JSON.stringify({app:'body-clock', v:1, saved:new Date().toISOString(), state:S}, null, 1);
+  var name = 'body-clock-trip-' + new Date().toISOString().slice(0,10) + '.json';
+  try{
+    var file = new File([text], name, {type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); V.flash = 'Backup shared. Choose Save to Files to keep it.'; render(); return; }
+  }catch(err){ if(err && err.name === 'AbortError'){ return; } }
+  var url = URL.createObjectURL(new Blob([text], {type:'application/json'}));
+  var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  V.flash = 'Backup saved as ' + name + '.'; render();
+}
+function restoreFile(file){
+  var rd = new FileReader();
+  rd.onload = function(){
+    try{
+      var o = JSON.parse(rd.result), st = o && o.state ? o.state : o;
+      if(st && st.v === 1 && Array.isArray(st.flights)){ S = fix(st); save(); V.flash = 'Trip restored.'; }
+      else if(st && Array.isArray(st.rows)){ V.flash = 'That is a classic app backup. Restore it in the classic app, then use Import.'; }
+      else V.flash = 'That file is not a Body Clock backup.';
+    }catch(e){ V.flash = 'Could not read that file.'; }
+    render();
+  };
+  rd.readAsText(file);
+}
+
+/* ---------- update ---------- */
+async function cleanReload(){
+  try{ if(navigator.serviceWorker){ var reg = await navigator.serviceWorker.getRegistration(location.pathname); if(reg && reg.scope.indexOf('/classic/') < 0) await reg.unregister(); } }catch(e){}
+  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('bc2-' + (location.pathname.indexOf('/next/') >= 0 ? 'next-' : 'main-')) === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  location.replace(location.pathname + '?u=' + Date.now());
+}
+async function checkUpdate(){
+  if(V.updForce){
+    if(navigator.onLine === false){ V.updMsg = 'You are offline. Clearing the saved copy now would leave the app unable to open, so it was left alone.'; render(); return; }
+    V.updMsg = 'Reloading…'; render(); cleanReload(); return;
+  }
+  V.updMsg = 'Checking…'; render();
+  try{
+    var res = await fetch(location.pathname + '?check=' + Date.now(), {cache:'no-store'});
+    var m = /var BUILD = '([^']*)'/.exec(await res.text());
+    if(!res.ok || !m) throw new Error('bad');
+    if(m[1] !== BUILD){ V.updMsg = 'Found ' + m[1] + '. Reloading…'; render(); cleanReload(); return; }
+    V.updMsg = 'You have the newest build. Tap again to reload anyway.';
+  }catch(e){ V.updMsg = 'Could not reach the server. Tap again to reload when you are online.'; }
+  V.updForce = true; V.updLabel = 'Reload anyway'; render();
+}
+
+/* ---------- routing and render ---------- */
+function go(path){
+  var parts = String(path).split('/'), view = parts[0], arg = parts.slice(1).join('/') || null;
+  if(view === 'flight'){ openFlight(arg); return; }
+  if(view === 'rest' || view === 'lay' || view === 'chart') V.from = V.view;
+  V.view = view; V.arg = arg; V.flash = ''; V.confirmClear = false; V.destMsg = '';
+  if(view === 'lay') V.layPick[arg] = null;
+  try{ history.replaceState(null, '', '#' + path); }catch(e){}
+  render(); window.scrollTo(0, 0);
+}
+function render(){
+  var app = $('#app'), h;
+  try{
+    if(V.view === 'trip') h = viewTrip();
+    else if(V.view === 'lay') h = viewLay(V.arg);
+    else if(V.view === 'chart') h = viewChart();
+    else if(V.view === 'rest') h = viewRest(V.arg);
+    else if(V.view === 'settings') h = viewSettings();
+    else if(V.view === 'dest') h = viewDest();
+    else { V.view = 'now'; h = viewNow(); }
+  }catch(err){ h = '<p class="err">Something went wrong drawing this screen: ' + esc(err.message) + '</p>'; if(window.console) console.error(err); }
+  app.innerHTML = '<div class="stack">' + h + '</div>';
+  var tab = {now:'now', chart:'now', trip:'trip', lay:'trip', rest:V.from === 'now' ? 'now' : 'trip', settings:'settings', dest:'settings'}[V.view];
+  document.querySelectorAll('.tab').forEach(function(t){ if(t.dataset.go === tab) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', function(e){
+  var g = e.target.closest('[data-go]');
+  if(g && !e.target.closest('[data-act]')){ e.preventDefault(); go(g.dataset.go); return; }
+  var b = e.target.closest('[data-act]'); if(!b) return;
+  var act = b.dataset.act, id = b.dataset.id;
+  if(act === 'num'){ e.stopPropagation(); var sp = b.querySelector('span:last-child'); if(sp) sp.textContent = /·/.test(sp.textContent) ? sp.textContent.split(' · ')[0] : sp.textContent + ' · ' + b.dataset.num; return; }
+  if(act === 'out'){
+    var Pl = P(), L = layById(Pl, id), cfg = S.lay[id] || (S.lay[id] = {});
+    var want = !L.out;
+    cfg.out = (want === L.autoOut) ? null : want;
+    if(cfg.out == null) delete cfg.out;
+    cfg.choice = null; save(); render(); return;
+  }
+  if(act === 'pick'){ V.layPick[id] = b.dataset.opt; render(); return; }
+  if(act === 'use'){
+    var Pl2 = P(), L2 = layById(Pl2, id), pick = V.layPick[id] || L2.picked;
+    (S.lay[id] || (S.lay[id] = {})).choice = pick; save(); go('trip'); return;
+  }
+  if(act === 'cv'){ V.chartView = b.dataset.v; render(); return; }
+  if(act === 'rest' || act === 'clearRest'){
+    var raw = S.flights.filter(function(x){ return String(x.id) === String(id); })[0]; if(!raw) return;
+    if(act === 'rest') raw.rest = Math.max(0, Math.min(8, (+raw.rest || 0) + parseFloat(b.dataset.d)));
+    else delete raw.restUTC;
+    save(); render(); return;
+  }
+  if(act === 'nightAuto'){ S.night.auto = !(S.night.auto !== false); save(); render(); return; }
+  if(act === 'backup'){ backup(); return; }
+  if(act === 'restore'){ $('#impFile').click(); return; }
+  if(act === 'import'){ V.flash = importClassic(); if(V.view === 'now'){ render(); } else render(); return; }
+  if(act === 'example'){ exampleTrip(); V.flash = 'Example trip loaded: Atlanta, Dallas, São Paulo and back.'; render(); return; }
+  if(act === 'clear'){ if(!V.confirmClear){ V.confirmClear = true; render(); setTimeout(function(){ if(V.confirmClear){ V.confirmClear = false; render(); } }, 3500); return; } S.flights = []; S.lay = {}; save(); V.confirmClear = false; V.flash = 'All flights removed.'; render(); return; }
+  if(act === 'update'){ checkUpdate(); return; }
+  if(act === 'destEdit'){ V.destEdit = !V.destEdit; render(); return; }
+  if(act === 'destRm'){ S.dests = S.dests.filter(function(c){ return c !== b.dataset.code; }); save(); render(); return; }
+  if(act === 'destReset'){ S.dests = DEFAULT_DESTS.slice(); save(); render(); return; }
+  if(act === 'destAdd'){
+    var c = ($('#dAdd').value || '').trim().toUpperCase();
+    if(!AIRPORTS[c]){ V.destMsg = c ? c + ' is not in the built-in list yet. Tell Claude and it can be added.' : 'Type a three-letter code.'; render(); return; }
+    if(S.dests.indexOf(c) < 0) S.dests.push(c);
+    V.destMsg = ''; save(); render(); return;
+  }
+  /* flight sheet */
+  if(act === 'sheetBg' && e.target === b){ V.flight = null; renderSheet(); return; }
+  if(act === 'sheetCancel'){ V.flight = null; V.confirmDel = false; renderSheet(); return; }
+  if(act === 'sheetSave'){ saveFlight(); return; }
+  if(act === 'toChip'){ V.flight.to = b.dataset.code; autoArr(); renderSheet(); return; }
+  if(act === 'role'){ V.flight.role = b.dataset.v; renderSheet(); return; }
+  if(act === 'frest'){ V.flight.rest = Math.max(0, Math.min(8, (+V.flight.rest || 0) + parseFloat(b.dataset.d))); renderSheet(); return; }
+  if(act === 'sheetDel'){
+    if(!V.confirmDel){ V.confirmDel = true; renderSheet(); return; }
+    S.flights = S.flights.filter(function(x){ return x.id !== V.flight.id; }); save(); V.flight = null; V.confirmDel = false; renderSheet(); render(); return;
+  }
+});
+function autoArr(){
+  var fl = V.flight, d = flightDerived(fl);
+  if(fl.arr || !d.f || !d.t || isNaN(d.a)) return;
+  fl.arr = BC.msToLocal(d.t.tz, d.a + 8*H);
+}
+document.addEventListener('change', function(e){
+  var t = e.target, id = t.id;
+  if(V.flight && (id === 'fDep' || id === 'fArr')){ V.flight[id === 'fDep' ? 'dep' : 'arr'] = t.value; if(id === 'fDep') autoArr(); renderSheet(); return; }
+  var map = {sHome:'home', sBed:'bed', sWake:'wake', sBal:'balance'};
+  if(map[id]){ if(t.value) S[map[id]] = t.value; save(); render(); return; }
+  var nums = {sLand:['landBed',0,6], sVan:['van',0.5,4]};
+  if(nums[id]){ var v = parseFloat(t.value); if(!isNaN(v)){ S[nums[id][0]] = Math.max(nums[id][1], Math.min(nums[id][2], v)); save(); render(); } return; }
+  if(id === 'sReady'){ var r = parseFloat(t.value); if(!isNaN(r)){ S.ready = Math.max(0, Math.min(180, r))/60; save(); render(); } return; }
+  var nn = {sNs:'start', sNe:'end'};
+  if(nn[id]){ if(t.value){ S.night[nn[id]] = t.value; save(); render(); } return; }
+  if(id === 'sGap' || id === 'sLast'){ var g = parseFloat(t.value); if(!isNaN(g)){ S.night[id === 'sGap' ? 'gap' : 'last'] = Math.max(8, Math.min(24, g)); save(); render(); } return; }
+  if(id === 'rs' || id === 're'){
+    var raw = S.flights.filter(function(x){ return String(x.id) === String(V.arg); })[0]; if(!raw) return;
+    var s = $('#rs').value, en = $('#re').value;
+    if(s || en) raw.restUTC = {s:s, e:en}; else delete raw.restUTC;
+    save(); render(); return;
+  }
+  if(id === 'impFile'){ var f = t.files && t.files[0]; if(f) restoreFile(f); t.value = ''; }
+});
+document.addEventListener('input', function(e){
+  var t = e.target;
+  if(V.flight && (t.id === 'fFrom' || t.id === 'fTo')){
+    var v = t.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    V.flight[t.id === 'fFrom' ? 'from' : 'to'] = v;
+    if(v.length === 3){ autoArr(); var pos = t.id; renderSheet(); var el = $('#' + pos); if(el){ el.focus(); el.setSelectionRange(3, 3); } }
+  }
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && V.flight){ V.flight = null; renderSheet(); }
+  if(e.key === 'Enter' && e.target.id === 'dAdd'){ var btn = document.querySelector('[data-act=destAdd]'); if(btn) btn.click(); }
+});
+
+/* keep the Now screen current */
+setInterval(function(){ if(!document.hidden && !V.flight && (V.view === 'now' || V.view === 'chart')) render(); }, 60000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden && !V.flight) render(); });
+
+window.addEventListener('hashchange', function(){ var hsh = (location.hash || '').replace(/^#/, ''); if(hsh && hsh !== V.view + (V.arg ? '/' + V.arg : '')) go(hsh); });
+var start = (location.hash || '').replace(/^#/, '');
+if(start && !/^flight/.test(start)) go(start); else render();
+})();
+</script>
+<script>
+if(/[?&]u=\d+/.test(location.search)){ try{ history.replaceState(null, '', location.pathname + location.hash); }catch(e){} }
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(function(reg){
+      document.addEventListener('visibilitychange', function(){ if(!document.hidden) reg.update().catch(function(){}); });
+    }).catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
