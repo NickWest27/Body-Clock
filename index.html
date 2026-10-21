@@ -19,7 +19,7 @@
   --bg:#F2F2F7; --card:#FFFFFF; --label:#000000; --sec:#5F5F66; --ter:#8A8A90; --sep:rgba(60,60,67,.18);
   --fill:rgba(118,118,128,.12); --bar:rgba(249,249,249,.94); --tint:#0A66D8; --sleep:#5856D6; --sleepbg:rgba(88,86,214,.14);
   --flight:#1C1C1E; --day:#F7DC94; --nite:#2E3160; --nitebg:rgba(46,49,96,.10); --out:#C2378A; --outbg:rgba(194,55,138,.12);
-  --switch:#248A3D; --danger:#C4161C; --tired:#D93A1E; --rested:#2E9E5B; --dusk:#E6A766; --sunc:#C98A00; --bodyn:#3459C9;
+  --switch:#248A3D; --danger:#C4161C; --tired:#D93A1E; --rested:#2E9E5B; --coffee:#8A5528; --dusk:#E6A766; --sunc:#C98A00; --bodyn:#3459C9;
   --scale:linear-gradient(90deg,#C4161C 0%,#E2531A 17%,#EE8A12 33%,#D8B10F 50%,#7DB843 67%,#2E9E5B 83%,#1F7A4D 100%);
   color-scheme:light dark;
 }
@@ -28,7 +28,7 @@
     --bg:#000000; --card:#1C1C1E; --label:#FFFFFF; --sec:#A1A1A8; --ter:#7C7C82; --sep:rgba(84,84,88,.6);
     --fill:rgba(118,118,128,.24); --bar:rgba(22,22,24,.94); --tint:#3E9BFF; --sleep:#8D8BFF; --sleepbg:rgba(94,92,230,.28);
     --flight:#E5E5EA; --day:#8A7440; --nite:#262A55; --nitebg:rgba(120,130,255,.12); --out:#F06BB8; --outbg:rgba(240,107,184,.18);
-    --switch:#30D158; --danger:#FF6961; --tired:#FF5A3C; --rested:#3BC77A; --dusk:#9A6A44; --sunc:#F5C451; --bodyn:#7C9BFF;
+    --switch:#30D158; --danger:#FF6961; --tired:#FF5A3C; --rested:#3BC77A; --coffee:#C98E5F; --dusk:#9A6A44; --sunc:#F5C451; --bodyn:#7C9BFF;
   }
 }
 *{box-sizing:border-box}
@@ -196,13 +196,13 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '21 Oct 2026 · build 24';
+var BUILD = '21 Oct 2026 · build 25';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
 function defaults(){
   return {v:1, home:'ATL', bed:'23:00', wake:'07:00', landBed:2, van:2, ready:0.75, balance:'balanced', light:50,
-          night:{auto:true, start:'19:00', end:'23:00', gap:12, last:12},
+          night:{last:12}, caf:{on:true, cut:6, log:[]},
           dests:DEFAULT_DESTS.slice(), flights:[], lay:{}, actual:[], skips:[]};
 }
 function load(){
@@ -215,11 +215,15 @@ function load(){
 function fix(o){
   var d = defaults();
   Object.keys(d).forEach(function(k){ if(o[k] === undefined) o[k] = d[k]; });
-  Object.keys(d.night).forEach(function(k){ if(o.night[k] === undefined) o.night[k] = d.night[k]; });
+  if(!o.night || typeof o.night !== 'object') o.night = {last:12};
   if(!Array.isArray(o.dests)) o.dests = d.dests;
   if(!o.lay || typeof o.lay !== 'object') o.lay = {};
   if(!Array.isArray(o.actual)) o.actual = [];
   if(!Array.isArray(o.skips)) o.skips = [];
+  if(!o.caf || typeof o.caf !== 'object') o.caf = {on:true, cut:6, log:[]};
+  if(!Array.isArray(o.caf.log)) o.caf.log = [];
+  if(o.caf.cut == null) o.caf.cut = 6;
+  if(o.night && o.night.last == null) o.night.last = 12;
   return o;
 }
 var S = load();
@@ -238,6 +242,7 @@ var I = {
   sun:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>',
   car:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17h14v-4l-2-5H7l-2 5v4zM5 13h14"/><circle cx="8" cy="17.5" r="1.5"/><circle cx="16" cy="17.5" r="1.5"/></svg>',
   land:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M4.5 9.5l2-1 3 2.5 3-1-3.5-6 2-.8 6 5.3 3.4-1.1a1.6 1.6 0 0 1 1 3l-14 4.3-3.2-3.3z"/></svg>',
+  cup:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 2.5c0 1.5 1 1.5 1 3M12 2.5c0 1.5 1 1.5 1 3"/></svg>',
   glass:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
   plus:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
 };
@@ -508,6 +513,59 @@ function clockCard(Pl, nw){
     line(pl.name, BC.hm(pl.tz, nw)) + line('Body', hh(x.bodyH)) + (atHome ? '' : line(shortCity(home), BC.hm(home.tz, nw))) + foot + '</div>' + I.chev + '</div></button>';
 }
 
+/* ---------- caffeine ---------- */
+var CAF_SIZES = [[50, 'Tea or cola', '≈ 50 mg'], [100, 'Coffee', '≈ 100 mg'], [200, 'Large or strong', '≈ 200 mg']];
+function cafName(mg){ var z = CAF_SIZES.filter(function(x){ return x[0] === +mg; })[0]; return z ? z[1] : mg + ' mg caffeine'; }
+function tzNow(Pl, t){ var q = Pl.E.locAt(t); return q.fl ? q.flight.f.tz : q.tz; }
+function cafCard(Pl, nw){
+  if(S.caf.on === false) return '';
+  var A = BC.cafAdvice(S, nw), rows = [];
+  if(A.cutoff != null && A.sleep){
+    var stz = tzNow(Pl, A.sleep.a), what = A.sleep.kind === 'rest' ? 'crew rest' : A.sleep.kind === 'nap' ? 'nap' : 'sleep';
+    if(A.cutoff > nw) rows.push(['Last caffeine by ' + whenTxt(tzNow(Pl, A.cutoff), A.cutoff, nw), S.caf.cut + ' h before your ' + what + ' at ' + whenTxt(stz, A.sleep.a, nw) + (A.sleep.kind === 'rest' ? ' (Watch time)' : '')]);
+    else rows.push(['No more caffeine for now', 'Your ' + what + ' at ' + whenTxt(stz, A.sleep.a, nw) + ' is less than ' + S.caf.cut + ' h away']);
+  }
+  if(A.coffee){
+    var c = A.coffee, ctz = c.inFlight ? c.f.f.tz : tzNow(Pl, c.t), gain = [];
+    if(c.after){
+      if(Math.round(c.after.min) - Math.round(c.before.min) >= 2) gain.push('lowest ' + BC.word(c.before.min) + ' ' + Math.round(c.before.min) + ' → ' + BC.word(c.after.min) + ' ' + Math.round(c.after.min));
+      if(Math.round(c.after.land) - Math.round(c.before.land) >= 2) gain.push('landing ' + BC.word(c.before.land) + ' ' + Math.round(c.before.land) + ' → ' + BC.word(c.after.land) + ' ' + Math.round(c.after.land));
+    }
+    rows.push(['Coffee at ' + whenTxt(ctz, c.t, nw) + (c.inFlight ? ' Watch' : ''), 'Before your low point on ' + c.f.f.code + ' → ' + c.f.t.code + (gain.length ? ': ' + gain.join(', ') : '') + (c.conflict ? '. It may cost some sleep at ' + whenTxt(tzNow(Pl, c.conflict.a), c.conflict.a, c.t) : '') + '.']);
+  }
+  if(A.mg >= 10) rows.push(['In you now: about ' + Math.round(A.mg/10)*10 + ' mg', 'Half of it gone by ' + BC.hm(tzNow(Pl, nw), A.halfBy)]);
+  if(!rows.length) rows.push(['Nothing to watch right now', 'Log a coffee and the plan takes it into account.']);
+  return '<section class="card" aria-label="Caffeine" style="padding:14px 16px 12px"><div class="hero-l" style="color:var(--coffee);margin-bottom:6px">' + I.cup + 'Caffeine</div>' +
+    rows.map(function(r){ return '<div style="padding:6px 0"><div style="font-size:17px;font-weight:600">' + esc(r[0]) + '</div><div class="lab" style="font-size:14px">' + esc(r[1]) + '</div></div>'; }).join('') +
+    '<button class="btn sec small" type="button" data-act="cafLog" style="margin-top:6px">' + I.plus.replace('width="22" height="22"', 'width="16" height="16"') + '&nbsp;Log caffeine</button></section>';
+}
+function openCaf(id){
+  var Pl = P(), nw = now(), x = id ? S.caf.log.filter(function(c){ return String(c.id) === String(id); })[0] : null, t = x ? x.t : nw, tz = tzNow(Pl, Math.min(Math.max(t, Pl.E.t0), Pl.E.t1));
+  V.caf = {id:x ? x.id : null, tz:tz, t:BC.msToLocal(tz, t), mg:x ? x.mg : 100}; V.confirmDel = false; renderCaf();
+}
+function renderCaf(){
+  var box = $('#sheet');
+  if(!V.caf){ box.innerHTML = ''; return; }
+  var c = V.caf, city = '';
+  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === c.tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  var h = '<div class="sheet" data-act="cafBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log caffeine"><div class="grab"><span></span></div>' +
+      '<div class="sheet-h"><button class="navbtn" type="button" data-act="cafCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (c.id ? 'Edit caffeine' : 'Log caffeine') + '</div><button class="navbtn r" type="button" data-act="cafSave">Save</button></div>' +
+      '<div class="list">' + CAF_SIZES.map(function(z){ return '<button class="row" type="button" data-act="cafMg" data-v="' + z[0] + '"><span class="main"><span class="t1">' + z[1] + '</span><span class="t3">' + z[2] + '</span></span>' + (+c.mg === z[0] ? '<span style="color:var(--tint);font-weight:700">✓</span>' : '') + '</button>'; }).join('') + '</div>' +
+      '<div class="list" style="margin-top:10px"><label class="row static"><span class="main"><span class="t1">When</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
+      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. A strong espresso or a large brewed coffee counts as large.</p>';
+  if(c.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cafDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete') + '</button></div>';
+  box.innerHTML = h + '</div></div>';
+}
+function saveCaf(){
+  var c = V.caf, t = BC.localToMs(c.tz, c.t);
+  if(isNaN(t)) return;
+  if(c.id){ S.caf.log.forEach(function(x){ if(x.id === c.id){ x.t = t; x.mg = +c.mg; } }); }
+  else { var m = 0; S.caf.log.forEach(function(x){ if(x.id > m) m = x.id; }); S.caf.log.push({id:m + 1, t:t, mg:+c.mg}); }
+  S.caf.log.sort(function(p, q){ return p.t - q.t; });
+  S.caf.log = S.caf.log.filter(function(x){ return x.t > now() - 21*24*H; });
+  save(); V.caf = null; renderCaf(); render();
+}
+
 /* ---------- views ---------- */
 var V = {view:'now', arg:null, layPick:{}, showNum:{}, chartView:'land', chartMetric:'alert', destEdit:false, flight:null, flash:''};
 
@@ -587,6 +645,7 @@ function viewNow(){
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
        '<button class="row" type="button" data-go="calc" style="color:var(--tint);min-height:48px">' + I.moon + 'What if I sleep at another time?</button>' +
        '<button class="row" type="button" data-act="logSleep" style="color:var(--tint);min-height:48px">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Log a sleep you took</button></section>';
+  h += cafCard(Pl, nw);
   /* ribbon */
   var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
   var a = Math.max(nw, E.t0), b = target && target.b - a <= 72*H ? target.b : Math.min(a + 36*H, Pl.R.t1);
@@ -614,6 +673,7 @@ function timelineItems(Pl){
     var L = layOfBlock(Pl, sl), tz = L ? L.ap.tz : Pl.E.locAt(sl.a + 1).tz;
     items.push({t:sl.a, tz:tz, kind:'sleep', s:sl, L:L});
   });
+  S.caf.log.forEach(function(c){ if(c.t >= Pl.E.t0 && c.t <= Pl.E.t1) items.push({t:c.t, tz:tzNow(Pl, c.t), kind:'caf', c:c}); });
   Pl.layovers.forEach(function(L){
     items.push({t:L.arr + 1, tz:L.ap.tz, kind:'lay', L:L});
     if(L.out) items.push({t:L.out.ns, tz:L.ap.tz, kind:'out', L:L});
@@ -621,7 +681,7 @@ function timelineItems(Pl){
   return items.sort(function(p,q){ return p.t - q.t; });
 }
 function tlRow(Pl, it, nw){
-  var past = (it.kind === 'sleep' ? it.s.b : it.kind === 'flight' ? it.f.b : it.kind === 'out' ? it.L.out.ne : it.L.dep) < nw, cls = 'row' + (past ? ' past' : ''), tz = it.tz;
+  var past = (it.kind === 'sleep' ? it.s.b : it.kind === 'flight' ? it.f.b : it.kind === 'caf' ? it.c.t : it.kind === 'out' ? it.L.out.ne : it.L.dep) < nw, cls = 'row' + (past ? ' past' : ''), tz = it.tz;
   function row(go, icoBg, ico, t1, t2, right){
     return '<button class="' + cls + '" type="button" ' + go + '><span class="tcol" style="width:56px">' + BC.hm(tz, it.t) + '</span>' +
       '<span class="ico" style="background:' + icoBg + '">' + ico + '</span><span class="main"><span class="t1">' + t1 + '</span><span class="t3">' + t2 + '</span></span>' + (right || '') + '</button>';
@@ -645,6 +705,7 @@ function tlRow(Pl, it, nw){
     var pend = past || (sl.a < nw);
     return row(calc, 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), (pend ? 'Planned, not confirmed · ' : 'Planned · ') + dur, I.chev);
   }
+  if(it.kind === 'caf') return row('data-act="cafEdit" data-id="' + it.c.id + '"', 'var(--coffee)', I.cup.replace('stroke="currentColor"', 'stroke="#fff"'), esc(cafName(it.c.mg)), 'Logged · ' + it.c.mg + ' mg', '<span class="tag">Edit</span>');
   if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
     'Crew night out until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
   var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
@@ -709,7 +770,7 @@ function calcInit(Pl, nw){
   return c;
 }
 function calcKey(c){
-  return JSON.stringify([c.bedAuto ? null : c.bed, c.wakeAuto ? null : c.wake, c.bedAuto, c.wakeAuto, c.fid, c.tz, V.calcGoal || 'flight', S.actual, S.skips, S.lay, S.flights, S.bed, S.wake, S.balance, S.night, Math.floor(now()/(5*60000))]);
+  return JSON.stringify([c.bedAuto ? null : c.bed, c.wakeAuto ? null : c.wake, c.bedAuto, c.wakeAuto, c.fid, c.tz, V.calcGoal || 'flight', S.actual, S.skips, S.lay, S.flights, S.bed, S.wake, S.balance, S.night, S.caf, Math.floor(now()/(5*60000))]);
 }
 function computeCalc(){
   var c = V.calc, nw = now(), goal = V.calcGoal || 'flight', key = calcKey(c), res = null, w, then = null;
@@ -740,7 +801,7 @@ function computeCalc(){
 function calcItems(c, cr, nw){
   var r = cr.r, P2 = r.P2, Pl = r.Pl, m = r.m, bs = r.base, w = cr.w, R2 = P2.R, ctx = r.ctx, f = ctx.f, out = [];
   function A(t){ return BC.ptAt(R2, t).A; }
-  function ease(t){ var q = BC.ptAt(R2, t - R2.dt); return (q.S - 0.5*q.cb)/R2.Pref; }
+  function ease(t){ return BC.easeOf(R2, BC.ptAt(R2, t - R2.dt)); }
   function tzAt(t){ var q = Pl.E.locAt(t); return q.fl ? q.flight.f.tz : q.tz; }
   var endT = c.scope === 'trip' ? Infinity : (f ? f.b : w.b + 12*H);
   if(nw < w.a - 10*60000) out.push({t:nw, ico:'now', t1:'Now', t3:esc(placeName(Pl, nw)), rt:wordHTML(BC.ptAt(Pl.R, nw).A, true)});
@@ -760,6 +821,19 @@ function calcItems(c, cr, nw){
       out.push({t:L.out.ns, ico:'glass', t1:'Night out ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), t3:'Lowest during it', rt:mn < 101 ? wordHTML(mn, true) : ''});
     }
   });
+  if(S.caf.on !== false){
+    var cutT = w.a - S.caf.cut*H;
+    if(cutT > nw) out.push({t:cutT, ico:'cup', t1:'Last caffeine ' + BC.hm(tzAt(cutT), cutT), t3:S.caf.cut + ' h before bed', rt:''});
+    if(f){
+      var groggy = function(t){ return P2.sleeps.some(function(sl){ return sl.b <= t && t - sl.b < 0.75*H; }); }, lo = null;
+      R2.pts.forEach(function(p){ if(p.t >= Math.max(nw, f.a) && p.t <= f.b && !p.sl && !groggy(p.t) && (!lo || p.A < lo.A)) lo = p; });
+      if(lo && lo.A < 50){
+        var tc = lo.t - 0.75*H; P2.sleeps.forEach(function(sl){ if(tc >= sl.a && tc < sl.b) tc = sl.b; }); tc = Math.round(Math.max(tc, nw)/(15*60000))*15*60000;
+        if(tc < endT) out.push({t:tc, ico:'cup', t1:'Coffee ' + BC.hm(tc >= f.a && tc < f.b ? f.f.tz : tzAt(tc), tc) + (tc >= f.a && tc < f.b ? ' Watch' : ''), t3:'Ahead of your low point on the flight', rt:''});
+      }
+    }
+  }
+  S.caf.log.forEach(function(cl){ if(cl.t >= Math.min(nw, w.a) - 6*H && cl.t < endT) out.push({t:cl.t, ico:'cup', t1:cafName(cl.mg) + ' ' + BC.hm(tzAt(cl.t), cl.t), t3:'Logged · ' + cl.mg + ' mg', rt:''}); });
   P2.flights.forEach(function(fl){
     if(fl.b < Math.max(nw, w.a) || fl.a > endT) return;
     var base = Pl.flights.filter(function(x){ return x.id === fl.id; })[0];
@@ -775,8 +849,8 @@ function calcItems(c, cr, nw){
 function placeName(Pl, t){ var q = Pl.E.locAt(t); return q.fl ? 'In flight' : (q.ap || Pl.E.home).city + ' ' + BC.hm(q.tz, t); }
 function dlt(v, w){ if(v == null || w == null) return ''; var d = Math.round(v) - Math.round(w); return Math.abs(d) < 2 ? '' : '<span class="t3">' + (d > 0 ? '+' : '−') + Math.abs(d) + ' vs plan</span>'; }
 function tlHTML(Pl, items){
-  var ico = {now:'', moon:I.moon, sun:I.sun, then:I.moon, glass:I.glass, car:I.car, plane:I.plane, land:I.land};
-  var nodeCol = {moon:'var(--sleep)', sun:'var(--sunc)', then:'var(--ter)', glass:'var(--out)', car:'var(--label)', plane:'var(--label)', land:'var(--label)'};
+  var ico = {now:'', moon:I.moon, sun:I.sun, then:I.moon, glass:I.glass, car:I.car, plane:I.plane, land:I.land, cup:I.cup};
+  var nodeCol = {cup:'var(--coffee)', moon:'var(--sleep)', sun:'var(--sunc)', then:'var(--ter)', glass:'var(--out)', car:'var(--label)', plane:'var(--label)', land:'var(--label)'};
   var h = '<div class="tl" role="list">', day = null;
   items.forEach(function(it, i){
     var prev = items[i-1], next = items[i+1];
@@ -841,15 +915,7 @@ function viewLay(id){
   if(!L){ return h + '<p class="msg">This layover has changed. Go back to the trip.</p>'; }
   var tz = L.ap.tz, sel = V.layPick[id] || L.picked;
   h += '<header style="padding:0 4px 6px"><h1>' + esc(L.ap.city) + '</h1><div class="sub">Land ' + BC.dow(tz, L.arr) + ' ' + BC.hm(tz, L.arr) + ' · Van ' + BC.dow(tz, L.duty) + ' ' + BC.hm(tz, L.duty) + ' · ' + Math.round((L.duty - L.arr)/H) + ' h</div></header>';
-  var outOn = !!L.out;
-  h += '<div class="stack" style="gap:10px"><div class="list"><div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew night out</span></span>' +
-       '<button class="sw" type="button" role="switch" aria-label="Crew night out" aria-checked="' + outOn + '" data-act="out" data-id="' + esc(id) + '"></button></div>';
-  if(L.out){
-    h += '<label class="row static"><span class="main"><span class="t1">Out from</span><span class="t3">' + esc(BC.dow(tz, L.out.ns)) + ' evening</span></span><input class="pill" type="time" id="loNs" data-id="' + esc(id) + '" value="' + BC.hm(tz, L.out.ns) + '"></label>' +
-         '<label class="row static"><span class="main"><span class="t1">Back by</span><span class="t3">Change it if the night ran late</span></span><input class="pill" type="time" id="loNe" data-id="' + esc(id) + '" value="' + BC.hm(tz, L.out.ne) + '"></label>' +
-         '<div class="row static"><span class="main"><span class="t1">Last drink by</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.out.lastDrink) + ' ' + BC.hm(tz, L.out.lastDrink) + '</span></div>';
-  }
-  h += '</div><p class="foot" style="margin-top:-4px">' + (L.autoOut ? 'On by default: the evening is more than ' + S.night.gap + ' hours before duty.' : 'Off by default for this layover.') + ' Last drink is ' + S.night.last + ' hours before the van. Set your company rule and usual times in Settings.</p>';
+  h += '<div class="stack" style="gap:10px"><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before the van; change it in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
   var hist = L.fixed.map(function(x){ return {t:x.a, txt:(x.kind === 'main' ? 'Slept ' : 'Napped ') + BC.dow(tz, x.a) + ' ' + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b), act:'editSleep', id:x.id}; })
     .concat(L.skips.map(function(x, i){ return {t:x.a, txt:'Skipped the ' + (x.kind === 'main' ? 'sleep' : 'nap') + ' at ' + BC.hm(tz, x.a), act:'unskip', id:String(x.a)}; }));
   if(L.open) hist.push({t:L.open.a, txt:'In bed since ' + BC.dow(tz, L.open.a) + ' ' + BC.hm(tz, L.open.a), act:'editSleep', id:L.open.id});
@@ -926,12 +992,13 @@ function frameBits(Pl, R, a, b, X, Hh, sleeps){
 }
 function barsBits(Pl, a, b, X){
   var s = '';
+  S.caf.log.forEach(function(c){ if(c.t >= a && c.t <= b) s += '<circle cx="' + X(c.t) + '" cy="189" r="4" fill="var(--coffee)" stroke="var(--card)" stroke-width="1.5"/>'; });
   Pl.flights.forEach(function(f){ if(f.b > a && f.a < b) s += '<rect x="' + X(Math.max(a, f.a)) + '" y="186" width="' + (X(Math.min(b, f.b)) - X(Math.max(a, f.a))).toFixed(1) + '" height="6" rx="3" fill="var(--flight)"/>'; });
   Pl.layovers.forEach(function(L){ if(L.out && L.out.ne > a && L.out.ns < b) s += '<rect x="' + X(Math.max(a, L.out.ns)) + '" y="186" width="' + (X(Math.min(b, L.out.ne)) - X(Math.max(a, L.out.ns))).toFixed(1) + '" height="6" rx="3" fill="var(--out)"/>'; });
   return s;
 }
 /* sleep pressure, and the line above which falling asleep comes easily (it moves with the body clock) */
-function gateOf(R, p){ return 0.6*R.Pref + 0.5*p.cb; }
+function gateOf(R, p){ return BC.gateOf(R, p); }
 function pressSVG(Pl, a, b, tz){
   var W = 358, Hh = 180, R = Pl.R, span = b - a;
   function X(t){ return ((t - a)/span*W).toFixed(1); }
@@ -1014,7 +1081,7 @@ function viewChart(){
       else {
         var lastWake = null; Pl.sleeps.forEach(function(x){ if(x.b <= nw && (lastWake === null || x.b > lastWake)) lastWake = x.b; });
         rows2.push(['Sleep pressure now', lastWake ? 'Awake for ' + durTxt(Math.round((nw - lastWake)/(15*60000))*15*60000) : 'Since your last sleep', pressWord(pn.S)]);
-        var ez = (pn.S - 0.5*pn.cb)/R.Pref;
+        var ez = BC.easeOf(R, pn);
         rows2.push(['If you lay down now', ez >= 0.6 ? 'Your body clock and sleep pressure agree' : pn.cb > 0.6 ? 'Your body clock is keeping you awake' : 'Not enough sleep pressure yet', easeWord(ez) + ' to fall asleep']);
       }
     }
@@ -1084,13 +1151,11 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">Layover sleep</span></span>' + sel('sBal', S.balance, [['home','Keep home time'],['balanced','Balanced'],['local','Follow local time']]) + '</label>' +
        '<button class="row" type="button" data-go="dest"><span class="main"><span class="t1">Destinations</span></span><span class="val">' + S.dests.length + ' airports</span>' + I.chev + '</button></div>' +
        '<p class="foot">Balanced splits the difference between your home night and the local night.</p>';
-  h += '<h2 class="grp-h">Crew night out</h2><div class="list">' +
-       '<div class="row static"><span class="main"><span class="t1">Plan one automatically</span></span><button class="sw" type="button" role="switch" aria-label="Plan a crew night out automatically" aria-checked="' + (S.night.auto !== false) + '" data-act="nightAuto"></button></div>' +
-       '<label class="row static"><span class="main"><span class="t1">Usual evening starts</span></span><input class="pill" type="time" id="sNs" value="' + esc(S.night.start) + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">Back by</span></span><input class="pill" type="time" id="sNe" value="' + esc(S.night.end) + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">When duty is at least</span><span class="t3">hours after the evening</span></span>' + num('sGap', S.night.gap, 8, 24, 1) + '</label>' +
-       '<label class="row static"><span class="main"><span class="t1">Last drink before duty</span><span class="t3">hours</span></span>' + num('sLast', S.night.last, 8, 24, 1) + '</label></div>' +
-       '<p class="foot">Use your company’s rule. The FAA minimum is 8 hours.</p>';
+  h += '<h2 class="grp-h">Caffeine and alcohol</h2><div class="list">' +
+       '<div class="row static"><span class="main"><span class="t1">Caffeine advice</span><span class="t3">Cut-off and best coffee time on Now</span></span><button class="sw" type="button" role="switch" aria-label="Caffeine advice" aria-checked="' + (S.caf.on !== false) + '" data-act="cafOn"></button></div>' +
+       '<label class="row static"><span class="main"><span class="t1">No caffeine before sleep</span><span class="t3">hours</span></span>' + num('sCut', S.caf.cut, 3, 10, 0.5) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Last drink before the van</span><span class="t3">hours</span></span>' + num('sLast', S.night.last, 8, 24, 1) + '</label></div>' +
+       '<p class="foot">About 6 hours keeps most caffeine out of your sleep; some people clear it faster or slower. For alcohol use your company’s rule; the FAA minimum is 8 hours.</p>';
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
        '<button class="row" type="button" data-act="restore" style="color:var(--tint)">Restore from file</button>' +
@@ -1105,8 +1170,8 @@ function viewSettings(){
   if(V.updMsg) h += '<p class="msg">' + esc(V.updMsg) + '</p>';
   h += '<details class="how" style="margin-top:18px"><summary>How the plan works</summary>' +
        '<p>The model is the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. Alertness here is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
-       '<p>For each layover the app tries naps after landing, naps before the van, both or neither, with your main sleep moved earlier or later, and scores each plan on alertness from wake-up to landing, the last 90 minutes counting most. Plans that need you to fall asleep when you probably cannot, or that leave you up for long stretches under high sleep pressure, lose points. On a night out it also wants you at least Okay for the evening.</p>' +
-       '<p>Drinks are modelled only as somewhat less restful sleep afterwards, which probably flatters a big night. Crew rest you enter is used as it is; until then the plan assumes your expected rest in the middle of the flight. The numbers are for comparing plans, not a fitness-for-duty measure.</p></details>';
+       '<p>For each layover the app tries naps after landing, naps before the van, both or neither, with your main sleep moved earlier or later, and scores each plan on alertness from wake-up to landing, the last 90 minutes counting most. Plans that need you to fall asleep when you probably cannot, or that leave you up for long stretches under high sleep pressure, lose points. </p>' +
+       '<p>Caffeine you log is in the model: it takes about 45 minutes to peak and half of it is gone after 5 hours. While it is in you it lifts alertness a little, makes it harder to fall asleep and makes sleep less restful. Crew rest you enter is used as it is; until then the plan assumes your expected rest in the middle of the flight. The numbers are for comparing plans, not a fitness-for-duty measure.</p></details>';
   return h;
 }
 
@@ -1346,13 +1411,6 @@ document.addEventListener('click', function(e){
   var b = e.target.closest('[data-act]'); if(!b) return;
   var act = b.dataset.act, id = b.dataset.id;
   if(act === 'num'){ e.stopPropagation(); var sp = b.querySelector('span:last-child'); if(sp) sp.textContent = /·/.test(sp.textContent) ? sp.textContent.split(' · ')[0] : sp.textContent + ' · ' + b.dataset.num; return; }
-  if(act === 'out'){
-    var Pl = P(), L = layById(Pl, id), cfg = S.lay[id] || (S.lay[id] = {});
-    var want = !L.out;
-    cfg.out = (want === L.autoOut) ? null : want;
-    if(cfg.out == null) delete cfg.out;
-    cfg.choice = null; save(); render(); return;
-  }
   if(act === 'pick'){ V.layPick[id] = b.dataset.opt; render(); return; }
   if(act === 'use'){
     var Pl2 = P(), L2 = layById(Pl2, id), pick = V.layPick[id] || L2.picked;
@@ -1380,12 +1438,13 @@ document.addEventListener('click', function(e){
   if(act === 'logSleep'){ openSleep(null); return; }
   if(act === 'addMenu'){
     $('#sheet').innerHTML = '<div class="sheet" data-act="menuBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Add"><div class="grab"><span></span></div><div class="stack" style="gap:10px;margin-top:14px">' +
-      '<button class="btn" type="button" data-act="menuFlight">Add a flight</button><button class="btn sec" type="button" data-act="menuSleep">Log a sleep you took</button><button class="btn sec" type="button" data-act="menuBg2">Cancel</button></div></div></div>';
+      '<button class="btn" type="button" data-act="menuFlight">Add a flight</button><button class="btn sec" type="button" data-act="menuSleep">Log a sleep you took</button><button class="btn sec" type="button" data-act="menuCaf">Log caffeine</button><button class="btn sec" type="button" data-act="menuBg2">Cancel</button></div></div></div>';
     return;
   }
   if(act === 'menuBg' && e.target === b || act === 'menuBg2'){ $('#sheet').innerHTML = ''; return; }
   if(act === 'menuFlight'){ $('#sheet').innerHTML = ''; openFlight('new'); return; }
   if(act === 'menuSleep'){ $('#sheet').innerHTML = ''; openSleep(null); return; }
+  if(act === 'menuCaf'){ $('#sheet').innerHTML = ''; openCaf(null); return; }
   if(act === 'cScope'){ V.calc.scope = b.dataset.v; render(); return; }
   if(act === 'cGoal'){ V.calcGoal = b.dataset.v; render(); return; }
   if(act === 'cAuto'){ var fk = b.dataset.v === 'cBed' ? 'bedAuto' : 'wakeAuto'; V.calc[fk] = !V.calc[fk]; render(); return; }
@@ -1407,6 +1466,13 @@ document.addEventListener('click', function(e){
     cfg2.choice = 'custom'; save(); go('now'); return;
   }
   if(act === 'editSleep'){ openSleep(id); return; }
+  if(act === 'cafLog'){ openCaf(null); return; }
+  if(act === 'cafEdit'){ openCaf(id); return; }
+  if(act === 'cafBg' && e.target === b){ V.caf = null; renderCaf(); return; }
+  if(act === 'cafCancel'){ V.caf = null; renderCaf(); return; }
+  if(act === 'cafSave'){ saveCaf(); return; }
+  if(act === 'cafMg'){ V.caf.mg = +b.dataset.v; renderCaf(); return; }
+  if(act === 'cafDel'){ if(!V.confirmDel){ V.confirmDel = true; renderCaf(); return; } S.caf.log = S.caf.log.filter(function(x){ return x.id !== V.caf.id; }); save(); V.caf = null; V.confirmDel = false; renderCaf(); render(); return; }
   if(act === 'unskip'){ S.skips = S.skips.filter(function(x){ return String(x.a) !== String(id); }); save(); render(); return; }
   if(act === 'sleepBg' && e.target === b){ V.sleep = null; renderSleep(); return; }
   if(act === 'sleepCancel'){ V.sleep = null; V.confirmDel = false; renderSleep(); return; }
@@ -1422,7 +1488,7 @@ document.addEventListener('click', function(e){
     else delete raw.restUTC;
     save(); render(); return;
   }
-  if(act === 'nightAuto'){ S.night.auto = !(S.night.auto !== false); save(); render(); return; }
+  if(act === 'cafOn'){ S.caf.on = !(S.caf.on !== false); save(); render(); return; }
   if(act === 'backup'){ backup(); return; }
   if(act === 'restore'){ $('#impFile').click(); return; }
   if(act === 'import'){ V.flash = importClassic(); if(V.view === 'now'){ render(); } else render(); return; }
@@ -1465,20 +1531,15 @@ document.addEventListener('change', function(e){
     render(); return;
   }
   if(V.calc && id === 'cFlight'){ V.calc.fid = t.value; render(); return; }
+  if(V.caf && id === 'cafT'){ V.caf.t = t.value; return; }
   if(V.sleep && (id === 'slBed' || id === 'slWake')){ V.sleep[id === 'slBed' ? 'bed' : 'wake'] = t.value; return; }
-  if(id === 'loNs' || id === 'loNe'){
-    var cfgL = S.lay[t.dataset.id] || (S.lay[t.dataset.id] = {});
-    if(t.value) cfgL[id === 'loNs' ? 'ns' : 'ne'] = t.value;
-    save(); render(); return;
-  }
   if(V.flight && (id === 'fDep' || id === 'fArr')){ V.flight[id === 'fDep' ? 'dep' : 'arr'] = t.value; if(id === 'fDep') autoArr(); renderSheet(); return; }
   var map = {sHome:'home', sBed:'bed', sWake:'wake', sBal:'balance'};
   if(map[id]){ if(t.value) S[map[id]] = t.value; save(); render(); return; }
   var nums = {sLand:['landBed',0,6], sVan:['van',0.5,4]};
   if(nums[id]){ var v = parseFloat(t.value); if(!isNaN(v)){ S[nums[id][0]] = Math.max(nums[id][1], Math.min(nums[id][2], v)); save(); render(); } return; }
   if(id === 'sReady'){ var r = parseFloat(t.value); if(!isNaN(r)){ S.ready = Math.max(0, Math.min(180, r))/60; save(); render(); } return; }
-  var nn = {sNs:'start', sNe:'end'};
-  if(nn[id]){ if(t.value){ S.night[nn[id]] = t.value; save(); render(); } return; }
+  if(id === 'sCut'){ var cg = parseFloat(t.value); if(!isNaN(cg)){ S.caf.cut = Math.max(3, Math.min(10, cg)); save(); render(); } return; }
   if(id === 'sGap' || id === 'sLast'){ var g = parseFloat(t.value); if(!isNaN(g)){ S.night[id === 'sGap' ? 'gap' : 'last'] = Math.max(8, Math.min(24, g)); save(); render(); } return; }
   if(id === 'rs' || id === 're'){
     var raw = S.flights.filter(function(x){ return String(x.id) === String(V.arg); })[0]; if(!raw) return;
