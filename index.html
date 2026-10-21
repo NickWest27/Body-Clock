@@ -196,7 +196,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '21 Oct 2026 · build 25';
+var BUILD = '22 Oct 2026 · build 26';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -304,7 +304,7 @@ function ribbon(Pl, a, b, tz, opts){
     var tt = t0 + k*stepH*H;
     var hr = +BC.hm(tz, tt).slice(0,2);
     if(tt > b) break;
-    if(tt < a + span*0.02 || tt > b - span*(opts.endLabel ? 0.1 : 0.04)) continue;
+    if(tt < a + span*0.02 || tt > b - span*(opts.endLabel ? 0.16 : 0.04)) continue;
     var mid = hr === 0;
     h += '<i class="tk' + (mid ? ' mid' : '') + '" style="left:' + pc(tt) + '"></i>';
     labels.push({t:tt, txt:mid ? BC.dow(tz, tt) : BC.hm(tz, tt), d:mid});
@@ -326,7 +326,7 @@ function ribbon(Pl, a, b, tz, opts){
   if(hasNow) h += '<span class="lb n" style="left:' + pc(nw) + ';' + (nowX < 0.05 ? 'transform:none' : '') + '">Now</span>';
   labels.forEach(function(l){
     var x = (l.t - a)/span;
-    if(hasNow && Math.abs(x - nowX) < 0.08) return;
+    if(hasNow && Math.abs(x - nowX) < 0.13) return;
     h += '<span class="lb' + (l.d ? ' d' : '') + '" style="left:' + pc(l.t) + '">' + esc(l.txt) + '</span>';
   });
   if(opts.endLabel) h += '<span class="lb" style="left:auto;right:0;transform:none">' + esc(opts.endLabel) + '</span>';
@@ -640,7 +640,7 @@ function viewNow(){
   /* up next */
   var from = heroUsed ? heroUsed.a + 1 : nw;
   var ev = events(Pl, Pl.open ? (Pl.openEnd || nw) : from, 4);
-  h += '<section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
+  h += '<h2 class="grp-h" style="margin:4px 16px -8px">Up next</h2><section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
        (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.options.length > 1; })[0];
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
        '<button class="row" type="button" data-go="calc" style="color:var(--tint);min-height:48px">' + I.moon + 'What if I sleep at another time?</button>' +
@@ -651,7 +651,7 @@ function viewNow(){
   var a = Math.max(nw, E.t0), b = target && target.b - a <= 72*H ? target.b : Math.min(a + 36*H, Pl.R.t1);
   if(b - a > 2*H){
     h += '<button class="card" type="button" data-go="chart" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px 12px">' +
-         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:17px;font-weight:600">' + (target && b === target.b ? 'Until you land' : 'Next 36 hours') + '</span>' + I.chev + '</div>' +
+         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span><span class="eyebrow" style="display:block">Alertness</span><span style="display:block;font-size:17px;font-weight:600;margin-top:2px">' + (target && b === target.b ? 'Until you land at ' + esc(target.t.code) + ' · ' + esc(BC.dow(target.t.tz, target.b)) + ' ' + BC.hm(target.t.tz, target.b) : 'Next 36 hours') + '</span></span>' + I.chev + '</div>' +
          ribbon(Pl, a, b, tz, {endLabel:target && b === target.b ? 'Land' : '', out:Pl.layovers.some(function(x){ return x.out && x.out.ne > a && x.out.ns < b; })}) + '</button>';
   }
   h += clockCard(Pl, nw);
