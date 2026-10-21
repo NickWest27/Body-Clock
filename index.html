@@ -19,7 +19,7 @@
   --bg:#F2F2F7; --card:#FFFFFF; --label:#000000; --sec:#5F5F66; --ter:#8A8A90; --sep:rgba(60,60,67,.18);
   --fill:rgba(118,118,128,.12); --bar:rgba(249,249,249,.94); --tint:#0A66D8; --sleep:#5856D6; --sleepbg:rgba(88,86,214,.14);
   --flight:#1C1C1E; --day:#F7DC94; --nite:#2E3160; --nitebg:rgba(46,49,96,.10); --out:#C2378A; --outbg:rgba(194,55,138,.12);
-  --switch:#248A3D; --danger:#C4161C; --dusk:#E6A766; --sunc:#C98A00; --bodyn:#3459C9;
+  --switch:#248A3D; --danger:#C4161C; --tired:#D93A1E; --rested:#2E9E5B; --dusk:#E6A766; --sunc:#C98A00; --bodyn:#3459C9;
   --scale:linear-gradient(90deg,#C4161C 0%,#E2531A 17%,#EE8A12 33%,#D8B10F 50%,#7DB843 67%,#2E9E5B 83%,#1F7A4D 100%);
   color-scheme:light dark;
 }
@@ -28,7 +28,7 @@
     --bg:#000000; --card:#1C1C1E; --label:#FFFFFF; --sec:#A1A1A8; --ter:#7C7C82; --sep:rgba(84,84,88,.6);
     --fill:rgba(118,118,128,.24); --bar:rgba(22,22,24,.94); --tint:#3E9BFF; --sleep:#8D8BFF; --sleepbg:rgba(94,92,230,.28);
     --flight:#E5E5EA; --day:#8A7440; --nite:#262A55; --nitebg:rgba(120,130,255,.12); --out:#F06BB8; --outbg:rgba(240,107,184,.18);
-    --switch:#30D158; --danger:#FF6961; --dusk:#9A6A44; --sunc:#F5C451; --bodyn:#7C9BFF;
+    --switch:#30D158; --danger:#FF6961; --tired:#FF5A3C; --rested:#3BC77A; --dusk:#9A6A44; --sunc:#F5C451; --bodyn:#7C9BFF;
   }
 }
 *{box-sizing:border-box}
@@ -196,7 +196,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '21 Oct 2026 · build 23';
+var BUILD = '21 Oct 2026 · build 24';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -439,6 +439,60 @@ function dial3SVG(Pl, C, t, hand){
   s += sunIco(cx, 7, 3.4);
   if(hand){ var e = pt(lh, 64); s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" stroke="var(--tint)" stroke-width="2.5" stroke-linecap="round"/><circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="var(--tint)"/>'; }
   return s + '</svg>';
+}
+/* The big body clock: the same three labelled rings, with thin rings for the days before.
+   Between outer and body: where you were on each earlier day (newest outermost), so the rings that line up
+   with the outer one count your days in this time zone. Between body and home: your body's day on each
+   earlier day, so you can see it drift from home towards now. All on today's local clock. */
+function dialBigSVG(Pl, C, nw){
+  var home = Pl.E.home, pl = placeAt(Pl, C, nw), x = pl.x, lh = ((nw/H + x.off) % 24 + 24) % 24, id = 'b' + (dialN++);
+  var cx = 170, cy = 170, ND = 0;
+  for(var k=1;k<=6;k++){ if(nw - k*24*H >= C.R.t0 - 6*H) ND = k; }
+  function pt(h, r){ var a = (h - 12)/24*2*Math.PI; return [cx + r*Math.sin(a), cy - r*Math.cos(a)]; }
+  function seg(h0, h1, r){ var a = pt(h0, r), b = pt(h1, r); return 'M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 0 1 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2); }
+  function ring(r, w, el, step){
+    step = step || 0.25;
+    var s = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + skyCol(el(nw - lh*H)) + '" stroke-width="' + w + '"/>';
+    for(var h0=0; h0<24; h0+=step) s += '<path d="' + seg(h0 - 0.04, h0 + step + 0.04, r) + '" fill="none" stroke="' + skyCol(el(nw + (h0 + step/2 - lh)*H)) + '" stroke-width="' + w + '"/>';
+    return s;
+  }
+  function shiftAt(t){ var q = C.at(Math.max(C.R.t0, Math.min(C.R.t1, t))); return q.eff - q.homeOff; }
+  var here = function(tau){ return BC.sunElev(tau, pl.lat, pl.lon); };
+  var shN = shiftAt(nw);
+  var body = function(tau){ return BC.sunElev(tau + shN*H, home.lat, home.lon); };
+  var homeL = function(tau){ return BC.sunElev(tau, home.lat, home.lon); };
+  var s = '<svg class="dial" viewBox="0 0 340 340" role="img" aria-label="Body clock with the days before">';
+  var rO = 146, wO = 12, rB = 92, wB = 18, rH = 36, wH = 12, tw = 4, tg = 1.6;
+  s += ring(rO, wO, here);
+  /* where you were, k days ago, on today's clock */
+  for(var k1=1;k1<=ND;k1++){ (function(k){
+    var r = rO - wO/2 - 4 - tw/2 - (k - 1)*(tw + tg);
+    s += ring(r, tw, function(tau){ var tt = tau - k*24*H, q = Pl.E.locAt(tt); return BC.sunElev(tt, q.lat, q.lon); }, 0.5);
+  })(k1); }
+  s += ring(rB, wB, body);
+  /* your body's day, k days ago */
+  for(var k2=1;k2<=ND;k2++){ (function(k){
+    var r = rB - wB/2 - 4 - tw/2 - (k - 1)*(tw + tg), sh = shiftAt(nw - k*24*H);
+    s += ring(r, tw, function(tau){ return BC.sunElev(tau - k*24*H + sh*H, home.lat, home.lon); }, 0.5);
+  })(k2); }
+  s += ring(rH, wH, homeL);
+  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (rB + wB/2 + 0.6) + '" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.3"/><circle cx="' + cx + '" cy="' + cy + '" r="' + (rB - wB/2 - 0.6) + '" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.3"/>';
+  var R = [[rO, pl.name, 10], [rB, 'Your body', 12], [rH, pl.ap && pl.ap.code === home.code ? 'Home' : shortCity(home), 9]], defs = '<defs>', labs = '';
+  R.forEach(function(r, i){
+    var rb = r[0] + r[2]*0.36, a = pt(6, rb), b = pt(18, rb);
+    defs += '<path id="' + id + 'p' + i + '" d="M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + rb + ' ' + rb + ' 0 0 0 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2) + '"/>';
+    labs += '<text font-size="' + r[2] + '" font-weight="700" letter-spacing=".05em" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width="2.6" paint-order="stroke" stroke-linejoin="round"><textPath href="#' + id + 'p' + i + '" startOffset="50%" text-anchor="middle">' + esc(r[1].toUpperCase()) + '</textPath></text>';
+  });
+  s += defs + '</defs>' + labs;
+  /* day marks on the thin rings, at 03:00 */
+  for(var k3=1;k3<=ND;k3++){
+    var q1 = pt(15, rO - wO/2 - 4 - tw/2 - (k3 - 1)*(tw + tg)), q2 = pt(15, rB - wB/2 - 4 - tw/2 - (k3 - 1)*(tw + tg));
+    if(k3 === 1 || k3 === ND){ var dl = BC.dow(pl.tz, nw - k3*24*H); s += '<text x="' + (q1[0] + 5).toFixed(1) + '" y="' + (q1[1] + 3).toFixed(1) + '" font-size="9" font-weight="600" fill="var(--label)" stroke="var(--card)" stroke-width="3" paint-order="stroke">' + esc(dl) + '</text>'; }
+  }
+  [[6, '06'], [18, '18'], [0, '00']].forEach(function(l){ var q = pt(l[0], 162); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="12" text-anchor="middle" fill="var(--sec)">' + l[1] + '</text>'; });
+  s += sunIco(cx, 10, 4.5);
+  var e = pt(lh, 156); s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" stroke="var(--tint)" stroke-width="3" stroke-linecap="round"/><circle cx="' + cx + '" cy="' + cy + '" r="4.5" fill="var(--tint)"/>';
+  return {svg:s + '</svg>', days:ND};
 }
 function clockCard(Pl, nw){
   var C = BC.clock(S, nw);
@@ -887,20 +941,20 @@ function pressSVG(Pl, a, b, tz){
   s += '</linearGradient></defs>';
   s += frameBits(Pl, R, a, b, X, Hh, true);
   var pts = R.pts.filter(function(p){ return p.t >= a && p.t <= b; });
-  /* shade where sleep would come easily and you are awake */
-  var poly = [], open = false;
-  pts.forEach(function(p, i){
-    var g = gateOf(R, p), on = !p.sl && p.S > g;
-    if(on){ if(!open){ poly.push([]); open = true; } poly[poly.length-1].push(p); } else open = false;
+  /* shade between sleep pressure and the sleep threshold while awake: red when you are tired enough to sleep, green when not */
+  var runs = [], cur = null;
+  pts.forEach(function(p){
+    var k = p.sl ? null : (p.S > gateOf(R, p) ? 'red' : 'green');
+    if(!cur || cur.k !== k){ if(cur && cur.k && p.sl === false) cur.pts.push(p); cur = {k:k, pts:[]}; runs.push(cur); }
+    cur.pts.push(p);
   });
-  poly.forEach(function(seg){
-    if(seg.length < 2) return;
-    var d = 'M' + seg.map(function(p){ return X(p.t) + ' ' + Y(p.S); }).join('L') + 'L' + seg.slice().reverse().map(function(p){ return X(p.t) + ' ' + Y(gateOf(R, p)); }).join('L') + 'Z';
-    s += '<path d="' + d + '" fill="var(--bodyn)" opacity=".22"/>';
+  runs.forEach(function(rn){
+    if(!rn.k || rn.pts.length < 2) return;
+    var d = 'M' + rn.pts.map(function(p){ return X(p.t) + ' ' + Y(p.S); }).join('L') + 'L' + rn.pts.slice().reverse().map(function(p){ return X(p.t) + ' ' + Y(Math.min(1, gateOf(R, p))); }).join('L') + 'Z';
+    s += '<path d="' + d + '" fill="' + (rn.k === 'red' ? 'var(--tired)' : 'var(--rested)') + '" opacity=".32"/>';
   });
   var dg = '', ds = '';
   pts.forEach(function(p, i){ dg += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(Math.min(1, gateOf(R, p))); ds += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(p.S); });
-  s += '<path d="' + ds + 'L' + X(pts[pts.length-1].t) + ' ' + Hh + 'L' + X(pts[0].t) + ' ' + Hh + 'Z" fill="url(#pg)" opacity=".16"/>';
   s += '<path d="' + dg + '" fill="none" stroke="var(--bodyn)" stroke-width="1.5" stroke-dasharray="4 4"/>';
   s += '<path d="' + ds + '" fill="none" stroke="url(#pg)" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>';
   s += lbl(6, 14, 'High') + lbl(6, Hh - 4, 'Low');
@@ -935,15 +989,9 @@ function viewChart(){
   var F = Pl.flights, a, b, tz;
   if(M === 'clock'){
     var C = BC.clock(S, nw);
-    h += '<p class="msg" style="margin:0 4px 10px;color:var(--label)">One clock per day, at local noon (today at now). Outer ring: daylight where you were. <b>Middle: the day your body expects.</b> Inner: home. When the middle ring lines up with the outer one, you have adjusted.</p>';
-    var days = clockRows(Pl, C, nw), nowUsed = false;
-    h += '<div class="dials">' + days.map(function(r){
-      var isNow = !nowUsed && nw >= r.t0 && nw < r.t1; if(isNow) nowUsed = true;
-      var t = isNow ? nw : Math.min(Math.max(r.t0 + 12*H, C.R.t0), C.R.t1);
-      if(!isNow){ var fl = Pl.flights.filter(function(f){ return f.a <= t && t < f.b; })[0]; if(fl) t = Math.min(fl.b + H, C.R.t1); }
-      var pl = placeAt(Pl, C, t);
-      return '<figure class="' + (isNow ? 'now' : '') + '">' + dial3SVG(Pl, C, t, isNow) + '<div class="t1">' + esc(r.lab.replace(/^(\w+) (\d+).*$/, '$1 $2')) + ' · ' + esc(pl.name) + '</div><div class="t3">' + esc(isNow ? 'Now · ' : '') + esc(gapPhrase(pl.x.gap, pl.fl ? 'local time' : pl.name).replace(/ (behind|ahead of) .*$/, ' $1').replace('ahead of', 'ahead')) + '</div></figure>';
-    }).join('') + '</div>';
+    var big = dialBigSVG(Pl, C, Math.min(Math.max(nw, C.R.t0), C.R.t1));
+    h += '<figure class="chart" style="padding:14px 10px 12px">' + big.svg.replace('class="dial"', 'class="dial" style="width:100%;height:auto;display:block"') +
+         '<p class="foot" style="margin:8px 6px 0">Three labelled rings, on today’s local clock: where you are, <b>your body</b>, and home. ' + (big.days ? 'The thin rings are the ' + big.days + ' day' + (big.days > 1 ? 's' : '') + ' before, newest on the outside. Outer group: where you were. When they line up with the outer ring you’ve been in this time zone that long. Inner group: your body’s day, drifting from home towards now.' : '') + ' When the body ring lines up with the outer ring, you’ve adjusted.</p></figure>';
     var rows = [], x = C.at(nw), Ln = E.locAt(nw);
     if(nw >= C.R.t0 && nw <= C.R.t1) rows.push(['Now', 'Your body thinks it’s ' + hh(x.bodyH), gapPhrase(x.gap, Ln.fl ? 'local time' : (Ln.ap || E.home).city)]);
     F.forEach(function(f){ if(f.role !== 'operate' || f.b < nw) return; var xf = C.at(f.b); rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b), gapPhrase(xf.gap, f.t.city)]); });
@@ -958,7 +1006,7 @@ function viewChart(){
   h += '<div class="seg" role="group" aria-label="Time span" style="margin-bottom:12px"><button type="button" data-act="cv" data-v="land" aria-pressed="' + !!land + '"' + (target ? '' : ' disabled') + '>Until you land</button><button type="button" data-act="cv" data-v="trip" aria-pressed="' + !land + '">Whole trip</button></div>';
   var clockName = land ? esc(E.locAt(a).fl ? 'Departure' : (E.locAt(a).ap || E.home).city) + ' time' : 'Days on home time';
   if(M === 'press'){
-    h += '<figure class="chart">' + pressSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Low<span style="width:46px;height:8px;border-radius:4px;background:linear-gradient(90deg,' + pressCol(0.1) + ',' + pressCol(0.4) + ',' + pressCol(0.75) + ');display:inline-block"></span>High</span><span><span class="sw10" style="border:1.5px dashed var(--bodyn);background:none"></span>You can fall asleep above this</span><span><span class="sw10" style="background:var(--bodyn);opacity:.3"></span>Window to fall asleep</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
+    h += '<figure class="chart">' + pressSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Low<span style="width:46px;height:8px;border-radius:4px;background:linear-gradient(90deg,' + pressCol(0.1) + ',' + pressCol(0.4) + ',' + pressCol(0.75) + ');display:inline-block"></span>High</span><span><span class="sw10" style="border:1.5px dashed var(--bodyn);background:none"></span>Sleep threshold</span><span><span class="sw10" style="background:var(--tired);opacity:.45"></span>Tired: sleep would come</span><span><span class="sw10" style="background:var(--rested);opacity:.45"></span>Not tired yet</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
     var R = Pl.R, rows2 = [], from = Math.max(nw, a);
     if(nw >= a && nw <= b){
       var pn = BC.ptAt(R, nw);
@@ -974,7 +1022,7 @@ function viewChart(){
     for(var i=0;i<R.pts.length;i++){ var p = R.pts[i]; if(p.t < from || p.t > b) continue; var on = !p.sl && p.S > gateOf(R, p); if(on && !win) win = {a:p.t}; if(win && p.sl) break; if(win && !on){ win.b = p.t; break; } }
     if(win){ var wtz = E.locAt(win.a).tz; rows2.push(['Next window to fall asleep', E.locAt(win.a).fl ? 'In flight, ' + E.locAt(win.a).flight.f.city + ' time' : (E.locAt(win.a).ap || E.home).city + ' time', whenTxt(wtz, win.a, nw) + (win.b ? '–' + whenTxt(wtz, win.b, win.a) : ' on')]); }
     h += '<div class="list" style="margin-top:14px">' + rows2.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
-    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is where you can fall asleep; it drops in your body’s night and rises in its afternoon, which is why you can be exhausted and still not sleep at the wrong body time.</p>';
+    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is the sleep threshold: above it you can fall asleep. It is set by your body clock, low in your body’s night and high in its late afternoon, which is why you can be exhausted and still not sleep at the wrong body time. Red is when sleep pressure is above it, green when it is below.</p>';
     return h;
   }
   h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Night out</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
