@@ -614,9 +614,10 @@ function plan(S, now, opt){
 /* ---------- sleep calculator ---------- */
 /* Replace whatever is planned over [w.a, w.b] with that sleep and measure the result. Logged sleeps
    that overlap it are replaced too, so you can also ask "what if I had slept then". */
-function contextFor(Pl, t){
+function contextFor(Pl, t, fid){
   var L = Pl.layovers.filter(function(x){ return t >= x.arr - H && t < x.dep; })[0] || null;
-  var f = Pl.flights.filter(function(x){ return x.role === 'operate' && x.a > t; })[0] || null;
+  var f = (fid != null ? Pl.flights.filter(function(x){ return String(x.id) === String(fid) && x.a > t; })[0] : null) ||
+          Pl.flights.filter(function(x){ return x.role === 'operate' && x.a > t; })[0] || null;
   return {L:L, f:f};
 }
 function metricsOf(R, w, ctx, E){
@@ -663,8 +664,8 @@ function nextSleep(Pl, w, m, ctx){
   m.nextEase = (q.S - 0.5*q.cb)/Pl.R.Pref; m.nextAt = n.a; m.nextKind = n.kind === 'nap' ? 'nap' : 'main';
 }
 /* then: a fixed set of sleeps after w (a whole plan) instead of letting the planner fill the rest */
-function whatIf(S, now, w, then){
-  var Pl = plan(S, now), ctx = contextFor(Pl, w.a), base = metricsOf(Pl.R, w, ctx, Pl.E), P2, rest = null, L2;
+function whatIf(S, now, w, then, fid){
+  var Pl = plan(S, now), ctx = contextFor(Pl, w.a, fid), base = metricsOf(Pl.R, w, ctx, Pl.E), P2, rest = null, L2;
   if(then && ctx.L){
     var S3 = stateBefore(S, Pl, w.a, ctx.L, w), cfg = S3.lay[ctx.L.id] || (S3.lay[ctx.L.id] = {});
     cfg.custom = [w].concat(then).map(function(x){ return {a:x.a, b:x.b, kind:x.kind === 'nap' ? 'nap' : 'main'}; });
@@ -678,7 +679,7 @@ function whatIf(S, now, w, then){
   }
   var m = metricsOf(P2.R, w, ctx, P2.E);
   nextSleep(P2, w, m, ctx); nextSleep(Pl, w, base, ctx);
-  return {m:m, base:base, ctx:ctx, rest:rest,
+  return {m:m, base:base, ctx:ctx, rest:rest, P2:P2, Pl:Pl,
           wakeBy:ctx.L ? ctx.L.we : (ctx.f ? ctx.f.a - ((+S.van || 2) + (+S.ready || 0.75))*H : null)};
 }
 function bestWake(S, now, a, kind){
@@ -707,9 +708,17 @@ function pickBest(c, goal){
 }
 function findBest(S, now, o){
   var Pl = plan(S, now), goal = o.goal === 'body' ? 'body' : 'flight';
+  var fl = o.fid != null ? Pl.flights.filter(function(f){ return String(f.id) === String(o.fid); })[0] : null;
   if(o.mode === 'plan'){
-    var L = Pl.layovers.filter(function(x){ return now >= x.arr - H && now < x.we; })[0] || Pl.layovers.filter(function(x){ return x.arr > now; })[0];
-    if(!L) return {err:'There is no layover ahead to plan.'};
+    var L = fl ? Pl.layovers.filter(function(x){ return x.outF.id === fl.id && now < x.we; })[0]
+               : (Pl.layovers.filter(function(x){ return now >= x.arr - H && now < x.we; })[0] || Pl.layovers.filter(function(x){ return x.arr > now; })[0]);
+    if(!L){
+      /* no layover before that flight (it leaves from home, or the van is due): the planned sleeps before it */
+      var lead0 = ((+S.van || 2) + (+S.ready || 0.75))*H;
+      var hs = Pl.sleeps.filter(function(x){ return x.kind !== 'rest' && !x.actual && !x.open && x.a >= now - 2*MIN && (!fl || x.b <= fl.a - lead0 + MIN); });
+      if(!hs.length) return {err:'No sleep left to plan before that flight.'};
+      return {a:hs[0].a, b:hs[0].b, kind:hs[0].kind === 'nap' ? 'nap' : 'main', then:hs.slice(1).map(function(b){ return {a:b.a, b:b.b, kind:b.kind === 'nap' ? 'nap' : 'main'}; }), name:'Your usual nights', goal:goal, lay:null, home:true};
+    }
     var S2 = JSON.parse(JSON.stringify(S)); S2.lay = S2.lay || {};
     if(S2.lay[L.id]){ delete S2.lay[L.id].custom; delete S2.lay[L.id].choice; }
     var P2 = plan(S2, now, {noCache:true}), L2 = P2.layovers.filter(function(x){ return x.id === L.id; })[0];
@@ -740,7 +749,7 @@ function findBest(S, now, o){
   });
   if(!ok.length) return {err:o.mode === 'bed' ? 'No bedtime before that wake-up fits around your flights, the night out and now.' : 'No wake-up after that bedtime fits before you have to be up.'};
   var c = ok.map(function(w){
-    var r = whatIf(S, now, {a:w.a, b:w.b, kind:kind});
+    var r = whatIf(S, now, {a:w.a, b:w.b, kind:kind}, null, o.fid);
     var net = (r.m.score || 0) - (w.a >= now ? easeCost(r.m, kind) : 0);
     if(r.m.nextEase != null) net -= easeCost({ease:r.m.nextEase}, r.m.nextKind);
     return {a:w.a, b:w.b, m:r.m, net:net};
