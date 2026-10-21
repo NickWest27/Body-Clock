@@ -84,6 +84,9 @@ h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing
 .btn.small{min-height:40px;width:auto;padding:0 16px;font-size:15px}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;padding:2px;border-radius:9px;background:var(--fill)}
 .seg button{min-height:32px;border:0;border-radius:7px;background:transparent;font-size:13px;font-weight:600;cursor:pointer}
+.seg.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dialrow{display:flex;align-items:center;gap:14px}
+.dialrow .dial{flex:none;width:124px;height:124px}
 .seg button[aria-pressed=true]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .sw{position:relative;width:51px;height:31px;border:0;border-radius:16px;background:var(--fill);cursor:pointer;padding:0;flex:none;transition:background .2s}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:left .2s}
@@ -172,7 +175,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '17 Oct 2026 · build 20';
+var BUILD = '21 Oct 2026 · build 21';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -352,12 +355,66 @@ function whyFor(Pl, s){
   if(isArr && opt === 'both') return 'Short on purpose: enough for ' + (L.out ? 'tonight' : 'the evening') + ', and you will still be sleepy enough to nap again before the van.';
   if(isArr) return 'A proper nap now keeps you going ' + (L.out ? 'through the night out.' : 'until bedtime.');
   if(isLate) return 'Last sleep before the van. Lie down even if sleep is slow to come.';
+  if(s.mid) return 'Your usual night here, on the clock your layover balance setting picks.';
   if(s.kind === 'main' && L.out) return 'Straight to bed after the night out.';
   return 'Your main sleep for this layover.';
 }
 
+/* ---------- body clock ---------- */
+function gapTxt(g){
+  var a = Math.abs(g), m = Math.round(a*60/10)*10, h = Math.floor(m/60), r = m % 60;
+  return (h ? h + ' h' : '') + (h && r ? ' ' : '') + (r || !h ? r + ' min' : '');
+}
+function gapPhrase(g, city){
+  if(Math.abs(g) < 0.25) return 'In step with ' + city;
+  return gapTxt(g) + (g > 0 ? ' behind ' : ' ahead of ') + city;
+}
+function hh(x){ x = ((x % 24) + 24) % 24; var m = Math.round(x*60) % 1440; return BC.pad(Math.floor(m/60)) + ':' + BC.pad(m % 60); }
+function hhmmH(s){ var p = String(s).split(':'); return (+p[0] || 0) + (+p[1] || 0)/60; }
+/* 24-hour dial on the local clock: the body's night now (outer ring) and on the days before (inner rings, fading),
+   against your usual night here (dashed). */
+function dialSVG(C, nw){
+  var cx = 70, cy = 70, x = C.at(nw), bed = hhmmH(S.bed), wake = hhmmH(S.wake);
+  function pt(h, r){ var t = h/24*2*Math.PI; return [(cx + r*Math.sin(t)).toFixed(1), (cy - r*Math.cos(t)).toFixed(1)]; }
+  function arc(h0, h1, r){
+    var span = ((h1 - h0) % 24 + 24) % 24; if(span < 0.05) return '';
+    var p0 = pt(h0, r), p1 = pt(h0 + span, r);
+    return 'M' + p0[0] + ' ' + p0[1] + 'A' + r + ' ' + r + ' 0 ' + (span > 12 ? 1 : 0) + ' 1 ' + p1[0] + ' ' + p1[1];
+  }
+  var s = '<svg class="dial" viewBox="-6 -6 152 152" role="img" aria-label="Body clock dial">';
+  s += '<circle cx="70" cy="70" r="54" fill="none" stroke="var(--fill)" stroke-width="6"/>';
+  [0, 6, 12, 18].forEach(function(h){ var q = pt(h, 65); s += '<text x="' + q[0] + '" y="' + (+q[1] + 3.5) + '" font-size="10" text-anchor="middle" fill="var(--sec)">' + BC.pad(h) + '</text>'; });
+  s += '<path d="' + arc(bed, wake, 61) + '" fill="none" stroke="var(--sec)" stroke-width="1.5" stroke-dasharray="2 3" stroke-linecap="round"/>';
+  var localNow = BC.offH(x.tz, nw);
+  for(var k=3;k>=0;k--){
+    var t = nw - k*24*H;
+    if(t < C.R.t0) continue;
+    var xk = C.at(t), g = x.off - xk.eff;
+    s += '<path d="' + arc(bed + g, wake + g, 54 - k*8) + '" fill="none" stroke="var(--sleep)" stroke-width="6" stroke-linecap="round" opacity="' + [1, .5, .28, .14][k] + '"/>';
+  }
+  var hNow = ((nw/H + x.off) % 24 + 24) % 24, e = pt(hNow, 54);
+  s += '<line x1="70" y1="70" x2="' + e[0] + '" y2="' + e[1] + '" stroke="var(--tint)" stroke-width="2.5" stroke-linecap="round"/><circle cx="70" cy="70" r="3.5" fill="var(--tint)"/>';
+  return s + '</svg>';
+}
+function clockCard(Pl, nw){
+  var C = BC.clock(S, nw);
+  if(!C || C.maxGap < 0.75) return '';
+  var end = C.adaptedBy || C.R.t1;
+  if(nw < Pl.E.t0 || nw > end) return '';
+  var x = C.at(nw), L = Pl.E.locAt(nw), city = L.fl ? 'local time' : (L.ap || Pl.E.home).city;
+  var bed = hhmmH(S.bed), wake = hhmmH(S.wake);
+  var big = Math.abs(x.gap) < 0.25 ? 'In step' : gapTxt(x.gap) + (x.gap > 0 ? ' behind' : ' ahead');
+  var sub = Math.abs(x.gap) < 0.25 ? 'Your body is on ' + esc(city) + ' time.' : 'Your body thinks it’s ' + hh(x.bodyH) + '. Its night is ' + hh(bed + x.gap) + '–' + hh(wake + x.gap) + ' here.';
+  var foot = '';
+  if(C.back && C.adaptedBy && C.adaptedBy > nw) foot = 'Back in step with ' + esc(Pl.E.home.city) + ' about ' + esc(BC.dow(Pl.E.home.tz, C.adaptedBy)) + '.';
+  return '<button class="card" type="button" data-go="chart/clock" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px">' +
+    '<div class="dialrow">' + dialSVG(C, nw) + '<div style="flex:1;min-width:0"><div class="eyebrow">Body clock</div><div style="font-size:22px;font-weight:600;line-height:27px">' + esc(big) + '</div>' +
+    '<div class="lab" style="margin-top:4px">' + sub + '</div>' + (foot ? '<div class="lab" style="margin-top:6px">' + foot + '</div>' : '') + '</div>' + I.chev + '</div>' +
+    '<div class="legend" style="margin-top:8px"><span><span class="sw10" style="background:var(--sleep)"></span>Body’s night, fading back over 3 days</span><span><span class="sw10" style="border:1.5px dashed var(--sec);background:none"></span>Your usual night here</span></div></button>';
+}
+
 /* ---------- views ---------- */
-var V = {view:'now', arg:null, layPick:{}, showNum:{}, chartView:'land', destEdit:false, flight:null, flash:''};
+var V = {view:'now', arg:null, layPick:{}, showNum:{}, chartView:'land', chartMetric:'alert', destEdit:false, flight:null, flash:''};
 
 function viewNow(){
   var Pl = P(), nw = now(), E = Pl.E, h = '';
@@ -443,6 +500,7 @@ function viewNow(){
          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:17px;font-weight:600">' + (target && b === target.b ? 'Until you land' : 'Next 36 hours') + '</span>' + I.chev + '</div>' +
          ribbon(Pl, a, b, tz, {endLabel:target && b === target.b ? 'Land' : '', out:Pl.layovers.some(function(x){ return x.out && x.out.ne > a && x.out.ns < b; })}) + '</button>';
   }
+  h += clockCard(Pl, nw);
   return h;
 }
 
@@ -531,6 +589,11 @@ function viewTrip(){
 }
 
 /* ---------- calculator ---------- */
+function hDelta(v, w){
+  if(v == null || w == null) return '';
+  var d = Math.round((v - w)*4)/4;
+  return '<span class="t3" style="margin-left:6px">' + (Math.abs(d) < 0.25 ? 'same as plan' : (d > 0 ? '+' : '−') + durTxt(Math.abs(d)*H) + ' vs plan') + '</span>';
+}
 function easeWord(e){ return e >= 0.85 ? 'Easy' : e >= 0.6 ? 'OK' : 'Hard'; }
 function viewCalc(){
   var Pl = P(), nw = now(), E = Pl.E, h = '<h1 style="margin:4px 4px 2px">Sleep calculator</h1>';
@@ -552,18 +615,28 @@ function viewCalc(){
   h += '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span></span><input class="pill" type="datetime-local" id="cBed" value="' + esc(c.bed) + '"></label>' +
        '<label class="row static"><span class="main"><span class="t1">Wake</span></span><input class="pill" type="datetime-local" id="cWake" value="' + esc(c.wake) + '"></label>' +
        '<div class="row static"><span class="main"><span class="t2">' + (b > a ? durTxt(b - a) + ' asleep' : 'Wake must be after bed') + '</span></span><div class="seg" role="group" aria-label="Nap or main sleep" style="width:170px"><button type="button" data-act="cKind" data-v="nap" aria-pressed="' + (c.kind === 'nap') + '">Nap</button><button type="button" data-act="cKind" data-v="main" aria-pressed="' + (c.kind === 'main') + '">Main sleep</button></div></div></div>';
-  h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cBest">Best wake-up for this bedtime</button></div>';
+  var goal = V.calcGoal || 'flight', busy = V.calcBusy;
+  function fb(mode, label){ return '<button class="row" type="button" data-act="cFind" data-v="' + mode + '" style="color:var(--tint);min-height:48px"' + (busy ? ' disabled' : '') + '><span class="main"><span class="t1">' + (busy === mode ? 'Working…' : label) + '</span></span>' + I.chev + '</button>'; }
+  h += '<h2 class="grp-h">Find the best</h2><div class="list">' +
+       '<div class="row static"><span class="main"><span class="t1">Aim for</span></span><div class="seg" role="group" aria-label="Aim for" style="width:210px"><button type="button" data-act="cGoal" data-v="flight" aria-pressed="' + (goal === 'flight') + '">The flight</button><button type="button" data-act="cGoal" data-v="body" aria-pressed="' + (goal === 'body') + '">Body clock</button></div></div>' +
+       fb('wake', 'Wake-up for this bedtime') + fb('bed', 'Bedtime for this wake-up') + fb('plan', 'Whole plan: sleep and naps') + '</div>';
+  h += '<p class="foot">' + (goal === 'body' ? 'Body clock: the most sleep in your body’s own night (its ' + esc(S.bed) + '–' + esc(S.wake) + '), as long as landing stays within 5 points of the best for the flight.' : 'The flight: the best alertness from the van to landing, counting how easily you would fall asleep.') + '</p>';
+  if(c.found) h += c.found.err ? '<p class="err">' + esc(c.found.err) + '</p>' : '<p class="msg" style="color:var(--label)"><b>' + esc(c.found.title) + '</b> ' + esc(c.found.note) + '</p>';
   if(!(b > a) || b - a > 16*H){ return h + '<p class="err">Pick a wake-up after bedtime, within 16 hours.</p>'; }
-  var r = BC.whatIf(S, nw, {a:a, b:b, kind:c.kind}), m = r.m, bs = r.base, ctx = r.ctx;
+  var r = BC.whatIf(S, nw, {a:a, b:b, kind:c.kind}, c.then || null), m = r.m, bs = r.base, ctx = r.ctx;
   function delta(v, w){ if(v == null || w == null) return ''; var d = Math.round(v) - Math.round(w); return '<span class="t3" style="margin-left:6px">' + (Math.abs(d) < 2 ? 'same as plan' : (d > 0 ? '+' : '−') + Math.abs(d) + ' vs plan') + '</span>'; }
   function res(label, sub, v, base){ return '<div class="row static"><span class="main"><span class="t1">' + esc(label) + '</span>' + (sub ? '<span class="t3">' + esc(sub) + '</span>' : '') + '</span><span style="display:flex;flex-direction:column;align-items:flex-end">' + wordHTML(v, true) + delta(v, base) + '</span></div>'; }
   h += '<h2 class="grp-h">What happens</h2><div class="list">';
   h += '<div class="row static"><span class="main"><span class="t1">Falling asleep</span><span class="t3">' + (a < nw ? 'At that time' : 'How sleepy you will be at bedtime') + '</span></span><span class="word">' + easeWord(m.ease) + '</span></div>';
   h += res('15 min after waking', 'Includes grogginess', m.wake15, null);
+  if(m.nextEase != null) h += '<div class="row static"><span class="main"><span class="t1">Falling asleep next time</span><span class="t3">' + (m.nextKind === 'nap' ? 'Nap' : 'Sleep') + ' ' + esc(whenTxt(c.tz, m.nextAt, b)) + '</span></span><span style="display:flex;flex-direction:column;align-items:flex-end"><span class="word">' + easeWord(m.nextEase) + '</span>' + (bs.nextEase != null && easeWord(bs.nextEase) !== easeWord(m.nextEase) ? '<span class="t3">' + easeWord(bs.nextEase) + ' in the plan</span>' : '') + '</span></div>';
   if(ctx.L && ctx.L.duty > b) h += res('At the van', BC.dow(ctx.L.ap.tz, ctx.L.duty) + ' ' + BC.hm(ctx.L.ap.tz, ctx.L.duty), m.van, bs.van);
   if(ctx.f){ h += res('Lowest on ' + ctx.f.f.code + ' → ' + ctx.f.t.code, null, m.fmin, bs.fmin); h += res('Landing at ' + ctx.f.t.code, BC.dow(ctx.f.t.tz, ctx.f.b) + ' ' + BC.hm(ctx.f.t.tz, ctx.f.b), m.land, bs.land); }
   h += '</div>';
-  if(r.rest){
+  h += '<div class="list" style="margin-top:10px"><div class="row static"><span class="main"><span class="t1">Sleep in your body’s night</span><span class="t3">Until landing, crew rest included</span></span><span style="display:flex;flex-direction:column;align-items:flex-end"><span class="word">' + durTxt(Math.round(m.night*4)/4*H) + '</span>' + hDelta(m.night, bs.night) + '</span></div></div>';
+  if(c.then){
+    h += '<p class="foot">Then: ' + (c.then.length ? esc(c.then.map(function(x){ return (x.kind === 'main' ? 'sleep ' : 'nap ') + whenTxt(c.tz, x.a, b) + '–' + BC.hm(c.tz, x.b); }).join(', ')) : 'nothing more before the van') + '. The results above include it.</p>';
+  } else if(r.rest){
     h += '<p class="foot">After this sleep the app would suggest: <b>' + esc(r.rest.name) + '</b>' + (r.rest.blocks.length ? ' (' + esc(r.rest.blocks.map(function(x){ return (x.kind === 'main' ? 'sleep ' : 'nap ') + BC.hm(ctx.L.ap.tz, x.a) + '–' + BC.hm(ctx.L.ap.tz, x.b); }).join(', ')) + ')' : '') + '. The results above include it.</p>';
   }
   if(r.wakeBy && b > r.wakeBy) h += '<p class="err">That wake-up is after you need to be up for the van (' + BC.hm(c.tz, r.wakeBy) + ').</p>';
@@ -655,17 +728,130 @@ function chartSVG(Pl, a, b, tz){
   if(nw >= a && nw <= b){ var pn = BC.ptAt(R, nw); s += '<line x1="' + X(nw) + '" x2="' + X(nw) + '" y1="0" y2="196" stroke="var(--tint)" stroke-width="2"/><circle cx="' + X(nw) + '" cy="' + Y(pn.A) + '" r="4.5" fill="var(--card)" stroke="var(--tint)" stroke-width="2.5"/>'; }
   return s + '</svg>';
 }
+function axisTicks(a, b, tz, W, X){
+  var s = '', span = b - a, stepH = span <= 60*H ? 6 : span <= 120*H ? 12 : 24, t0 = BC.localToMs(tz, BC.dateStr(tz, a) + 'T00:00');
+  for(var k=0;k<200;k++){
+    var tt = t0 + k*stepH*H; if(tt > b) break; if(tt < a + span*0.03 || tt > b - span*0.03) continue;
+    var mid = BC.hm(tz, tt) === '00:00';
+    s += '<line x1="' + X(tt) + '" x2="' + X(tt) + '" y1="' + (mid ? 0 : 180) + '" y2="196" stroke="' + (mid ? 'var(--ter)' : 'var(--sep)') + '"' + (mid ? ' stroke-opacity=".6"' : '') + '/>';
+    s += '<text x="' + X(tt) + '" y="218" font-size="12" text-anchor="middle" fill="' + (mid ? 'var(--label)' : 'var(--sec)') + '"' + (mid ? ' font-weight="600"' : '') + '>' + (mid ? BC.dow(tz, tt) : BC.hm(tz, tt)) + '</text>';
+  }
+  return s;
+}
+function lbl(x, y, txt, anchor){ return '<text x="' + x + '" y="' + y + '" font-size="11" fill="var(--sec)" font-weight="600" paint-order="stroke" stroke="var(--card)" stroke-width="3"' + (anchor ? ' text-anchor="' + anchor + '"' : '') + '>' + esc(txt) + '</text>'; }
+function frameBits(Pl, R, a, b, X, Hh, sleeps){
+  var s = '';
+  function runs(test){ var out = [], r = null; R.pts.forEach(function(p){ if(p.t < a || p.t > b) return; if(test(p) && r === null) r = p.t; if(!test(p) && r !== null){ out.push([r, p.t]); r = null; } }); if(r !== null) out.push([r, b]); return out; }
+  runs(function(p){ return p.ni; }).forEach(function(r){ s += '<rect x="' + X(r[0]) + '" y="0" width="' + (X(r[1]) - X(r[0])).toFixed(1) + '" height="' + Hh + '" fill="var(--nitebg)"/>'; });
+  if(sleeps) Pl.sleeps.forEach(function(sl){ if(sl.b > a && sl.a < b) s += '<rect x="' + X(Math.max(a, sl.a)) + '" y="0" width="' + (X(Math.min(b, sl.b)) - X(Math.max(a, sl.a))).toFixed(1) + '" height="' + Hh + '" fill="var(--sleepbg)"/>'; });
+  return s;
+}
+function barsBits(Pl, a, b, X){
+  var s = '';
+  Pl.flights.forEach(function(f){ if(f.b > a && f.a < b) s += '<rect x="' + X(Math.max(a, f.a)) + '" y="186" width="' + (X(Math.min(b, f.b)) - X(Math.max(a, f.a))).toFixed(1) + '" height="6" rx="3" fill="var(--flight)"/>'; });
+  Pl.layovers.forEach(function(L){ if(L.out && L.out.ne > a && L.out.ns < b) s += '<rect x="' + X(Math.max(a, L.out.ns)) + '" y="186" width="' + (X(Math.min(b, L.out.ne)) - X(Math.max(a, L.out.ns))).toFixed(1) + '" height="6" rx="3" fill="var(--out)"/>'; });
+  return s;
+}
+/* sleep pressure, and the line above which falling asleep comes easily (it moves with the body clock) */
+function gateOf(R, p){ return 0.85*R.Pref + 0.5*p.cb; }
+function pressSVG(Pl, a, b, tz){
+  var W = 358, Hh = 180, R = Pl.R, span = b - a;
+  function X(t){ return ((t - a)/span*W).toFixed(1); }
+  function Y(v){ return (Hh - 8 - v*(Hh - 16)).toFixed(1); }
+  var s = '<svg role="img" aria-label="Sleep pressure chart" viewBox="0 0 ' + W + ' 226" width="' + W + '" height="226">';
+  s += frameBits(Pl, R, a, b, X, Hh, true);
+  var pts = R.pts.filter(function(p){ return p.t >= a && p.t <= b; });
+  /* shade where sleep would come easily and you are awake */
+  var poly = [], open = false;
+  pts.forEach(function(p, i){
+    var g = gateOf(R, p), on = !p.sl && p.S > g;
+    if(on){ if(!open){ poly.push([]); open = true; } poly[poly.length-1].push(p); } else open = false;
+  });
+  poly.forEach(function(seg){
+    if(seg.length < 2) return;
+    var d = 'M' + seg.map(function(p){ return X(p.t) + ' ' + Y(p.S); }).join('L') + 'L' + seg.slice().reverse().map(function(p){ return X(p.t) + ' ' + Y(gateOf(R, p)); }).join('L') + 'Z';
+    s += '<path d="' + d + '" fill="var(--sleep)" opacity=".22"/>';
+  });
+  var dg = '', ds = '';
+  pts.forEach(function(p, i){ dg += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(Math.min(1, gateOf(R, p))); ds += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(p.S); });
+  s += '<path d="' + dg + '" fill="none" stroke="var(--sec)" stroke-width="1.5" stroke-dasharray="4 4"/>';
+  s += '<path d="' + ds + '" fill="none" stroke="var(--sleep)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>';
+  s += lbl(6, 14, 'High') + lbl(6, Hh - 4, 'Low');
+  s += barsBits(Pl, a, b, X) + axisTicks(a, b, tz, W, X);
+  var nw = now();
+  if(nw >= a && nw <= b){ var pn = BC.ptAt(R, nw); s += '<line x1="' + X(nw) + '" x2="' + X(nw) + '" y1="0" y2="196" stroke="var(--tint)" stroke-width="2"/><circle cx="' + X(nw) + '" cy="' + Y(pn.S) + '" r="4.5" fill="var(--card)" stroke="var(--tint)" stroke-width="2.5"/>'; }
+  return s + '</svg>';
+}
+function pressWord(v){ return v >= BC.PAR.warnS ? 'Very high' : v >= 0.55 ? 'High' : v >= 0.35 ? 'Building' : 'Low'; }
+/* body clock against the local clock, both as hours ahead of home */
+function clockSVG(Pl, C, a, b, tz){
+  var W = 358, Hh = 180, span = b - a, R = C.R, home = Pl.E.home;
+  function X(t){ return ((t - a)/span*W).toFixed(1); }
+  var pts = R.pts.filter(function(p){ return p.t >= a && p.t <= b; }).map(function(p){ var x = C.at(p.t); return {t:p.t, loc:x.off - x.homeOff, body:x.eff - x.homeOff}; });
+  var lo = 0, hi = 0;
+  pts.forEach(function(p){ lo = Math.min(lo, p.loc, p.body); hi = Math.max(hi, p.loc, p.body); });
+  if(hi - lo < 3){ var mid = (hi + lo)/2; lo = mid - 1.5; hi = mid + 1.5; }
+  lo -= 0.6; hi += 0.6;
+  function Y(v){ return (Hh - 10 - (v - lo)/(hi - lo)*(Hh - 20)).toFixed(1); }
+  var s = '<svg role="img" aria-label="Body clock chart" viewBox="0 0 ' + W + ' 226" width="' + W + '" height="226">';
+  s += frameBits(Pl, R, a, b, X, Hh, false);
+  /* a dotted line and label for each place's clock */
+  var seen = {}, places = [{code:home.code, tz:home.tz}];
+  Pl.flights.forEach(function(f){ places.push({code:f.t.code, tz:f.t.tz}); });
+  places.forEach(function(pl){
+    var v = BC.offH(pl.tz, a + span/2) - BC.offH(home.tz, a + span/2), k = v.toFixed(2);
+    if(seen[k]){ if(seen[k].indexOf(pl.code) < 0) seen[k].push(pl.code); return; }
+    seen[k] = [pl.code];
+  });
+  Object.keys(seen).forEach(function(k){ var y = Y(+k); s += '<line x1="0" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="var(--sep)" stroke-dasharray="3 4"/>' + lbl(W - 6, +y - 5, seen[k].join(' · '), 'end'); });
+  var dl = '', db = '', area = '';
+  pts.forEach(function(p, i){ dl += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(p.loc); db += (i ? 'L' : 'M') + X(p.t) + ' ' + Y(p.body); });
+  area = db + pts.slice().reverse().map(function(p){ return 'L' + X(p.t) + ' ' + Y(p.loc); }).join('') + 'Z';
+  s += '<path d="' + area + '" fill="var(--sleep)" opacity=".16"/>';
+  s += '<path d="' + dl + '" fill="none" stroke="var(--ter)" stroke-width="2" stroke-linejoin="round"/>';
+  s += '<path d="' + db + '" fill="none" stroke="var(--sleep)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>';
+  s += lbl(6, 14, 'Later (east)') + lbl(6, Hh - 2, 'Earlier (west)');
+  s += barsBits(Pl, a, b, X) + axisTicks(a, b, tz, W, X);
+  var nw = now();
+  if(nw >= a && nw <= b){ var xn = C.at(nw); s += '<line x1="' + X(nw) + '" x2="' + X(nw) + '" y1="0" y2="196" stroke="var(--tint)" stroke-width="2"/><circle cx="' + X(nw) + '" cy="' + Y(xn.eff - xn.homeOff) + '" r="4.5" fill="var(--card)" stroke="var(--tint)" stroke-width="2.5"/>'; }
+  return s + '</svg>';
+}
 function viewChart(){
-  var Pl = P(), nw = now(), E = Pl.E, h = navBar('now', 'Now');
-  h += '<h1 style="margin:0 4px 12px">Alertness</h1>';
+  var Pl = P(), nw = now(), E = Pl.E, h = navBar(V.from === 'trip' ? 'trip' : 'now', V.from === 'trip' ? 'Trip' : 'Now'), M = V.chartMetric || 'alert';
+  h += '<h1 style="margin:0 4px 10px">' + ({alert:'Alertness', press:'Sleep pressure', clock:'Body clock'})[M] + '</h1>';
   if(!Pl.flights.length) return h + '<p class="msg">Add a trip first.</p>';
+  h += '<div class="seg three" role="group" aria-label="What to show" style="margin-bottom:8px"><button type="button" data-act="cm" data-v="alert" aria-pressed="' + (M === 'alert') + '">Alertness</button><button type="button" data-act="cm" data-v="press" aria-pressed="' + (M === 'press') + '">Sleep pressure</button><button type="button" data-act="cm" data-v="clock" aria-pressed="' + (M === 'clock') + '">Body clock</button></div>';
   var target = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > nw; })[0];
-  var land = V.chartView === 'land' && target;
   var F = Pl.flights, a, b, tz;
+  if(M === 'clock'){
+    var C = BC.clock(S, nw), last = F[F.length-1];
+    a = F[0].a - 12*H; b = Math.min(C.R.t1, Math.max(last.b + 36*H, (C.adaptedBy || C.R.t1) + 12*H)); tz = E.home.tz;
+    h += '<figure class="chart">' + clockSVG(Pl, C, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span><span class="sw10" style="background:var(--sleep)"></span>Body clock</span><span><span class="sw10" style="background:var(--ter)"></span>Clock where you are</span><span><span class="sw10" style="background:var(--sleep);opacity:.25"></span>The gap</span><span style="margin-left:auto">Days on home time</span></div></figure>';
+    var rows = [], x = C.at(Math.max(nw, a));
+    if(nw >= a && nw <= b){ var Ln = E.locAt(nw); rows.push(['Now', 'Your body thinks it’s ' + hh(x.bodyH), gapPhrase(x.gap, Ln.fl ? 'local time' : (Ln.ap || E.home).city)]); }
+    F.forEach(function(f){ if(f.role !== 'operate' || f.b < nw) return; var xf = C.at(f.b); rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b), gapPhrase(xf.gap, f.t.city)]); });
+    if(C.back) rows.push(['Back in step with ' + E.home.city, 'Within 30 minutes of home time', C.adaptedBy ? (C.adaptedBy <= nw ? 'Done' : 'About ' + BC.dayShort(E.home.tz, C.adaptedBy)) : 'More than a week']);
+    h += '<div class="list" style="margin-top:14px">' + rows.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val" style="max-width:48%">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
+    h += '<p class="foot">The purple line is the time zone your body is living on; the grey line is the clock where you are. Daylight pulls the purple line across, in the model about an hour a day when the gap is big and slower as it closes. Being outside in local daylight speeds it up; the model counts daylight only, not meals, exercise or melatonin, and people vary a lot.</p>';
+    return h;
+  }
+  var land = V.chartView === 'land' && target;
   if(land){ a = Math.max(nw, E.t0); b = target.b; tz = E.locAt(a).tz; }
   else { a = F[0].a - 6*H; b = Math.min(Pl.R.t1, F[F.length-1].b + 18*H); tz = E.home.tz; }
   h += '<div class="seg" role="group" aria-label="Time span" style="margin-bottom:12px"><button type="button" data-act="cv" data-v="land" aria-pressed="' + !!land + '"' + (target ? '' : ' disabled') + '>Until you land</button><button type="button" data-act="cv" data-v="trip" aria-pressed="' + !land + '">Whole trip</button></div>';
-  h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Night out</span><span style="margin-left:auto">' + (land ? esc(E.locAt(a).fl ? 'Departure' : (E.locAt(a).ap || E.home).city) + ' time' : 'Days on home time') + '</span></div></figure>';
+  var clockName = land ? esc(E.locAt(a).fl ? 'Departure' : (E.locAt(a).ap || E.home).city) + ' time' : 'Days on home time';
+  if(M === 'press'){
+    h += '<figure class="chart">' + pressSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span><span class="sw10" style="background:var(--sleep)"></span>Sleep pressure</span><span><span class="sw10" style="border:1.5px dashed var(--sec);background:none"></span>Sleep comes easily above</span><span><span class="sw10" style="background:var(--sleep);opacity:.3"></span>Easy to fall asleep</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
+    var R = Pl.R, rows2 = [], from = Math.max(nw, a);
+    if(nw >= a && nw <= b){ var pn = BC.ptAt(R, nw); rows2.push(['Sleep pressure now', pn.sl ? 'Asleep, clearing' : 'Builds while you are awake', pressWord(pn.S)]); }
+    var win = null;
+    for(var i=0;i<R.pts.length;i++){ var p = R.pts[i]; if(p.t < from || p.t > b) continue; var on = !p.sl && p.S > gateOf(R, p); if(on && !win) win = {a:p.t}; if(win && !on){ win.b = p.t; break; } }
+    if(win){ var wtz = E.locAt(win.a).tz; rows2.push(['Next easy window to fall asleep', E.locAt(win.a).fl ? 'In flight, ' + E.locAt(win.a).flight.f.city + ' time' : (E.locAt(win.a).ap || E.home).city + ' time', whenTxt(wtz, win.a, nw) + (win.b ? '–' + whenTxt(wtz, win.b, win.a) : ' on')]); }
+    h += '<div class="list" style="margin-top:14px">' + rows2.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
+    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is where sleep comes easily; it drops in your body’s night and rises in its afternoon, which is why you can be exhausted and still not sleep at the wrong body time.</p>';
+    return h;
+  }
+  h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Night out</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
   var rows = [];
   Pl.layovers.forEach(function(L){
     if(!L.out || L.out.ne < a || L.out.ns > b) return;
@@ -955,6 +1141,7 @@ function go(path){
   if(view === 'calc'){ V.calc = null; V.calcArg = arg; }
   if(view === 'trip') V.scrollNow = true;
   if(view === 'rest' || view === 'lay' || view === 'chart') V.from = V.view;
+  if(view === 'chart' && arg) V.chartMetric = arg;
   V.view = view; V.arg = arg; V.flash = ''; V.confirmClear = false; V.destMsg = '';
   if(view === 'lay') V.layPick[arg] = null;
   try{ history.replaceState(null, '', '#' + path); }catch(e){}
@@ -998,6 +1185,7 @@ document.addEventListener('click', function(e){
     var cfgU = S.lay[id] || (S.lay[id] = {}); cfgU.choice = pick; if(pick !== 'custom') delete cfgU.custom; save(); go('trip'); return;
   }
   if(act === 'cv'){ V.chartView = b.dataset.v; render(); return; }
+  if(act === 'cm'){ V.chartMetric = b.dataset.v; try{ history.replaceState(null, '', '#chart/' + V.chartMetric); }catch(e2){} render(); return; }
   if(act === 'bedNow'){
     if(S.actual.some(function(x){ return x.b == null; })) return;
     var k = b.dataset.kind || (+BC.hm(placeTz(P(), now()), now()).slice(0,2) >= 18 || +BC.hm(placeTz(P(), now()), now()).slice(0,2) < 5 ? 'main' : 'nap');
@@ -1024,11 +1212,28 @@ document.addEventListener('click', function(e){
   if(act === 'menuBg' && e.target === b || act === 'menuBg2'){ $('#sheet').innerHTML = ''; return; }
   if(act === 'menuFlight'){ $('#sheet').innerHTML = ''; openFlight('new'); return; }
   if(act === 'menuSleep'){ $('#sheet').innerHTML = ''; openSleep(null); return; }
-  if(act === 'cKind'){ V.calc.kind = b.dataset.v; render(); return; }
-  if(act === 'cBest'){
-    var ca = BC.localToMs(V.calc.tz, V.calc.bed), bw = BC.bestWake(S, now(), ca, V.calc.kind);
-    if(bw) V.calc.wake = BC.msToLocal(V.calc.tz, bw);
-    render(); return;
+  if(act === 'cKind'){ V.calc.kind = b.dataset.v; V.calc.then = null; V.calc.found = null; render(); return; }
+  if(act === 'cGoal'){ V.calcGoal = b.dataset.v; V.calc.found = null; render(); return; }
+  if(act === 'cFind'){
+    if(V.calcBusy) return;
+    var mode = b.dataset.v, cc = V.calc, goalF = V.calcGoal || 'flight';
+    V.calcBusy = mode; render();
+    setTimeout(function(){
+      var nwF = now(), q = {mode:mode, goal:goalF, kind:cc.kind, a:BC.localToMs(cc.tz, cc.bed), b:BC.localToMs(cc.tz, cc.wake)}, res;
+      try{ res = BC.findBest(S, nwF, q); }catch(err){ res = {err:'Could not work that out: ' + err.message}; }
+      V.calcBusy = null;
+      if(res.err){ cc.found = {err:res.err}; render(); return; }
+      var ttz = cc.tz;
+      if(mode === 'plan'){ var Lx = BC.plan(S, nwF).layovers.filter(function(x){ return x.id === res.lay; })[0]; if(Lx) ttz = cc.tz = Lx.ap.tz; }
+      cc.bed = BC.msToLocal(ttz, res.a); cc.wake = BC.msToLocal(ttz, res.b); cc.kind = res.kind;
+      cc.then = mode === 'plan' ? res.then : null;
+      var aim = goalF === 'body' ? 'for your body clock' : 'for the flight';
+      cc.found = mode === 'wake' ? {title:'Best wake-up ' + aim + ': ' + BC.hm(ttz, res.b) + '.', note:'Tried ' + res.tried + ' wake-ups, ' + (res.kind === 'nap' ? 'from 30 minutes to 3½ hours' : 'from 5 to 10 hours') + ' of sleep, re-planning the rest of the layover for each.'}
+               : mode === 'bed' ? {title:'Best bedtime ' + aim + ': ' + BC.hm(ttz, res.a) + '.', note:'Tried ' + res.tried + ' bedtimes, ' + (res.kind === 'nap' ? 'from 30 minutes to 3½ hours' : 'from 5 to 10 hours') + ' before your wake-up, re-planning the rest of the layover for each.'}
+               : {title:(goalF === 'body' ? 'Body-clock plan' : 'Best plan for the flight: ' + res.name) + '.', note:'The planner compared nap now, nap later, both and none, with the main sleep earlier or later.'};
+      render();
+    }, 30);
+    return;
   }
   if(act === 'cUse' || act === 'cLog'){
     var c2 = V.calc, a2 = BC.localToMs(c2.tz, c2.bed), b2 = BC.localToMs(c2.tz, c2.wake);
@@ -1041,7 +1246,8 @@ document.addEventListener('click', function(e){
     var r2 = BC.whatIf(S, now(), {a:a2, b:b2, kind:c2.kind}), Lc = r2.ctx.L;
     if(!Lc) return;
     var cfg2 = S.lay[Lc.id] || (S.lay[Lc.id] = {});
-    cfg2.custom = [{a:a2, b:b2, kind:c2.kind}].concat(r2.rest ? r2.rest.blocks.map(function(x){ return {a:x.a, b:x.b, kind:x.kind}; }) : []);
+    var follow = c2.then || (r2.rest ? r2.rest.blocks : []);
+    cfg2.custom = [{a:a2, b:b2, kind:c2.kind}].concat(follow.map(function(x){ return {a:x.a, b:x.b, kind:x.kind}; }));
     cfg2.choice = 'custom'; save(); go('now'); return;
   }
   if(act === 'editSleep'){ openSleep(id); return; }
@@ -1096,6 +1302,7 @@ function autoArr(){
 document.addEventListener('change', function(e){
   var t = e.target, id = t.id;
   if(V.calc && (id === 'cBed' || id === 'cWake')){
+    V.calc.then = null; V.calc.found = null;
     if(t.value){
       if(id === 'cBed'){ var oldA = BC.localToMs(V.calc.tz, V.calc.bed), oldB = BC.localToMs(V.calc.tz, V.calc.wake), na = BC.localToMs(V.calc.tz, t.value); V.calc.bed = t.value; if(!isNaN(oldA) && !isNaN(oldB) && !isNaN(na)) V.calc.wake = BC.msToLocal(V.calc.tz, na + (oldB - oldA)); }
       else V.calc.wake = t.value;
