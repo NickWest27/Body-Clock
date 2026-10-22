@@ -21,6 +21,12 @@ The Now screen has a caffeine card: the last time for caffeine before your next 
 
 The layover screen shows the last-drink time (12 hours before the van by default; set your company rule in Settings, the FAA minimum is 8 hours). Alcohol is not modelled.
 
+## Crew meetup and van pickup
+
+On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. A flight can carry its own van pickup time; otherwise the van is the usual time before departure from Settings.
+
+When you log a sleep or caffeine you can type the time on the local clock, your Watch (departure time) or UTC.
+
 ## The model
 
 The two-process model of sleep (Borbély, Daan and Beersma): sleep pressure rises while you are awake and clears while you sleep, and a body-clock rhythm shifts slowly with daylight where you are. Sleep inertia after waking is included. Alertness is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25. The numbers are for comparing plans, not a fitness-for-duty measure.

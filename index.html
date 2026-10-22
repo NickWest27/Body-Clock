@@ -196,7 +196,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 26';
+var BUILD = '22 Oct 2026 · build 27';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -333,7 +333,7 @@ function ribbon(Pl, a, b, tz, opts){
   h += '</div>';
   h += '<div class="legend"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span>' +
        '<span><span class="sw10" style="background:var(--sleep)"></span>Sleep</span><span><span class="sw10" style="background:var(--nite)"></span>Night</span>' +
-       (opts.out ? '<span><span class="sw10" style="background:var(--out)"></span>Night out</span>' : '') + '</div>';
+       (opts.out ? '<span><span class="sw10" style="background:var(--out)"></span>Crew meetup</span>' : '') + '</div>';
   return h;
 }
 
@@ -347,7 +347,7 @@ function events(Pl, from, max){
   });
   Pl.layovers.forEach(function(L){
     if(!L.out || L.out.ns < from) return;
-    ev.push({t:L.out.ns, tz:L.ap.tz, title:'Crew night out', sub:'Back by ' + BC.hm(L.ap.tz, L.out.ne) + ' · last drink by ' + BC.dow(L.ap.tz, L.out.lastDrink) + ' ' + BC.hm(L.ap.tz, L.out.lastDrink), color:'var(--out)', go:'lay/' + L.id});
+    ev.push({t:L.out.ns, tz:L.ap.tz, title:'Crew meetup', sub:'Until ' + BC.hm(L.ap.tz, L.out.ne) + ' · last drink by ' + BC.dow(L.ap.tz, L.out.lastDrink) + ' ' + BC.hm(L.ap.tz, L.out.lastDrink), color:'var(--out)', go:'lay/' + L.id});
   });
   Pl.flights.forEach(function(f){
     var L = Pl.layovers.filter(function(x){ return x.outF.id === f.id; })[0];
@@ -383,10 +383,10 @@ function whyFor(Pl, s){
   if(!L) return '';
   var opt = L.picked, isArr = s.kind === 'nap' && s.a <= L.ws + 1000, isLate = s.kind === 'nap' && !isArr;
   if(isArr && opt === 'both') return 'Short on purpose: enough for ' + (L.out ? 'tonight' : 'the evening') + ', and you will still be sleepy enough to nap again before the van.';
-  if(isArr) return 'A proper nap now keeps you going ' + (L.out ? 'through the night out.' : 'until bedtime.');
+  if(isArr) return 'A proper nap now keeps you going ' + (L.out ? 'through the crew meetup.' : 'until bedtime.');
   if(isLate) return 'Last sleep before the van. Lie down even if sleep is slow to come.';
   if(s.mid) return 'Your usual night here, on the clock your layover balance setting picks.';
-  if(s.kind === 'main' && L.out) return 'Straight to bed after the night out.';
+  if(s.kind === 'main' && L.out && s.a - L.out.ne < 2*H && s.a >= L.out.ne) return 'Straight to bed after the crew meetup.';
   return 'Your main sleep for this layover.';
 }
 
@@ -513,6 +513,39 @@ function clockCard(Pl, nw){
     line(pl.name, BC.hm(pl.tz, nw)) + line('Body', hh(x.bodyH)) + (atHome ? '' : line(shortCity(home), BC.hm(home.tz, nw))) + foot + '</div>' + I.chev + '</div></button>';
 }
 
+/* ---------- which clock a time is typed in: local where you were, your Watch (departure time), or UTC ---------- */
+function zoneTz(Pl, zone, ms){
+  if(zone === 'utc') return 'UTC';
+  var q = Pl.E.locAt(ms);
+  if(zone === 'watch'){
+    if(q.fl) return q.flight.f.tz;
+    var last = Pl.flights.filter(function(f){ return f.a <= ms; }).pop();
+    return last ? last.f.tz : Pl.E.home.tz;
+  }
+  return q.fl ? q.flight.f.tz : q.tz;
+}
+function zoneLabel(Pl, zone, ms){
+  var tz = zoneTz(Pl, zone, ms), city = '';
+  if(zone === 'utc') return 'UTC (Zulu)';
+  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  return (zone === 'watch' ? 'Watch: ' : '') + (city || tz) + ' time';
+}
+function zoneSeg(act, zone){
+  return '<div class="seg three" role="group" aria-label="Clock the time is in" style="margin:10px 0 0">' + [['local', 'Local'], ['watch', 'Watch'], ['utc', 'UTC']].map(function(z){ return '<button type="button" data-act="' + act + '" data-v="' + z[0] + '" aria-pressed="' + (zone === z[0]) + '">' + z[1] + '</button>'; }).join('') + '</div>';
+}
+
+/* ---------- crew meetup ---------- */
+function addMeet(id){
+  var Pl = P(), L = layById(Pl, id); if(!L) return;
+  var tz = L.ap.tz, d = BC.dateStr(tz, L.arr), a = BC.localToMs(tz, d + 'T19:00');
+  if(a < L.ws) a = BC.localToMs(tz, BC.addDays(d, 1) + 'T19:00');
+  if(a + 3*H > L.we) a = Math.max(L.ws, L.we - 6*H);
+  var cfg = S.lay[id] || (S.lay[id] = {}); cfg.meet = {a:a, b:a + 3*H}; delete cfg.choice; delete cfg.custom;
+  save(); go('lay/' + id);
+}
+/* the layover you are on, or the next one */
+function layNowOrNext(Pl, nw){ return Pl.layovers.filter(function(x){ return nw < x.we; })[0] || null; }
+
 /* ---------- caffeine ---------- */
 var CAF_SIZES = [[50, 'Tea or cola', '≈ 50 mg'], [100, 'Coffee', '≈ 100 mg'], [200, 'Large or strong', '≈ 200 mg']];
 function cafName(mg){ var z = CAF_SIZES.filter(function(x){ return x[0] === +mg; })[0]; return z ? z[1] : mg + ' mg caffeine'; }
@@ -541,7 +574,7 @@ function cafCard(Pl, nw){
 }
 function openCaf(id){
   var Pl = P(), nw = now(), x = id ? S.caf.log.filter(function(c){ return String(c.id) === String(id); })[0] : null, t = x ? x.t : nw, tz = tzNow(Pl, Math.min(Math.max(t, Pl.E.t0), Pl.E.t1));
-  V.caf = {id:x ? x.id : null, tz:tz, t:BC.msToLocal(tz, t), mg:x ? x.mg : 100}; V.confirmDel = false; renderCaf();
+  V.caf = {id:x ? x.id : null, zone:'local', tz:tz, t:BC.msToLocal(tz, t), mg:x ? x.mg : 100}; V.confirmDel = false; renderCaf();
 }
 function renderCaf(){
   var box = $('#sheet');
@@ -551,8 +584,9 @@ function renderCaf(){
   var h = '<div class="sheet" data-act="cafBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log caffeine"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="cafCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (c.id ? 'Edit caffeine' : 'Log caffeine') + '</div><button class="navbtn r" type="button" data-act="cafSave">Save</button></div>' +
       '<div class="list">' + CAF_SIZES.map(function(z){ return '<button class="row" type="button" data-act="cafMg" data-v="' + z[0] + '"><span class="main"><span class="t1">' + z[1] + '</span><span class="t3">' + z[2] + '</span></span>' + (+c.mg === z[0] ? '<span style="color:var(--tint);font-weight:700">✓</span>' : '') + '</button>'; }).join('') + '</div>' +
-      '<div class="list" style="margin-top:10px"><label class="row static"><span class="main"><span class="t1">When</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
-      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. A strong espresso or a large brewed coffee counts as large.</p>';
+      zoneSeg('cafZone', c.zone || 'local') +
+      '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span><span class="t3">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
+      '<p class="foot">Type the time on whichever clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
   if(c.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cafDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete') + '</button></div>';
   box.innerHTML = h + '</div></div>';
 }
@@ -707,7 +741,7 @@ function tlRow(Pl, it, nw){
   }
   if(it.kind === 'caf') return row('data-act="cafEdit" data-id="' + it.c.id + '"', 'var(--coffee)', I.cup.replace('stroke="currentColor"', 'stroke="#fff"'), esc(cafName(it.c.mg)), 'Logged · ' + it.c.mg + ' mg', '<span class="tag">Edit</span>');
   if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
-    'Crew night out until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
+    'Crew meetup until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
   var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
   return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span></span><span class="tag" style="color:var(--tint)">Plans</span>' + I.chev + '</button>';
 }
@@ -818,7 +852,7 @@ function calcItems(c, cr, nw){
   P2.layovers.forEach(function(L){
     if(L.out && L.out.ne > nw && L.out.ns < endT){
       var mn = 101; R2.pts.forEach(function(p){ if(p.t >= L.out.ns && p.t <= L.out.ne && !p.sl && p.A < mn) mn = p.A; });
-      out.push({t:L.out.ns, ico:'glass', t1:'Night out ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), t3:'Lowest during it', rt:mn < 101 ? wordHTML(mn, true) : ''});
+      out.push({t:L.out.ns, ico:'glass', t1:'Crew meetup ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), t3:'Lowest during it', rt:mn < 101 ? wordHTML(mn, true) : ''});
     }
   });
   if(S.caf.on !== false){
@@ -902,7 +936,7 @@ function viewCalc(){
 
 function noteFor(L, o){
   var m = o.m, parts = [];
-  if(m.awakeAtBed != null && m.awakeAtBed >= 18) parts.push(Math.round(m.awakeAtBed) + ' hours awake by bedtime' + (L.out ? ', and drinks on top of that hit harder.' : '.'));
+  if(m.awakeAtBed != null && m.awakeAtBed >= 18) parts.push(Math.round(m.awakeAtBed) + ' hours awake by bedtime' + '.');
   var lateNap = o.blocks.filter(function(b){ return b.kind === 'nap' && b.a > L.ws + 1000; })[0];
   if(lateNap){ var e = m.ease[o.blocks.indexOf(lateNap)]; if(e < 0.6) parts.push('You may not be sleepy enough for the nap before the van. Lie down anyway: resting still helps a little.'); else if(o.blocks.some(function(b){ return b.kind === 'main'; })) parts.push('Waking at this time keeps you sleepy enough for the afternoon nap.'); }
   var main = o.blocks.filter(function(b){ return b.kind === 'main'; })[0];
@@ -915,7 +949,13 @@ function viewLay(id){
   if(!L){ return h + '<p class="msg">This layover has changed. Go back to the trip.</p>'; }
   var tz = L.ap.tz, sel = V.layPick[id] || L.picked;
   h += '<header style="padding:0 4px 6px"><h1>' + esc(L.ap.city) + '</h1><div class="sub">Land ' + BC.dow(tz, L.arr) + ' ' + BC.hm(tz, L.arr) + ' · Van ' + BC.dow(tz, L.duty) + ' ' + BC.hm(tz, L.duty) + ' · ' + Math.round((L.duty - L.arr)/H) + ' h</div></header>';
-  h += '<div class="stack" style="gap:10px"><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before the van; change it in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
+  h += '<div class="stack" style="gap:10px"><div class="list">';
+  if(L.out){
+    h += '<div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew meetup</span><span class="t3">You’ll be up and out; the plan sleeps around it</span></span><button class="navbtn" type="button" data-act="meetRm" data-id="' + esc(id) + '" style="color:var(--danger)">Remove</button></div>' +
+         '<label class="row static"><span class="main"><span class="t1">Starts</span></span><input class="pill" type="datetime-local" id="meetA" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ns) + '"></label>' +
+         '<label class="row static"><span class="main"><span class="t1">Ends</span><span class="t3">Change it if it ran late</span></span><input class="pill" type="datetime-local" id="meetB" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ne) + '"></label>';
+  } else h += '<button class="row" type="button" data-act="meetAdd" data-id="' + esc(id) + '" style="color:var(--tint)">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Add a crew meetup</button>';
+  h += '</div><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before the van; change it in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
   var hist = L.fixed.map(function(x){ return {t:x.a, txt:(x.kind === 'main' ? 'Slept ' : 'Napped ') + BC.dow(tz, x.a) + ' ' + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b), act:'editSleep', id:x.id}; })
     .concat(L.skips.map(function(x, i){ return {t:x.a, txt:'Skipped the ' + (x.kind === 'main' ? 'sleep' : 'nap') + ' at ' + BC.hm(tz, x.a), act:'unskip', id:String(x.a)}; }));
   if(L.open) hist.push({t:L.open.a, txt:'In bed since ' + BC.dow(tz, L.open.a) + ' ' + BC.hm(tz, L.open.a), act:'editSleep', id:L.open.id});
@@ -933,7 +973,7 @@ function viewLay(id){
          '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : '') + '</span>' +
          '<span style="font-size:15px;line-height:20px;color:var(--sec);font-variant-numeric:tabular-nums">' + esc(o.blocks.length ? o.blocks.map(function(b){ return b.open ? 'Wake ' + (sameDay(tz, b.b, L.arr) ? '' : BC.dow(tz, b.b) + ' ') + BC.hm(tz, b.b) : (b.kind === 'main' ? 'Sleep ' : 'Nap ') + (sameDay(tz, b.a, L.arr) ? '' : BC.dow(tz, b.a) + ' ') + BC.hm(tz, b.a) + '–' + BC.hm(tz, b.b); }).join(' · ') : 'Stay up until the van') + '</span>' +
          '<span class="two" style="gap:14px">' +
-         (m.outMin != null && L.out && L.out.ne > now() ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Night out</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
+         (m.outMin != null && L.out && L.out.ne > now() ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Crew meetup</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
                            : '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Lowest in flight</span><b>' + BC.word(m.fmin) + ' · ' + Math.round(m.fmin) + '</b></span><span class="meter"><i style="left:' + pos(m.fmin) + '"></i></span></span>') +
          '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Landing</span><b>' + BC.word(m.land) + ' · ' + Math.round(m.land) + '</b></span><span class="meter"><i style="left:' + pos(m.land) + '"></i></span></span></span>' +
          '<span style="font-size:13px;line-height:18px;color:var(--sec)">' + esc(noteFor(L, o)) + '</span></button>';
@@ -1092,12 +1132,12 @@ function viewChart(){
     h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is the sleep threshold: above it you can fall asleep. It is set by your body clock, low in your body’s night and high in its late afternoon, which is why you can be exhausted and still not sleep at the wrong body time. Red is when sleep pressure is above it, green when it is below.</p>';
     return h;
   }
-  h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Night out</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
+  h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Crew meetup</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
   var rows = [];
   Pl.layovers.forEach(function(L){
     if(!L.out || L.out.ne < a || L.out.ns > b) return;
     var o = L.options.filter(function(x){ return x.id === L.picked; })[0];
-    if(o && o.m.outMin != null) rows.push(['Night out', BC.dow(L.ap.tz, L.out.ns) + ' ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), o.m.outMin]);
+    if(o && o.m.outMin != null) rows.push(['Crew meetup', BC.dow(L.ap.tz, L.out.ns) + ' ' + BC.hm(L.ap.tz, L.out.ns) + '–' + BC.hm(L.ap.tz, L.out.ne), o.m.outMin]);
   });
   F.forEach(function(f){
     if(f.role !== 'operate' || f.b < a || f.a > b) return;
@@ -1223,7 +1263,8 @@ function renderSheet(){
   h += '<div class="chips" role="group" aria-label="Your destinations">' + chips.map(function(c){ return '<button type="button" data-act="toChip" data-code="' + c + '" aria-pressed="' + (c === fl.to) + '">' + c + '</button>'; }).join('') + '</div>';
   h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(d.f.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
        '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(d.t.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
-       '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div></div>' +
+       '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div>' +
+       '<label class="row static"><span class="main"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(d.f.city) + ' time' : '') : 'Optional · otherwise ' + hrsTxt(+S.van) + ' before') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
        '<p class="foot">Times are local at each airport, as on your schedule.</p>';
   h += '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:6px"><div style="margin-bottom:10px">Your role</div><div class="seg" role="group" aria-label="Your role"><button type="button" data-act="role" data-v="operate" aria-pressed="' + (role === 'operate') + '">Operate</button><button type="button" data-act="role" data-v="commute" aria-pressed="' + (role === 'commute') + '">Commute</button></div></div>';
   if(role === 'operate'){
@@ -1242,7 +1283,9 @@ function saveFlight(){
   if(isNaN(d.a) || isNaN(d.b)){ V.flightErr = 'Enter both the departure and arrival times.'; renderSheet(); return; }
   if(!(d.b > d.a)){ V.flightErr = 'Arrival must be after departure. Check the dates, remembering each time is local.'; renderSheet(); return; }
   if(d.b - d.a > 22*H){ V.flightErr = 'That is over 22 hours. Check the arrival date.'; renderSheet(); return; }
+  if(fl.van){ var vm = BC.localToMs(d.f.tz, fl.van); if(isNaN(vm) || !(vm < d.a) || d.a - vm > 8*H){ V.flightErr = 'The van pickup should be before departure, within 8 hours.'; renderSheet(); return; } }
   var rec = {id:fl.id || nextId(), from:d.f.code, to:d.t.code, dep:fl.dep, arr:fl.arr, role:fl.role || null, rest:+fl.rest || 0};
+  if(fl.van) rec.van = fl.van;
   if(fl.restUTC) rec.restUTC = fl.restUTC;
   var i = S.flights.findIndex(function(x){ return x.id === rec.id; });
   if(i >= 0) S.flights[i] = rec; else S.flights.push(rec);
@@ -1255,7 +1298,7 @@ function openSleep(id, preset){
   var x = id ? S.actual.filter(function(a){ return String(a.id) === String(id); })[0] : null;
   var a = x ? x.a : preset ? preset.a : nw - 8*H, b = x ? (x.b == null ? null : x.b) : preset ? preset.b : nw;
   var Lb = Pl.E.locAt(a); if(!Lb.fl && Lb.tz) tz = Lb.tz;
-  V.sleep = {id:x ? x.id : null, tz:tz, bed:BC.msToLocal(tz, a), wake:b == null ? '' : BC.msToLocal(tz, b), kind:x ? x.kind : preset ? (preset.kind === 'nap' ? 'nap' : 'main') : '', open:x && x.b == null, preset:preset || null};
+  V.sleep = {id:x ? x.id : null, zone:'local', tz:tz, bed:BC.msToLocal(tz, a), wake:b == null ? '' : BC.msToLocal(tz, b), kind:x ? x.kind : preset ? (preset.kind === 'nap' ? 'nap' : 'main') : '', open:x && x.b == null, preset:preset || null};
   V.sleepErr = ''; renderSleep();
 }
 function renderSleep(){
@@ -1267,7 +1310,7 @@ function renderSleep(){
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="sleepCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (sl.id ? 'Edit sleep' : 'Log a sleep') + '</div><button class="navbtn r" type="button" data-act="sleepSave">Save</button></div>' +
       '<div class="list"><label class="row static"><span class="main"><span class="t1">Fell asleep</span></span><input class="pill" type="datetime-local" id="slBed" value="' + esc(sl.bed) + '"></label>' +
       '<label class="row static"><span class="main"><span class="t1">Woke up</span><span class="t3">' + (sl.open ? 'Leave empty if still asleep' : '') + '</span></span><input class="pill" type="datetime-local" id="slWake" value="' + esc(sl.wake) + '"></label></div>' +
-      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. Rough times are fine.</p>' +
+      '<p class="foot">' + esc(zoneLabel(P(), sl.zone || 'local', BC.localToMs(sl.tz, sl.bed))) + '. Rough times are fine.</p>' + zoneSeg('slZone', sl.zone || 'local') +
       '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:8px"><div style="margin-bottom:10px">It was</div><div class="seg" role="group" aria-label="Kind of sleep"><button type="button" data-act="slKind" data-v="nap" aria-pressed="' + (sl.kind === 'nap') + '">A nap</button><button type="button" data-act="slKind" data-v="main" aria-pressed="' + (sl.kind === 'main') + '">My main sleep</button></div></div>' +
       '<p class="foot">The app keeps what you log as fact and re-plans everything after it.</p>';
   if(V.sleepErr) h += '<p class="err">' + esc(V.sleepErr) + '</p>';
@@ -1411,7 +1454,10 @@ document.addEventListener('click', function(e){
   var b = e.target.closest('[data-act]'); if(!b) return;
   var act = b.dataset.act, id = b.dataset.id;
   if(act === 'num'){ e.stopPropagation(); var sp = b.querySelector('span:last-child'); if(sp) sp.textContent = /·/.test(sp.textContent) ? sp.textContent.split(' · ')[0] : sp.textContent + ' · ' + b.dataset.num; return; }
+  if(act === 'vanClear'){ delete V.flight.van; renderSheet(); return; }
   if(act === 'pick'){ V.layPick[id] = b.dataset.opt; render(); return; }
+  if(act === 'meetAdd'){ addMeet(id); return; }
+  if(act === 'meetRm'){ var cm = S.lay[id]; if(cm){ delete cm.meet; delete cm.choice; } save(); render(); return; }
   if(act === 'use'){
     var Pl2 = P(), L2 = layById(Pl2, id), pick = V.layPick[id] || L2.picked;
     var cfgU = S.lay[id] || (S.lay[id] = {}); cfgU.choice = pick; if(pick !== 'custom') delete cfgU.custom; save(); go('trip'); return;
@@ -1438,13 +1484,14 @@ document.addEventListener('click', function(e){
   if(act === 'logSleep'){ openSleep(null); return; }
   if(act === 'addMenu'){
     $('#sheet').innerHTML = '<div class="sheet" data-act="menuBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Add"><div class="grab"><span></span></div><div class="stack" style="gap:10px;margin-top:14px">' +
-      '<button class="btn" type="button" data-act="menuFlight">Add a flight</button><button class="btn sec" type="button" data-act="menuSleep">Log a sleep you took</button><button class="btn sec" type="button" data-act="menuCaf">Log caffeine</button><button class="btn sec" type="button" data-act="menuBg2">Cancel</button></div></div></div>';
+      '<button class="btn" type="button" data-act="menuFlight">Add a flight</button><button class="btn sec" type="button" data-act="menuSleep">Log a sleep you took</button><button class="btn sec" type="button" data-act="menuCaf">Log caffeine</button><button class="btn sec" type="button" data-act="menuMeet">Add a crew meetup</button><button class="btn sec" type="button" data-act="menuBg2">Cancel</button></div></div></div>';
     return;
   }
   if(act === 'menuBg' && e.target === b || act === 'menuBg2'){ $('#sheet').innerHTML = ''; return; }
   if(act === 'menuFlight'){ $('#sheet').innerHTML = ''; openFlight('new'); return; }
   if(act === 'menuSleep'){ $('#sheet').innerHTML = ''; openSleep(null); return; }
   if(act === 'menuCaf'){ $('#sheet').innerHTML = ''; openCaf(null); return; }
+  if(act === 'menuMeet'){ $('#sheet').innerHTML = ''; var Lq = layNowOrNext(P(), now()); if(Lq){ if(Lq.out) go('lay/' + Lq.id); else addMeet(Lq.id); } else { V.flash = 'Add a layover first: a crew meetup belongs to a layover.'; render(); } return; }
   if(act === 'cScope'){ V.calc.scope = b.dataset.v; render(); return; }
   if(act === 'cGoal'){ V.calcGoal = b.dataset.v; render(); return; }
   if(act === 'cAuto'){ var fk = b.dataset.v === 'cBed' ? 'bedAuto' : 'wakeAuto'; V.calc[fk] = !V.calc[fk]; render(); return; }
@@ -1472,12 +1519,19 @@ document.addEventListener('click', function(e){
   if(act === 'cafCancel'){ V.caf = null; renderCaf(); return; }
   if(act === 'cafSave'){ saveCaf(); return; }
   if(act === 'cafMg'){ V.caf.mg = +b.dataset.v; renderCaf(); return; }
+  if(act === 'cafZone'){ var c3 = V.caf, ms3 = BC.localToMs(c3.tz, c3.t); c3.zone = b.dataset.v; c3.tz = zoneTz(P(), c3.zone, ms3); c3.t = BC.msToLocal(c3.tz, ms3); renderCaf(); return; }
   if(act === 'cafDel'){ if(!V.confirmDel){ V.confirmDel = true; renderCaf(); return; } S.caf.log = S.caf.log.filter(function(x){ return x.id !== V.caf.id; }); save(); V.caf = null; V.confirmDel = false; renderCaf(); render(); return; }
   if(act === 'unskip'){ S.skips = S.skips.filter(function(x){ return String(x.a) !== String(id); }); save(); render(); return; }
   if(act === 'sleepBg' && e.target === b){ V.sleep = null; renderSleep(); return; }
   if(act === 'sleepCancel'){ V.sleep = null; V.confirmDel = false; renderSleep(); return; }
   if(act === 'sleepSave'){ saveSleep(); return; }
   if(act === 'slKind'){ V.sleep.kind = b.dataset.v; renderSleep(); return; }
+  if(act === 'slZone'){
+    var sv = V.sleep, a4 = BC.localToMs(sv.tz, sv.bed), b4 = sv.wake ? BC.localToMs(sv.tz, sv.wake) : NaN;
+    sv.zone = b.dataset.v; sv.tz = zoneTz(P(), sv.zone, isNaN(a4) ? now() : a4);
+    if(!isNaN(a4)) sv.bed = BC.msToLocal(sv.tz, a4); if(!isNaN(b4)) sv.wake = BC.msToLocal(sv.tz, b4);
+    renderSleep(); return;
+  }
   if(act === 'sleepDel'){
     if(!V.confirmDel){ V.confirmDel = true; renderSleep(); return; }
     S.actual = S.actual.filter(function(x){ return x.id !== V.sleep.id; }); save(); V.sleep = null; V.confirmDel = false; renderSleep(); render(); return;
@@ -1532,7 +1586,13 @@ document.addEventListener('change', function(e){
   }
   if(V.calc && id === 'cFlight'){ V.calc.fid = t.value; render(); return; }
   if(V.caf && id === 'cafT'){ V.caf.t = t.value; return; }
+  if(id === 'meetA' || id === 'meetB'){
+    var Lm = layById(P(), t.dataset.id), cm2 = (S.lay[t.dataset.id] || {}).meet;
+    if(Lm && cm2 && t.value){ var v2 = BC.localToMs(Lm.ap.tz, t.value); if(id === 'meetA'){ var dur = cm2.b - cm2.a; cm2.a = v2; cm2.b = v2 + dur; } else cm2.b = v2; if(cm2.b <= cm2.a) cm2.b = cm2.a + H; delete S.lay[t.dataset.id].choice; save(); }
+    render(); return;
+  }
   if(V.sleep && (id === 'slBed' || id === 'slWake')){ V.sleep[id === 'slBed' ? 'bed' : 'wake'] = t.value; return; }
+  if(V.flight && id === 'fVan'){ V.flight.van = t.value || ''; if(!V.flight.van) delete V.flight.van; renderSheet(); return; }
   if(V.flight && (id === 'fDep' || id === 'fArr')){ V.flight[id === 'fDep' ? 'dep' : 'arr'] = t.value; if(id === 'fDep') autoArr(); renderSheet(); return; }
   var map = {sHome:'home', sBed:'bed', sWake:'wake', sBal:'balance'};
   if(map[id]){ if(t.value) S[map[id]] = t.value; save(); render(); return; }
