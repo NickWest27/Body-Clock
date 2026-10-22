@@ -39,6 +39,10 @@ Each layover plan is scored on alertness from wake-up to landing, the last 90 mi
 - **Body clock**: the most sleep in your body's own night (your usual bedtime to wake-up on your body's clock, an "anchor sleep"), as long as landing and the lowest point in flight stay within 5 points of the best for the flight.
 - **Whole plan**: the layover planner's own comparison of nap now, nap later, both and none, with the main sleep earlier or later; every other night of a long layover is your usual night on the clock the balance setting picks.
 
+## Auto plans, your times and change notices
+
+Planned sleeps on Trip are labelled Auto (the app's plan, which moves whenever anything it depends on changes), Auto · option you picked (you chose nap now or later on the layover; the times still follow changes) or Your times (you set them with Change sleep; they stay put). Logged sleeps are facts. Every change re-plans at once, and a Plan updated card on Now and Trip says what moved: alertness at landing or the low point, the planned sleep times, and, when you are on your own times or a picked option, a better plan from the app with one tap to use it. If your times no longer fit (a flight or van moved), the app's plan comes back and the card says so.
+
 ## Data
 
 Everything stays on the device. Back up trip saves a file you can keep or AirDrop to another device; Restore from file loads it. Import trip from the classic app reads the trip saved by the old app on the same device (flights whose labels name two known airport codes, like DFWGRU).

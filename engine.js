@@ -608,7 +608,16 @@ function plan(S, now, opt){
     var want = L.choice || (L.custom ? 'custom' : null);
     var pick = L.options.filter(function(o){ return o.id === want; })[0] || L.options.filter(function(o){ return o.id === P.suggested; })[0];
     L.picked = pick ? pick.id : null;
-    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, alc:x.alc, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
+    /* where the plan comes from: the app (auto), an option you picked (its times still follow changes), or times you set */
+    L.src = L.picked === 'custom' ? 'yours' : (L.choice && L.picked === L.choice ? 'pick' : 'auto');
+    /* times you set that no longer fit the layover (a flight or van moved) */
+    L.customBroken = !!(L.custom && L.custom.some(function(x){ return !(x.b > x.a) || x.a < L.arr - H || x.b > L.we + MIN; }));
+    /* is the app's own suggestion clearly better than what you chose? */
+    var sugO = L.options.filter(function(o){ return o.id === P.suggested; })[0];
+    L.better = null;
+    if(pick && sugO && pick.id !== sugO.id && sugO.m.net - pick.m.net >= 2 && (sugO.m.land - pick.m.land >= 2 || sugO.m.fmin - pick.m.fmin >= 2))
+      L.better = {id:sugO.id, name:sugO.name, land:sugO.m.land, landMine:pick.m.land, fmin:sugO.m.fmin, fminMine:pick.m.fmin};
+    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, alc:x.alc, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, src:L.src, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
   });
   /* a sleep you are in outside any layover ends at your usual length */
   var extra = [];
