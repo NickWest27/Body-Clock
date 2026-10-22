@@ -195,7 +195,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 29';
+var BUILD = '22 Oct 2026 · build 30';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -226,7 +226,56 @@ function fix(o){
   return o;
 }
 var S = load();
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function store(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+/* Every change re-plans straight away. save() also compares the plan with how it looked before the change and
+   leaves a notice saying what moved: alertness at landing and the low point, planned sleep times, a better plan
+   when you are on your own times, and your times being dropped if they no longer fit. */
+function save(){
+  var notes = [];
+  try{
+    var Pl0 = P();
+    Pl0.layovers.forEach(function(L){ if(L.customBroken && S.lay[L.id]){ delete S.lay[L.id].custom; if(S.lay[L.id].choice === 'custom') delete S.lay[L.id].choice; notes.push({txt:'Your times for ' + L.ap.city + ' no longer fit the new schedule, so the app’s plan is back.'}); } });
+    var now2 = planSummary(P());
+    if(V.lastSum && V.lastSum.n > 0 && now2.n > 0) notes = notes.concat(diffSummary(V.lastSum, now2));
+    V.lastSum = now2;
+  }catch(err){ if(window.console) console.error(err); }
+  if(notes.length) S.notice = {t:now(), items:notes};
+  store();
+}
+function planSummary(Pl){
+  var nw = now(), sum = {n:Pl.flights.length, f:{}, lay:{}};
+  Pl.flights.forEach(function(f){ if(f.role === 'operate' && f.b > nw) sum.f[f.id] = {land:f.landA, min:f.minA, name:f.f.code + ' → ' + f.t.code, to:f.t.code}; });
+  Pl.layovers.forEach(function(L){
+    if(L.we < nw) return;
+    var tz = L.ap.tz, bl = Pl.sleeps.filter(function(x){ return x.lay === L.id && !x.actual && x.b > nw; });
+    sum.lay[L.id] = {city:L.ap.city, plan:bl.map(function(x){ return (x.kind === 'nap' ? 'nap ' : 'sleep ') + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b); }).join(', '), better:L.better ? L.better.name : null, betterTxt:L.better ? L.better.name + ' lands ' + BC.word(L.better.land) + ' ' + Math.round(L.better.land) + ', against ' + Math.round(L.better.landMine) + ' with yours' : '', src:L.src};
+  });
+  return sum;
+}
+function diffSummary(a, b){
+  var out = [];
+  Object.keys(b.f).forEach(function(id){
+    var x = a.f[id], y = b.f[id]; if(!x || x.land == null || y.land == null) return;
+    if(BC.word(x.land) !== BC.word(y.land) || Math.abs(Math.round(y.land) - Math.round(x.land)) >= 3) out.push({txt:'Landing at ' + y.to + ': ' + BC.word(x.land) + ' ' + Math.round(x.land) + ' → ' + BC.word(y.land) + ' ' + Math.round(y.land), up:y.land > x.land});
+    if(x.min != null && y.min != null && (BC.word(x.min) !== BC.word(y.min) || Math.abs(Math.round(y.min) - Math.round(x.min)) >= 3)) out.push({txt:'Lowest on ' + y.name + ': ' + BC.word(x.min) + ' ' + Math.round(x.min) + ' → ' + BC.word(y.min) + ' ' + Math.round(y.min), up:y.min > x.min});
+  });
+  Object.keys(b.lay).forEach(function(id){
+    var x = a.lay[id], y = b.lay[id]; if(!x) return;
+    if(x.plan !== y.plan && y.plan) out.push({txt:y.city + ' plan now: ' + y.plan + '.'});
+    if(y.better && y.better !== x.better) out.push({txt:'A better plan is available for ' + y.city + ': ' + y.betterTxt + '.', better:id});
+  });
+  return out;
+}
+function noticeCard(){
+  var n = S.notice; if(!n || !n.items || !n.items.length) return '';
+  if(now() - n.t > 24*H){ S.notice = null; store(); return ''; }
+  var Pl = P(), h = '<section class="card" aria-label="Plan updated" style="padding:14px 16px 12px;box-shadow:inset 0 0 0 2px var(--tint)"><div class="hero-l" style="color:var(--tint);margin-bottom:6px">' + I.sun + 'Plan updated</div>';
+  n.items.slice(0, 6).forEach(function(it){
+    h += '<div style="padding:4px 0;font-size:15px;line-height:20px">' + (it.up === true ? '<span style="color:var(--rested)">▲</span> ' : it.up === false ? '<span style="color:var(--tired)">▼</span> ' : '') + esc(it.txt) + '</div>';
+    if(it.better){ var L = layById(Pl, it.better); if(L && L.better) h += '<button class="btn small" type="button" data-act="useAuto" data-id="' + esc(it.better) + '" style="margin:4px 0 6px">Use the app’s plan</button>'; }
+  });
+  return h + '<div style="margin-top:6px"><button class="btn sec small" type="button" data-act="noticeOk">OK</button></div></section>';
+}
 function nextId(){ var m = 0; S.flights.forEach(function(f){ if(f.id > m) m = f.id; }); return m + 1; }
 
 /* ---------- helpers ---------- */
@@ -345,8 +394,9 @@ function events(Pl, from, max){
     ev.push({t:s.a, tz:tz, title:s.kind === 'home' ? 'Sleep at home' : s.kind === 'nap' ? 'Nap' : 'Sleep', sub:'Wake ' + whenTxt(tz, s.b, s.a), color:'var(--sleep)', go:L ? 'lay/' + L.id : null});
   });
   Pl.layovers.forEach(function(L){
-    if(!L.out || L.out.ns < from) return;
-    ev.push({t:L.out.ns, tz:L.ap.tz, title:'Crew meetup', sub:'Until ' + BC.hm(L.ap.tz, L.out.ne) + ' · last drink by ' + BC.dow(L.ap.tz, L.out.lastDrink) + ' ' + BC.hm(L.ap.tz, L.out.lastDrink), color:'var(--out)', go:'lay/' + L.id});
+    var nwE = now();
+    if(!L.out || L.out.ne <= nwE) return;
+    ev.push({t:Math.max(L.out.ns, nwE), tz:L.ap.tz, title:'Crew meetup' + (L.out.ns < nwE ? ' now' : ''), sub:'Until ' + BC.hm(L.ap.tz, L.out.ne) + ' · last drink by ' + BC.dow(L.ap.tz, L.out.lastDrink) + ' ' + BC.hm(L.ap.tz, L.out.lastDrink), color:'var(--out)', go:'lay/' + L.id});
   });
   Pl.flights.forEach(function(f){
     var L = Pl.layovers.filter(function(x){ return x.outF.id === f.id; })[0];
@@ -659,6 +709,7 @@ function viewNow(){
   h += '<header style="padding:4px 4px 0"><div class="eyebrow">' + esc(BC.dayLong(tz, nw)) + '</div><h1>Now</h1>' +
        '<div class="sub">' + esc(place) + ' ' + BC.hm(tz, nw) + (BC.offH(tz, nw) !== BC.offH(homeTz, nw) ? ' · ' + esc(E.home.city) + ' ' + BC.hm(homeTz, nw) : '') + '</div></header>';
   if(V.flash) h += '<p class="msg" style="margin:0 4px">' + esc(V.flash) + '</p>';
+  h += noticeCard();
   if(!Pl.flights.length){
     var hasClassic = classicData();
     h += '<section class="card empty"><h2 style="margin:0;font-size:22px">No trip yet</h2><p>Add your flights with airport codes. The app plans your sleep around them.</p>' +
@@ -701,7 +752,7 @@ function viewNow(){
       heroUsed = s;
       var sL = layOfBlock(Pl, s), stz = sL ? sL.ap.tz : (s.kind === 'rest' ? tz : homeTz);
       var soon = cur || s.a - nw < 30*60000;
-      var label = (s.kind === 'nap' ? 'Nap' : s.kind === 'rest' ? 'Crew rest' : 'Sleep') + (soon ? ' now' : '');
+      var label = (s.kind === 'nap' ? 'Nap' : s.kind === 'rest' ? 'Crew rest' : 'Sleep') + (soon ? ' now' : '') + (s.src === 'yours' ? ' · your times' : s.lay ? ' · auto' : '');
       var lead = soon ? durTxt(s.b - s.a) : 'Next · in ' + durTxt(s.a - nw);
       h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead) + '</div></div>' +
            '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(stz, s.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + BC.hm(stz, s.b) + '</div></div></div>' +
@@ -751,7 +802,10 @@ function tripTitle(Pl){
 }
 function timelineItems(Pl){
   var items = [];
-  Pl.flights.forEach(function(f){ items.push({t:f.a, tz:f.f.tz, kind:'flight', f:f}); });
+  Pl.flights.forEach(function(f){
+    items.push({t:f.a, tz:f.f.tz, kind:'flight', f:f});
+    if(f.role === 'operate' || f.van) items.push({t:BC.vanOf(S, f), tz:f.f.tz, kind:'van', f:f});
+  });
   Pl.sleeps.forEach(function(sl){
     if(sl.kind === 'rest') return;
     var L = layOfBlock(Pl, sl), tz = L ? L.ap.tz : Pl.E.locAt(sl.a + 1).tz;
@@ -765,7 +819,7 @@ function timelineItems(Pl){
   return items.sort(function(p,q){ return p.t - q.t; });
 }
 function tlRow(Pl, it, nw){
-  var past = (it.kind === 'sleep' ? it.s.b : it.kind === 'flight' ? it.f.b : it.kind === 'caf' ? it.c.t : it.kind === 'out' ? it.L.out.ne : it.L.dep) < nw, cls = 'row' + (past ? ' past' : ''), tz = it.tz;
+  var past = (it.kind === 'sleep' ? it.s.b : it.kind === 'flight' ? it.f.b : it.kind === 'van' ? it.t : it.kind === 'caf' ? it.c.t : it.kind === 'out' ? it.L.out.ne : it.L.dep) < nw, cls = 'row' + (past ? ' past' : ''), tz = it.tz;
   function row(go, icoBg, ico, t1, t2, right){
     return '<button class="' + cls + '" type="button" ' + go + '><span class="tcol" style="width:56px">' + BC.hm(tz, it.t) + '</span>' +
       '<span class="ico" style="background:' + icoBg + '">' + ico + '</span><span class="main"><span class="t1">' + t1 + '</span><span class="t3">' + t2 + '</span></span>' + (right || '') + '</button>';
@@ -786,19 +840,21 @@ function tlRow(Pl, it, nw){
     if(sl.open){ var op = Pl.open; return row('data-act="editSleep" data-id="' + (op ? op.id : '') + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), 'In bed now', 'Suggested wake ' + whenTxt(tz, sl.b, sl.a), ''); }
     var calc = 'data-act="adjust" data-v="' + sl.a + '_' + sl.b + '_' + (nap ? 'nap' : 'main') + '"';
     if(sl.kind === 'home') return row(calc, 'var(--fill)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), 'Sleep at home until ' + whenTxt(tz, sl.b, sl.a), 'Your usual night · ' + dur, I.chev);
-    var pend = past || (sl.a < nw);
-    return row(calc, 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), (pend ? 'Planned, not confirmed · ' : 'Planned · ') + dur, I.chev);
+    var pend = past || (sl.a < nw), srcTxt = sl.src === 'yours' ? 'Your times' : sl.src === 'pick' ? 'Auto · option you picked' : 'Auto';
+    return row(calc, sl.src === 'yours' ? 'var(--sleep)' : 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', sl.src === 'yours' ? 'stroke="#fff"' : 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), srcTxt + (pend ? ', not confirmed' : '') + ' · ' + dur, I.chev);
   }
+  if(it.kind === 'van') return row('data-go="flight/' + it.f.id + '"', 'var(--fill)', I.car.replace('stroke="currentColor"', 'stroke="var(--label)"'), 'Van to ' + esc(it.f.f.code), it.f.van ? 'Pickup you set · ' + esc(cityOfTz(it.f.f.tz)) + ' time' : 'Assumed ' + hrsTxt(+S.van || 2) + ' before departure · tap to set it', I.chev);
   if(it.kind === 'caf') return row('data-act="cafEdit" data-id="' + it.c.id + '"', 'var(--coffee)', I.cup.replace('stroke="currentColor"', 'stroke="#fff"'), esc(cafName(it.c.mg)), 'Logged · ' + it.c.mg + ' mg', '<span class="tag">Edit</span>');
   if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
     'Crew meetup until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
   var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
-  return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span></span><span class="tag" style="color:var(--tint)">Plans</span>' + I.chev + '</button>';
+  return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (L.src === 'yours' ? 'Your times' : o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span>' + (L.better ? '<span class="t3" style="color:var(--tint);font-weight:600">A better plan is available</span>' : '') + '</span><span class="tag" style="color:var(--tint)">Plans</span>' + I.chev + '</button>';
 }
 function viewTrip(){
   var Pl = P(), h = '', nw = now();
   h += '<div class="hdr"><div><h1>Trip</h1>' + (Pl.flights.length ? '<div class="sub">' + esc(tripTitle(Pl)) + '</div>' : '') + '</div>' +
        '<button class="plus" type="button" data-act="addMenu" aria-label="Add a flight or a sleep">' + I.plus + '</button></div>';
+  h += noticeCard();
   if(!Pl.flights.length){
     h += '<section class="card empty"><p style="margin-top:0">No flights yet. Tap + to add one.</p></section>';
     return h;
@@ -999,6 +1055,7 @@ function viewLay(id){
   if(!L){ return h + '<p class="msg">This layover has changed. Go back to the trip.</p>'; }
   var tz = L.ap.tz, sel = V.layPick[id] || L.picked;
   h += '<header style="padding:0 4px 6px"><h1>' + esc(L.ap.city) + '</h1><div class="sub">Land ' + BC.dow(tz, L.arr) + ' ' + BC.hm(tz, L.arr) + ' · Van ' + BC.dow(tz, L.duty) + ' ' + BC.hm(tz, L.duty) + ' · ' + Math.round((L.duty - L.arr)/H) + ' h</div></header>';
+  if(L.better) h += '<section class="card" style="padding:12px 16px;box-shadow:inset 0 0 0 2px var(--tint)"><div style="font-weight:600">A better plan is available</div><div class="lab" style="font-size:14px;margin-top:2px">' + esc(L.better.name) + ' lands ' + BC.word(L.better.land) + ' ' + Math.round(L.better.land) + ', against ' + Math.round(L.better.landMine) + ' with ' + (L.src === 'yours' ? 'your times' : 'the plan you picked') + '.</div><button class="btn small" type="button" data-act="useAuto" data-id="' + esc(id) + '" style="margin-top:8px">Use the app’s plan</button></section>';
   h += '<div class="stack" style="gap:10px"><div class="list">';
   if(L.out){
     h += '<div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew meetup</span><span class="t3">You’ll be up and out; the plan sleeps around it</span></span><button class="navbtn" type="button" data-act="meetRm" data-id="' + esc(id) + '" style="color:var(--danger)">Remove</button></div>' +
@@ -1491,6 +1548,7 @@ function render(){
     else { V.view = 'now'; h = viewNow(); }
   }catch(err){ h = '<p class="err">Something went wrong drawing this screen: ' + esc(err.message) + '</p>'; if(window.console) console.error(err); }
   app.innerHTML = '<div class="stack">' + h + '</div>';
+  try{ V.lastSum = planSummary(P()); }catch(e3){}
   var tab = {now:'now', chart:'now', trip:'trip', lay:'trip', rest:V.from === 'now' ? 'now' : 'trip', settings:'settings', dest:'settings', calc:'calc'}[V.view];
   document.querySelectorAll('.tab').forEach(function(t){ if(t.dataset.go === tab) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
   if(V.view === 'trip' && V.scrollNow){ V.scrollNow = false; var nl = document.querySelector('.nowline'); if(nl) setTimeout(function(){ nl.scrollIntoView({block:'center'}); }, 0); }
@@ -1498,6 +1556,7 @@ function render(){
 
 /* ---------- events ---------- */
 document.addEventListener('click', function(e){
+  if(pendingInputs.length) flushInputs();
   var g = e.target.closest('[data-go]');
   if(g && !e.target.closest('[data-act]')){ e.preventDefault(); go(g.dataset.go); return; }
   var b = e.target.closest('[data-act]'); if(!b) return;
@@ -1563,6 +1622,8 @@ document.addEventListener('click', function(e){
     cfg2.choice = 'custom'; save(); if(V.adj){ V.adj = null; renderAdj(); render(); } else go('now'); return;
   }
   if(act === 'editSleep'){ openSleep(id); return; }
+  if(act === 'noticeOk'){ S.notice = null; store(); render(); return; }
+  if(act === 'useAuto'){ var cu = S.lay[id]; if(cu){ delete cu.custom; delete cu.choice; } save(); S.notice = null; store(); render(); return; }
   if(act === 'adjust'){ var pv = b.dataset.v.split('_'); openAdjust(+pv[0], +pv[1], pv[2]); return; }
   if(act === 'adjBg' && e.target === b || act === 'adjCancel'){ V.adj = null; renderAdj(); return; }
   if(act === 'adjBest'){ V.calc.wakeAuto = true; renderAdj(); return; }
@@ -1629,7 +1690,24 @@ function autoArr(){
   if(fl.arr || !d.f || !d.t || isNaN(d.a)) return;
   fl.arr = BC.msToLocal(d.t.tz, d.a + 8*H);
 }
+/* Date and time pickers: iOS fires change while the wheels are still turning, and redrawing the screen then
+   closes the picker before you reach the minutes. So while a picker is open we only remember the value, and
+   apply it when it closes, or straight away if a button is tapped first. */
+var pendingInputs = [];
+function isTimeInput(t){ return t && t.tagName === 'INPUT' && /^(date|time|datetime-local)$/.test(t.type); }
+function flushInputs(){
+  var list = pendingInputs; pendingInputs = [];
+  list.forEach(function(t){ onChange({target:t}); });
+}
 document.addEventListener('change', function(e){
+  var t = e.target;
+  if(isTimeInput(t) && document.activeElement === t){ if(pendingInputs.indexOf(t) < 0) pendingInputs.push(t); return; }
+  onChange(e);
+});
+document.addEventListener('focusout', function(e){
+  if(isTimeInput(e.target) && pendingInputs.indexOf(e.target) >= 0) setTimeout(flushInputs, 250);
+});
+function onChange(e){
   var t = e.target, id = t.id;
   if(V.adj && (id === 'adjBed' || id === 'adjWake')){
     if(t.value){
@@ -1669,7 +1747,7 @@ document.addEventListener('change', function(e){
     save(); render(); return;
   }
   if(id === 'impFile'){ var f = t.files && t.files[0]; if(f) restoreFile(f); t.value = ''; }
-});
+}
 document.addEventListener('input', function(e){
   var t = e.target;
   if(V.flight && (t.id === 'fFrom' || t.id === 'fTo')){
