@@ -188,7 +188,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 33';
+var BUILD = '22 Oct 2026 · build 34';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -249,8 +249,13 @@ function diffSummary(a, b){
   var out = [];
   Object.keys(b.f).forEach(function(id){
     var x = a.f[id], y = b.f[id]; if(!x || x.land == null || y.land == null) return;
-    if(BC.word(x.land) !== BC.word(y.land) || Math.abs(Math.round(y.land) - Math.round(x.land)) >= 3) out.push({txt:'Landing at ' + y.to + ': ' + BC.word(x.land) + ' ' + Math.round(x.land) + ' → ' + BC.word(y.land) + ' ' + Math.round(y.land), up:y.land > x.land});
-    if(x.min != null && y.min != null && (BC.word(x.min) !== BC.word(y.min) || Math.abs(Math.round(y.min) - Math.round(x.min)) >= 3)) out.push({txt:'Lowest on ' + y.name + ': ' + BC.word(x.min) + ' ' + Math.round(x.min) + ' → ' + BC.word(y.min) + ' ' + Math.round(y.min), up:y.min > x.min});
+    function chg(label, p, q){
+      var d = Math.round(q) - Math.round(p), wp = BC.word(p), wq = BC.word(q);
+      if(wp === wq && Math.abs(d) < 3) return;
+      out.push({txt:label + ': ' + (wp === wq ? 'still ' + wq : wp + ' → ' + wq), up:d > 0, d:Math.abs(d)});
+    }
+    chg('Landing at ' + y.to, x.land, y.land);
+    if(x.min != null && y.min != null) chg('Lowest on ' + y.name, x.min, y.min);
   });
   Object.keys(b.lay).forEach(function(id){
     var x = a.lay[id], y = b.lay[id]; if(!x) return;
@@ -264,7 +269,8 @@ function noticeCard(){
   if(now() - n.t > 24*H){ S.notice = null; store(); return ''; }
   var Pl = P(), h = '<section class="card" aria-label="Plan updated" style="padding:14px 16px 12px;box-shadow:inset 0 0 0 2px var(--tint)"><div class="hero-l" style="color:var(--tint);margin-bottom:6px">' + I.sun + 'Plan updated</div>';
   n.items.slice(0, 6).forEach(function(it){
-    h += '<div style="padding:4px 0;font-size:15px;line-height:20px">' + (it.up === true ? '<span style="color:var(--rested)">▲</span> ' : it.up === false ? '<span style="color:var(--tired)">▼</span> ' : '') + esc(it.txt) + '</div>';
+    var arrow = it.up == null ? '' : '<span style="display:inline-block;min-width:38px;font-weight:700;color:' + (it.up ? 'var(--rested)' : 'var(--tired)') + '">' + (it.up ? '▲' : '▼') + (it.d != null ? ' ' + it.d : '') + '</span> ';
+    h += '<div style="padding:4px 0;font-size:15px;line-height:20px">' + arrow + esc(it.txt) + '</div>';
     if(it.better){ var L = layById(Pl, it.better); if(L && L.better) h += '<button class="btn small" type="button" data-act="useAuto" data-id="' + esc(it.better) + '" style="margin:4px 0 6px">Use the app’s plan</button>'; }
   });
   return h + '<div style="margin-top:6px"><button class="btn sec small" type="button" data-act="noticeOk">OK</button></div></section>';
