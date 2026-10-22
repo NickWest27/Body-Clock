@@ -6,13 +6,13 @@ Live at https://nickwest27.github.io/Body-Clock/ (add it to your home screen fro
 
 ## Screens
 
-- **Now**: what to do now (for example "Nap now, bed 11:00, wake 13:00", with the reason), the next few things coming up, and a colour ribbon of your alertness until you land. During an operating flight it shows your crew rest times for your Watch.
+- **Now**: what to do now (for example "Nap now, bed 11:00, wake 13:00", with the reason), the next few things coming up, and a colour ribbon of your alertness until you land. During an operating flight it shows your crew rest times on the departure city's clock.
 - **Trip**: one timeline of the whole trip, past and future, with a Now line: flights, crew rest, sleeps and naps you logged, sleeps the app plans, caffeine you logged and each layover's plan. Tap a flight or a logged sleep to change it; tap a planned sleep to open it in the calculator. + adds a flight, a sleep you took or caffeine.
 - **Layover**: the main decision, nap now or later. The app compares nap now, nap later, both and no nap, each with your main sleep moved earlier or later, and suggests one, with the last-drink time.
-- **Calculator**: Bed, Wake and Flight. Leave Bed or Wake on Auto and it works out the best time (both on Auto gives the best sleep for that flight); type a time to set it yourself. Next sleep shows that sleep through to landing; Whole trip shows every sleep and flight to the end of the trip. Results are a timeline with a daylight rail (yellow day, blue night) and icons for bed, wake, van, flight and landing. Auto aims for the flight or your body clock. Use as my plan keeps it; Log as a sleep I took records it.
+- **Change a sleep**: tap a planned sleep on Trip (or Change on Now) to try other bed and wake times, or Best wake-up for this bedtime. A timeline shows what follows: the app's re-plan of the rest of the layover, caffeine cut-off and coffee time, the van, the lowest point in flight and landing, each against the current plan. Use this keeps it; Back to the app's plan undoes it; for a past sleep, Log as a sleep I took records it.
 - **Charts** (tap the ribbon): Alertness; Sleep pressure, coloured low to high, with the sleep threshold (shaded red between the lines when you are tired enough to sleep, green when not), how long you have been awake and how easily you would fall asleep now; Body clock as the big three-ring clock with thin rings for the days before.
 - **Body clock card** on Now, when a trip moves you an hour or more: a 24-hour dial on the local clock, noon at the top, with three named rings of daylight: outer where you are, middle the day your body expects (wider and outlined), inner home. When the middle ring lines up with the outer one you have adjusted. Tap it for a big version with thin rings for the six days before: where you were (between the outer and body rings) and your body's day (between the body and home rings).
-- **Crew rest**: enter the rest times in UTC, as the crew gives them. You get Lie down and Alarm times on your Watch (assumed to be on departure time) and a timer length.
+- **Crew rest**: enter the rest times in UTC, as the crew gives them. You get Lie down and Alarm times on the departure city's clock (the one you left on), and a timer length.
 - **Settings**: home airport, usual bedtime and wake time, landing to hotel bed, van and get-ready times, layover balance, caffeine advice and cut-off, last drink before the van, destinations, backups.
 
 ## Caffeine
@@ -23,9 +23,9 @@ The layover screen shows the last-drink time (12 hours before the van by default
 
 ## Crew meetup and van pickup
 
-On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. A flight can carry its own van pickup time; otherwise the van is the usual time before departure from Settings.
+On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. Each flight can carry its own van pickup time; if it is left empty the van is assumed 2 hours before departure.
 
-When you log a sleep or caffeine you can type the time on the local clock, your Watch (departure time) or UTC.
+When you log a sleep or caffeine you can type the time on the local clock, the clock of the city you departed from, or UTC; the buttons are named by city.
 
 ## The model
 
