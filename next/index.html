@@ -39,7 +39,7 @@ button{font:inherit;color:inherit}
 .wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 100px)}
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;background:var(--bar);border-top:1px solid var(--sep);padding-bottom:env(safe-area-inset-bottom);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .tabbar-in{display:flex;justify-content:space-around;width:100%;max-width:560px;padding-top:7px;height:56px}
-.tab{display:flex;flex-direction:column;align-items:center;gap:2px;width:84px;min-height:44px;border:0;background:none;color:var(--sec);font-size:10px;font-weight:600;cursor:pointer}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;width:100px;min-height:44px;border:0;background:none;color:var(--sec);font-size:10px;font-weight:600;cursor:pointer}
 .tab[aria-current=page]{color:var(--tint)}
 .tab svg{width:26px;height:26px}
 .nav{display:flex;align-items:center;justify-content:space-between;min-height:44px;margin:-6px -8px 0}
@@ -185,7 +185,6 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <nav class="tabbar" aria-label="Tabs"><div class="tabbar-in">
   <button class="tab" type="button" data-go="now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Now</button>
   <button class="tab" type="button" data-go="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>Trip</button>
-  <button class="tab" type="button" data-go="calc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18M5 18v-5a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v5M7 10V7a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3"/><path d="M12 13v2M9 14h6" opacity="0"/></svg>Calculator</button>
   <button class="tab" type="button" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Settings</button>
 </div></nav>
 <div id="sheet"></div>
@@ -196,7 +195,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 27';
+var BUILD = '22 Oct 2026 · build 29';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -405,7 +404,7 @@ function hhmmH(s){ var p = String(s).split(':'); return (+p[0] || 0) + (+p[1] ||
    against your usual night here (dashed). */
 function sunIco(x, y, r){ var s = '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="var(--sunc)"/>'; for(var k=0;k<8;k++){ var t = k*Math.PI/4; s += '<line x1="' + (x + Math.cos(t)*(r + 2)).toFixed(1) + '" y1="' + (y + Math.sin(t)*(r + 2)).toFixed(1) + '" x2="' + (x + Math.cos(t)*(r + 4.5)).toFixed(1) + '" y2="' + (y + Math.sin(t)*(r + 4.5)).toFixed(1) + '" stroke="var(--sunc)" stroke-width="1.6" stroke-linecap="round"/>'; } return s; }
 function moonIco(x, y, r){ return '<path d="M' + (x + r*0.35) + ' ' + (y - r) + 'A' + r + ' ' + r + ' 0 1 0 ' + (x + r) + ' ' + (y + r*0.35) + 'A' + (r*0.8) + ' ' + (r*0.8) + ' 0 0 1 ' + (x + r*0.35) + ' ' + (y - r) + 'Z" fill="var(--bodyn)"/>'; }
-function shortCity(ap){ return ap.city.replace(/ (Heathrow|Gatwick|O’Hare|Narita|Haneda|Incheon|Kansai|JFK|LaGuardia|National|Dulles)$/, ''); }
+function shortCity(ap){ return ap.city.replace(/ (Heathrow|Gatwick|O’Hare|Narita|Haneda|Incheon|Kansai|JFK|LaGuardia|National|Dulles)$/, '').replace('Dallas–Fort Worth', 'Dallas'); }
 /* where you are at t: the place (or the plane) and the local clock there */
 function placeAt(Pl, C, t){
   var q = Pl.E.locAt(t), x = C.at(t);
@@ -513,7 +512,13 @@ function clockCard(Pl, nw){
     line(pl.name, BC.hm(pl.tz, nw)) + line('Body', hh(x.bodyH)) + (atHome ? '' : line(shortCity(home), BC.hm(home.tz, nw))) + foot + '</div>' + I.chev + '</div></button>';
 }
 
-/* ---------- which clock a time is typed in: local where you were, your Watch (departure time), or UTC ---------- */
+/* a short city name for a time zone, for labelling clocks */
+function cityOfTz(tz){
+  if(tz === 'UTC') return 'UTC';
+  var hit = null; Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === tz){ hit = k; return true; } return false; });
+  return hit ? shortCity(BC.airport(hit)) : tz.split('/').pop().replace(/_/g, ' ');
+}
+/* ---------- which clock a time is typed in: local where you were, the departure city's clock, or UTC ---------- */
 function zoneTz(Pl, zone, ms){
   if(zone === 'utc') return 'UTC';
   var q = Pl.E.locAt(ms);
@@ -528,10 +533,53 @@ function zoneLabel(Pl, zone, ms){
   var tz = zoneTz(Pl, zone, ms), city = '';
   if(zone === 'utc') return 'UTC (Zulu)';
   Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === tz){ city = AIRPORTS[k][0]; return true; } return false; });
-  return (zone === 'watch' ? 'Watch: ' : '') + (city || tz) + ' time';
+  return cityOfTz(tz) + ' time';
 }
-function zoneSeg(act, zone){
-  return '<div class="seg three" role="group" aria-label="Clock the time is in" style="margin:10px 0 0">' + [['local', 'Local'], ['watch', 'Watch'], ['utc', 'UTC']].map(function(z){ return '<button type="button" data-act="' + act + '" data-v="' + z[0] + '" aria-pressed="' + (zone === z[0]) + '">' + z[1] + '</button>'; }).join('') + '</div>';
+function zoneSeg(act, zone, ms){
+  var Pl = P(), seen = {}, opts = [];
+  ['local', 'watch', 'utc'].forEach(function(z){ var tz = zoneTz(Pl, z, ms); if(seen[tz]) return; seen[tz] = 1; opts.push([z, cityOfTz(tz)]); });
+  if(!opts.some(function(o){ return o[0] === zone; })) zone = opts[0][0];
+  return '<div class="seg' + (opts.length === 3 ? ' three' : '') + '" role="group" aria-label="Which clock the time is on" style="margin:10px 0 0">' + opts.map(function(z){ return '<button type="button" data-act="' + act + '" data-v="' + z[0] + '" aria-pressed="' + (zone === z[0]) + '">' + esc(z[1]) + '</button>'; }).join('') + '</div>';
+}
+
+/* ---------- change a sleep (what the calculator used to do) ---------- */
+function openAdjust(a0, b0, kind){
+  var Pl = P(), F = Pl.flights.filter(function(f){ return f.role === 'operate' && f.b > now(); });
+  if(!F.length || isNaN(a0) || isNaN(b0)) return;
+  var tf = F.filter(function(f){ return f.a > b0; })[0] || F[0], q = Pl.E.locAt(a0), tz = q.fl ? q.flight.t.tz : q.tz;
+  V.calc = {bedAuto:false, wakeAuto:false, fid:tf.id, scope:'next', tz:tz, bed:BC.msToLocal(tz, a0), wake:BC.msToLocal(tz, b0)};
+  V.calcRes = null; V.adj = {a0:a0, b0:b0}; renderAdj();
+}
+function renderAdj(){
+  var box = $('#sheet');
+  if(!V.adj){ box.innerHTML = ''; return; }
+  var c = V.calc, cr = V.calcRes, fresh = cr && cr.key === calcKey(c), Pl = P(), nw = now(), city = '';
+  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === c.tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  var h = '<div class="sheet" data-act="adjBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Change sleep"><div class="grab"><span></span></div>' +
+      '<div class="sheet-h"><button class="navbtn" type="button" data-act="adjCancel" style="justify-self:start">Cancel</button><div class="ttl">Change sleep</div><span></span></div>' +
+      '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span></span><input class="pill" type="datetime-local" id="adjBed" value="' + esc(c.bed) + '"></label>' +
+      '<label class="row static"><span class="main"><span class="t1">Wake</span>' + (c.wakeAuto ? '<span class="t3" style="color:var(--tint)">Best for the flight</span>' : '') + '</span><input class="pill" type="datetime-local" id="adjWake" value="' + esc(c.wake) + '"></label>' +
+      '<button class="row" type="button" data-act="adjBest" style="color:var(--tint);min-height:46px"' + (c.wakeAuto ? ' disabled' : '') + '>' + I.sun + 'Best wake-up for this bedtime</button></div>' +
+      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. The app planned ' + BC.hm(c.tz, V.adj.a0) + '–' + BC.hm(c.tz, V.adj.b0) + '.</p>';
+  h += '<h2 class="grp-h" style="margin-top:14px">What happens</h2>';
+  if(!fresh){
+    h += '<div class="tl" style="padding:22px 16px;color:var(--sec)">Working…</div>';
+    if(!V.calcPending){ V.calcPending = true; setTimeout(function(){ V.calcPending = false; if(V.adj){ computeCalc(); renderAdj(); } }, 30); }
+  } else if(cr.err){
+    h += '<div class="tl" style="padding:16px"><p class="err" style="margin:0">' + esc(cr.err) + '</p></div>';
+  } else {
+    var r = cr.r, w = cr.w;
+    h += tlHTML(Pl, calcItems(c, cr, nw));
+    if(r.wakeBy && w.b > r.wakeBy) h += '<p class="err">That is after you need to be up for the van (' + BC.hm(c.tz, r.wakeBy) + ').</p>';
+    h += '<div class="stack" style="gap:10px;margin-top:12px">';
+    if(w.a > nw - 5*60000 && r.ctx.L) h += '<button class="btn" type="button" data-act="cUse">Use this</button>';
+    if(w.b <= nw) h += '<button class="btn" type="button" data-act="cLog">Log as a sleep I took</button>';
+    else if(w.a <= nw) h += '<button class="btn sec" type="button" data-act="cLog">Log it: I fell asleep at ' + BC.hm(c.tz, w.a) + '</button>';
+    var Lc = r.ctx.L, cfgc = Lc ? S.lay[Lc.id] : null;
+    if(cfgc && (cfgc.custom || cfgc.choice)) h += '<button class="btn sec" type="button" data-act="adjReset" data-id="' + esc(Lc.id) + '">Back to the app’s plan</button>';
+    h += '</div><p class="foot">“vs plan” compares with the plan as it stands. The numbers compare choices; they are not a measurement.</p>';
+  }
+  box.innerHTML = h + '</div></div>';
 }
 
 /* ---------- crew meetup ---------- */
@@ -555,7 +603,7 @@ function cafCard(Pl, nw){
   var A = BC.cafAdvice(S, nw), rows = [];
   if(A.cutoff != null && A.sleep){
     var stz = tzNow(Pl, A.sleep.a), what = A.sleep.kind === 'rest' ? 'crew rest' : A.sleep.kind === 'nap' ? 'nap' : 'sleep';
-    if(A.cutoff > nw) rows.push(['Last caffeine by ' + whenTxt(tzNow(Pl, A.cutoff), A.cutoff, nw), S.caf.cut + ' h before your ' + what + ' at ' + whenTxt(stz, A.sleep.a, nw) + (A.sleep.kind === 'rest' ? ' (Watch time)' : '')]);
+    if(A.cutoff > nw) rows.push(['Last caffeine by ' + whenTxt(tzNow(Pl, A.cutoff), A.cutoff, nw), S.caf.cut + ' h before your ' + what + ' at ' + whenTxt(stz, A.sleep.a, nw) + (A.sleep.kind === 'rest' ? ' ' + cityOfTz(stz) + ' time' : '')]);
     else rows.push(['No more caffeine for now', 'Your ' + what + ' at ' + whenTxt(stz, A.sleep.a, nw) + ' is less than ' + S.caf.cut + ' h away']);
   }
   if(A.coffee){
@@ -564,7 +612,7 @@ function cafCard(Pl, nw){
       if(Math.round(c.after.min) - Math.round(c.before.min) >= 2) gain.push('lowest ' + BC.word(c.before.min) + ' ' + Math.round(c.before.min) + ' → ' + BC.word(c.after.min) + ' ' + Math.round(c.after.min));
       if(Math.round(c.after.land) - Math.round(c.before.land) >= 2) gain.push('landing ' + BC.word(c.before.land) + ' ' + Math.round(c.before.land) + ' → ' + BC.word(c.after.land) + ' ' + Math.round(c.after.land));
     }
-    rows.push(['Coffee at ' + whenTxt(ctz, c.t, nw) + (c.inFlight ? ' Watch' : ''), 'Before your low point on ' + c.f.f.code + ' → ' + c.f.t.code + (gain.length ? ': ' + gain.join(', ') : '') + (c.conflict ? '. It may cost some sleep at ' + whenTxt(tzNow(Pl, c.conflict.a), c.conflict.a, c.t) : '') + '.']);
+    rows.push(['Coffee at ' + whenTxt(ctz, c.t, nw) + (c.inFlight ? ' ' + cityOfTz(ctz) + ' time' : ''), 'Before your low point on ' + c.f.f.code + ' → ' + c.f.t.code + (gain.length ? ': ' + gain.join(', ') : '') + (c.conflict ? '. It may cost some sleep at ' + whenTxt(tzNow(Pl, c.conflict.a), c.conflict.a, c.t) : '') + '.']);
   }
   if(A.mg >= 10) rows.push(['In you now: about ' + Math.round(A.mg/10)*10 + ' mg', 'Half of it gone by ' + BC.hm(tzNow(Pl, nw), A.halfBy)]);
   if(!rows.length) rows.push(['Nothing to watch right now', 'Log a coffee and the plan takes it into account.']);
@@ -584,9 +632,9 @@ function renderCaf(){
   var h = '<div class="sheet" data-act="cafBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log caffeine"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="cafCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (c.id ? 'Edit caffeine' : 'Log caffeine') + '</div><button class="navbtn r" type="button" data-act="cafSave">Save</button></div>' +
       '<div class="list">' + CAF_SIZES.map(function(z){ return '<button class="row" type="button" data-act="cafMg" data-v="' + z[0] + '"><span class="main"><span class="t1">' + z[1] + '</span><span class="t3">' + z[2] + '</span></span>' + (+c.mg === z[0] ? '<span style="color:var(--tint);font-weight:700">✓</span>' : '') + '</button>'; }).join('') + '</div>' +
-      zoneSeg('cafZone', c.zone || 'local') +
-      '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span><span class="t3">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
-      '<p class="foot">Type the time on whichever clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
+      zoneSeg('cafZone', c.zone || 'local', BC.localToMs(c.tz, c.t)) +
+      '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
+      '<p class="foot">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '. Type the time on whichever clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
   if(c.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cafDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete') + '</button></div>';
   box.innerHTML = h + '</div></div>';
 }
@@ -643,8 +691,8 @@ function viewNow(){
     if(inF.role === 'operate'){
       if(inF.restWin){
         h += '<div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[1]) + '</div></div></div>' +
-             '<p class="why">On your Watch (' + esc(inF.f.city) + ' time). UTC ' + BC.hm('UTC', inF.restWin[0]) + '–' + BC.hm('UTC', inF.restWin[1]) + '.</p>';
-      } else h += '<p class="why" style="margin-top:0">Enter your crew rest once you know it, and get the times for your Watch.</p>';
+             '<p class="why">' + esc(cityOfTz(inF.f.tz)) + ' time, the clock you left on. UTC ' + BC.hm('UTC', inF.restWin[0]) + '–' + BC.hm('UTC', inF.restWin[1]) + '.</p>';
+      } else h += '<p class="why" style="margin-top:0">Enter your crew rest once you know it, and get the times on ' + esc(cityOfTz(inF.f.tz)) + ' time.</p>';
       h += '<div style="margin-top:14px"><button class="btn" type="button" data-go="rest/' + inF.id + '">' + (inF.restWin ? 'Change crew rest' : 'Set crew rest alarm') + '</button></div>';
     } else h += '<p class="why" style="margin-top:0">Lands ' + BC.hm(inF.t.tz, inF.b) + ' ' + esc(inF.t.city) + ' time.</p>';
   } else {
@@ -658,9 +706,10 @@ function viewNow(){
       h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead) + '</div></div>' +
            '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(stz, s.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + BC.hm(stz, s.b) + '</div></div></div>' +
            '<p class="why">' + esc(whyFor(Pl, s)) + (sL && stz !== tz ? ' ' + esc(sL.ap.city) + ' time.' : '') + '</p>';
+      var adjV = s.a + '_' + s.b + '_' + (s.kind === 'nap' ? 'nap' : 'main');
       if(s.kind !== 'rest' && (cur || s.a - nw < 3*H)){
-        h += '<div style="margin-top:14px"><button class="btn' + (soon ? '' : ' sec') + '" type="button" data-act="bedNow" data-kind="' + (s.kind === 'nap' ? 'nap' : 'main') + '">Going to bed' + (soon ? '' : ' now') + '</button></div>';
-      }
+        h += '<div class="two" style="margin-top:14px;gap:8px;grid-template-columns:2fr 1fr"><button class="btn' + (soon ? '' : ' sec') + '" type="button" data-act="bedNow" data-kind="' + (s.kind === 'nap' ? 'nap' : 'main') + '">Going to bed' + (soon ? '' : ' now') + '</button><button class="btn sec" type="button" data-act="adjust" data-v="' + adjV + '">Change</button></div>';
+      } else if(s.kind !== 'rest') h += '<div style="margin-top:12px"><button class="btn sec small" type="button" data-act="adjust" data-v="' + adjV + '">Change times</button></div>';
     } else {
       var nf = Pl.flights.filter(function(f){ return f.a > nw; })[0];
       if(nf){
@@ -677,7 +726,8 @@ function viewNow(){
   h += '<h2 class="grp-h" style="margin:4px 16px -8px">Up next</h2><section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
        (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.options.length > 1; })[0];
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
-       '<button class="row" type="button" data-go="calc" style="color:var(--tint);min-height:48px">' + I.moon + 'What if I sleep at another time?</button>' +
+       (function(){ var nx = Pl.sleeps.filter(function(x){ return x.a > nw && !x.actual && !x.open && x.kind !== 'rest'; })[0];
+         return nx ? '<button class="row" type="button" data-act="adjust" data-v="' + nx.a + '_' + nx.b + '_' + (nx.kind === 'nap' ? 'nap' : 'main') + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Change the next ' + (nx.kind === 'nap' ? 'nap' : 'sleep') + '</button>' : ''; })() +
        '<button class="row" type="button" data-act="logSleep" style="color:var(--tint);min-height:48px">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Log a sleep you took</button></section>';
   h += cafCard(Pl, nw);
   /* ribbon */
@@ -725,7 +775,7 @@ function tlRow(Pl, it, nw){
     var h = row('data-go="flight/' + f.id + '"', 'var(--flight)', I.plane.replace('stroke="currentColor"', 'stroke="var(--card)"'), '<b>' + esc(f.f.code + ' → ' + f.t.code) + '</b>',
       'Lands ' + whenTxt(f.t.tz, f.b, f.a) + ' ' + BC.zabbr(f.t.tz, f.b) + ' · ' + durTxt(f.b - f.a), right);
     if(f.role === 'operate'){
-      h += f.restWin ? '<button class="subrow' + (past ? ' past' : '') + '" type="button" data-go="rest/' + f.id + '" style="padding-left:84px"><span style="color:var(--sleep)">' + I.moon + '</span>Crew rest ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + ' UTC · Watch ' + BC.hm(f.f.tz, f.restWin[0]) + '–' + BC.hm(f.f.tz, f.restWin[1]) + '</button>'
+      h += f.restWin ? '<button class="subrow' + (past ? ' past' : '') + '" type="button" data-go="rest/' + f.id + '" style="padding-left:84px"><span style="color:var(--sleep)">' + I.moon + '</span>Crew rest ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + ' UTC · ' + esc(cityOfTz(f.f.tz)) + ' ' + BC.hm(f.f.tz, f.restWin[0]) + '–' + BC.hm(f.f.tz, f.restWin[1]) + '</button>'
                      : '<button class="subrow link" type="button" data-go="rest/' + f.id + '" style="padding-left:84px">' + I.timer + 'Crew rest: set alarm once you know it</button>';
     }
     return h;
@@ -734,7 +784,7 @@ function tlRow(Pl, it, nw){
     var sl = it.s, nap = sl.kind === 'nap', dur = durTxt(sl.b - sl.a);
     if(sl.actual) return row('data-act="editSleep" data-id="' + sl.id + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), (nap ? 'Napped' : 'Slept') + ' until ' + whenTxt(tz, sl.b, sl.a), 'Logged · ' + dur, '<span class="tag">Edit</span>');
     if(sl.open){ var op = Pl.open; return row('data-act="editSleep" data-id="' + (op ? op.id : '') + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), 'In bed now', 'Suggested wake ' + whenTxt(tz, sl.b, sl.a), ''); }
-    var calc = 'data-go="calc/' + sl.a + '_' + sl.b + '_' + (nap ? 'nap' : 'main') + '"';
+    var calc = 'data-act="adjust" data-v="' + sl.a + '_' + sl.b + '_' + (nap ? 'nap' : 'main') + '"';
     if(sl.kind === 'home') return row(calc, 'var(--fill)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), 'Sleep at home until ' + whenTxt(tz, sl.b, sl.a), 'Your usual night · ' + dur, I.chev);
     var pend = past || (sl.a < nw);
     return row(calc, 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), (pend ? 'Planned, not confirmed · ' : 'Planned · ') + dur, I.chev);
@@ -774,7 +824,7 @@ function viewTrip(){
   });
   if(open) h += '</div>';
   if(!nowDone) h += '<div class="nowline">Now · ' + BC.hm(placeTz(Pl, nw), nw) + '</div>';
-  h += '<p class="foot">Times are local to where you are. Logged sleeps are what you told the app; planned ones are its suggestion. Tap a planned sleep to try other times in the calculator.</p>';
+  h += '<p class="foot">Times are local to where you are. Logged sleeps are what you told the app; planned ones are its suggestion. Tap a planned sleep to change its times and see what that does.</p>';
   return h;
 }
 
@@ -863,7 +913,7 @@ function calcItems(c, cr, nw){
       R2.pts.forEach(function(p){ if(p.t >= Math.max(nw, f.a) && p.t <= f.b && !p.sl && !groggy(p.t) && (!lo || p.A < lo.A)) lo = p; });
       if(lo && lo.A < 50){
         var tc = lo.t - 0.75*H; P2.sleeps.forEach(function(sl){ if(tc >= sl.a && tc < sl.b) tc = sl.b; }); tc = Math.round(Math.max(tc, nw)/(15*60000))*15*60000;
-        if(tc < endT) out.push({t:tc, ico:'cup', t1:'Coffee ' + BC.hm(tc >= f.a && tc < f.b ? f.f.tz : tzAt(tc), tc) + (tc >= f.a && tc < f.b ? ' Watch' : ''), t3:'Ahead of your low point on the flight', rt:''});
+        if(tc < endT) out.push({t:tc, ico:'cup', t1:'Coffee ' + BC.hm(tc >= f.a && tc < f.b ? f.f.tz : tzAt(tc), tc) + (tc >= f.a && tc < f.b ? ' ' + esc(cityOfTz(f.f.tz)) + ' time' : ''), t3:'Ahead of your low point on the flight', rt:''});
       }
     }
   }
@@ -1158,9 +1208,9 @@ function viewRest(id){
        '<label class="row static"><span class="main"><span class="t1">Start</span></span><input class="pill" type="time" step="300" id="rs" value="' + esc(r.s || '') + '"></label>' +
        '<label class="row static"><span class="main"><span class="t1">End</span></span><input class="pill" type="time" step="300" id="re" value="' + esc(r.e || '') + '"></label></div>';
   if(f.restWin){
-    h += '<h2 class="grp-h">On your Watch</h2><section class="watch"><div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(f.f.tz, f.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(f.f.tz, f.restWin[1]) + '</div></div></div>' +
+    h += '<h2 class="grp-h">On ' + esc(cityOfTz(f.f.tz)) + ' time</h2><section class="watch"><div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(f.f.tz, f.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(f.f.tz, f.restWin[1]) + '</div></div></div>' +
          '<div style="height:1px;background:rgba(255,255,255,.3);margin:14px 0"></div><div style="display:flex;justify-content:space-between;font-size:17px"><span class="lab" style="font-size:17px">Or set a timer</span><b style="font-variant-numeric:tabular-nums">' + durTxt(f.restWin[1] - f.restWin[0]) + '</b></div></section>' +
-         '<p class="foot">Watch on ' + esc(f.f.city) + ' time, the clock you left on. UTC ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + '. Give yourself a few minutes to shake off grogginess before you are back on duty.</p>' +
+         '<p class="foot">' + esc(cityOfTz(f.f.tz)) + ' time is the clock you left on. UTC ' + BC.hm('UTC', f.restWin[0]) + '–' + BC.hm('UTC', f.restWin[1]) + '. Give yourself a few minutes to shake off grogginess before you are back on duty.</p>' +
          '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="clearRest" data-id="' + f.id + '">Clear crew rest</button></div>';
   } else if(r.s || r.e){
     h += '<p class="err">Those times do not fall inside this flight (' + BC.hm('UTC', f.a) + '–' + BC.hm('UTC', f.b) + ' UTC).</p>';
@@ -1186,7 +1236,6 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">Wake up</span></span><input class="pill" type="time" id="sWake" value="' + esc(S.wake) + '"></label></div>';
   h += '<h2 class="grp-h">Trips</h2><div class="list">' +
        '<label class="row static"><span class="main"><span class="t1">Landing to hotel bed</span><span class="t3">hours</span></span>' + num('sLand', S.landBed, 0, 6, 0.25) + '</label>' +
-       '<label class="row static"><span class="main"><span class="t1">Van before departure</span><span class="t3">hours</span></span>' + num('sVan', S.van, 0.5, 4, 0.25) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Time to get ready</span><span class="t3">minutes</span></span>' + num('sReady', Math.round(S.ready*60), 0, 180, 5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Layover sleep</span></span>' + sel('sBal', S.balance, [['home','Keep home time'],['balanced','Balanced'],['local','Follow local time']]) + '</label>' +
        '<button class="row" type="button" data-go="dest"><span class="main"><span class="t1">Destinations</span></span><span class="val">' + S.dests.length + ' airports</span>' + I.chev + '</button></div>' +
@@ -1264,7 +1313,7 @@ function renderSheet(){
   h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(d.f.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
        '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(d.t.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
        '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div>' +
-       '<label class="row static"><span class="main"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(d.f.city) + ' time' : '') : 'Optional · otherwise ' + hrsTxt(+S.van) + ' before') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
+       '<label class="row static"><span class="main"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(d.f.city) + ' time' : '') : 'Optional · if empty, ' + hrsTxt(+S.van || 2) + ' before departure') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
        '<p class="foot">Times are local at each airport, as on your schedule.</p>';
   h += '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:6px"><div style="margin-bottom:10px">Your role</div><div class="seg" role="group" aria-label="Your role"><button type="button" data-act="role" data-v="operate" aria-pressed="' + (role === 'operate') + '">Operate</button><button type="button" data-act="role" data-v="commute" aria-pressed="' + (role === 'commute') + '">Commute</button></div></div>';
   if(role === 'operate'){
@@ -1310,7 +1359,7 @@ function renderSleep(){
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="sleepCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (sl.id ? 'Edit sleep' : 'Log a sleep') + '</div><button class="navbtn r" type="button" data-act="sleepSave">Save</button></div>' +
       '<div class="list"><label class="row static"><span class="main"><span class="t1">Fell asleep</span></span><input class="pill" type="datetime-local" id="slBed" value="' + esc(sl.bed) + '"></label>' +
       '<label class="row static"><span class="main"><span class="t1">Woke up</span><span class="t3">' + (sl.open ? 'Leave empty if still asleep' : '') + '</span></span><input class="pill" type="datetime-local" id="slWake" value="' + esc(sl.wake) + '"></label></div>' +
-      '<p class="foot">' + esc(zoneLabel(P(), sl.zone || 'local', BC.localToMs(sl.tz, sl.bed))) + '. Rough times are fine.</p>' + zoneSeg('slZone', sl.zone || 'local') +
+      '<p class="foot">' + esc(zoneLabel(P(), sl.zone || 'local', BC.localToMs(sl.tz, sl.bed))) + '. Rough times are fine.</p>' + zoneSeg('slZone', sl.zone || 'local', BC.localToMs(sl.tz, sl.bed)) +
       '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:8px"><div style="margin-bottom:10px">It was</div><div class="seg" role="group" aria-label="Kind of sleep"><button type="button" data-act="slKind" data-v="nap" aria-pressed="' + (sl.kind === 'nap') + '">A nap</button><button type="button" data-act="slKind" data-v="main" aria-pressed="' + (sl.kind === 'main') + '">My main sleep</button></div></div>' +
       '<p class="foot">The app keeps what you log as fact and re-plans everything after it.</p>';
   if(V.sleepErr) h += '<p class="err">' + esc(V.sleepErr) + '</p>';
@@ -1420,7 +1469,7 @@ function go(path){
   var parts = String(path).split('/'), view = parts[0], arg = parts.slice(1).join('/') || null;
   if(view === 'flight'){ openFlight(arg); return; }
   if(view === 'sleepnew'){ openSleep(null); return; }
-  if(view === 'calc'){ V.calc = null; V.calcArg = arg; }
+  if(view === 'calc'){ if(arg){ var pa = arg.split('_'); openAdjust(+pa[0], +pa[1], pa[2]); } view = 'trip'; path = 'trip'; arg = null; }
   if(view === 'trip') V.scrollNow = true;
   if(view === 'rest' || view === 'lay' || view === 'chart') V.from = V.view;
   if(view === 'chart' && arg) V.chartMetric = arg;
@@ -1502,17 +1551,22 @@ document.addEventListener('click', function(e){
       var openNow = b2 > now();
       S.actual = S.actual.filter(function(x){ return !(x.a < b2 && a2 < (x.b || now())); });
       S.actual.push({id:nextActualId(), a:a2, b:openNow ? null : b2, kind:c2.kind}); S.actual.sort(function(p,q){ return p.a - q.a; });
-      save(); go('now'); return;
+      save(); if(V.adj){ V.adj = null; renderAdj(); render(); } else go('now'); return;
     }
     var r2 = cr2.r, Lc = r2.ctx.L;
     if(!Lc) return;
     var cfg2 = S.lay[Lc.id] || (S.lay[Lc.id] = {}), nw2 = now();
     var follow = cr2.then || (r2.rest ? r2.rest.blocks : []);
-    var before = r2.Pl.sleeps.filter(function(x){ return x.lay === Lc.id && !x.actual && !x.open && x.a >= nw2 && x.b <= a2; });
+    /* planned sleeps before this one stay in the plan, including ones not yet confirmed */
+    var before = r2.Pl.sleeps.filter(function(x){ return x.lay === Lc.id && !x.actual && !x.open && x.b <= a2; });
     cfg2.custom = before.concat([{a:a2, b:b2, kind:c2.kind}], follow).map(function(x){ return {a:x.a, b:x.b, kind:x.kind === 'nap' ? 'nap' : 'main'}; });
-    cfg2.choice = 'custom'; save(); go('now'); return;
+    cfg2.choice = 'custom'; save(); if(V.adj){ V.adj = null; renderAdj(); render(); } else go('now'); return;
   }
   if(act === 'editSleep'){ openSleep(id); return; }
+  if(act === 'adjust'){ var pv = b.dataset.v.split('_'); openAdjust(+pv[0], +pv[1], pv[2]); return; }
+  if(act === 'adjBg' && e.target === b || act === 'adjCancel'){ V.adj = null; renderAdj(); return; }
+  if(act === 'adjBest'){ V.calc.wakeAuto = true; renderAdj(); return; }
+  if(act === 'adjReset'){ var cr5 = S.lay[id]; if(cr5){ delete cr5.custom; delete cr5.choice; } save(); V.adj = null; renderAdj(); render(); return; }
   if(act === 'cafLog'){ openCaf(null); return; }
   if(act === 'cafEdit'){ openCaf(id); return; }
   if(act === 'cafBg' && e.target === b){ V.caf = null; renderCaf(); return; }
@@ -1577,6 +1631,13 @@ function autoArr(){
 }
 document.addEventListener('change', function(e){
   var t = e.target, id = t.id;
+  if(V.adj && (id === 'adjBed' || id === 'adjWake')){
+    if(t.value){
+      if(id === 'adjBed'){ var oa = BC.localToMs(V.calc.tz, V.calc.bed), ob = BC.localToMs(V.calc.tz, V.calc.wake), na2 = BC.localToMs(V.calc.tz, t.value); V.calc.bed = t.value; if(!isNaN(oa) && !isNaN(ob) && !isNaN(na2) && !V.calc.wakeAuto) V.calc.wake = BC.msToLocal(V.calc.tz, na2 + (ob - oa)); }
+      else { V.calc.wake = t.value; V.calc.wakeAuto = false; }
+    }
+    renderAdj(); return;
+  }
   if(V.calc && (id === 'cBed' || id === 'cWake')){
     if(t.value){
       if(id === 'cBed'){ V.calc.bed = t.value; V.calc.bedAuto = false; }
