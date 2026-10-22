@@ -462,7 +462,7 @@ function evalPlan(E, L, base, blocks, scoreRest, ck){
     var prev = merge(sleeps.filter(function(s){ return s.b <= main.a + 1; }));
     if(prev.length) lastWake = prev[prev.length-1][1];
   }
-  return {net:bad ? -1e9 : score - cost, score:score, cost:cost, land:landA, fmin:fmin < 101 ? fmin : landA, mean:sum/n, min:mn,
+  return {net:score - cost - (bad ? 1000 : 0), score:score, cost:cost, land:landA, fmin:fmin < 101 ? fmin : landA, mean:sum/n, min:mn,
           outMin:outMin, ease:ease, bad:bad, awakeAtBed:(main && lastWake != null) ? (main.a - lastWake)/H : null, run:R};
 }
 
@@ -483,7 +483,13 @@ function planLayover(E, L, base, fx){
   var lateDecided = naps.some(function(n){ return n.a >= cut + 4*H && (!refMain || n.a > refMain.a); }) || (openNap && openNap.a >= cut + 4*H);
   var bedC = [];
   if(refMain) bedC = [refMain.a];
-  else if(L.out) bedC = [Math.max(L.out.ne + 0.5*H, T)];
+  else if(L.out){
+    /* after a crew meetup: straight to bed, or at your usual bedtime that night (an hour either side) */
+    var after = Math.max(L.out.ne + 0.5*H, T);
+    bedC = [after];
+    var un = ubAll.filter(function(u){ return u.a > after - H && u.a - after < 8*H; })[0];
+    if(un) [-1, 0, 1].forEach(function(k){ var x = un.a + k*H; if(x > after + 0.25*H && x <= L.we - 5*H) bedC.push(x); });
+  }
   else if(ub.length){ var B = ub[ub.length-1].a; [-1, 0, 1].forEach(function(k){ var x = B + k*H; if(x >= T && x <= L.we - 5*H) bedC.push(x); }); }
   if(!bedC.length) bedC = [Math.max(T, L.we - 9*H)];
   var hoursC = [6.5, 7, 7.5, 8, 8.5, 9.5];
