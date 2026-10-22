@@ -188,7 +188,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 31';
+var BUILD = '22 Oct 2026 · build 32';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -395,8 +395,8 @@ function events(Pl, from, max){
     var L = Pl.layovers.filter(function(x){ return x.outF.id === f.id; })[0];
     var t = L ? L.duty : f.a;
     if(f.b < from || t < from - 0) { if(!(f.a >= from)) return; }
-    var title = (L ? 'Van · ' : '') + f.f.code + ' → ' + f.t.code + (L ? ' ' + BC.hm(f.f.tz, f.a) : '');
-    ev.push({t:L ? L.duty : f.a, tz:f.f.tz, title:title, sub:'Lands ' + whenTxt(f.t.tz, f.b, f.a) + ' ' + f.t.city + ' time', flight:f, go:'flight/' + f.id});
+    var title = L ? 'Van to ' + f.f.code : f.f.code + ' → ' + f.t.code;
+    ev.push({t:L ? L.duty : f.a, tz:f.f.tz, title:title, sub:(L ? f.f.code + ' → ' + f.t.code + ' at ' + BC.hm(f.f.tz, f.a) + ' · lands ' : 'Lands ') + whenTxt(f.t.tz, f.b, f.a) + ' ' + cityOfTz(f.t.tz) + ' time', flight:f, go:'flight/' + f.id});
   });
   ev.sort(function(p,q){ return p.t - q.t; });
   return ev.slice(0, max);
@@ -832,7 +832,7 @@ function tlRow(Pl, it, nw){
     var pend = past || (sl.a < nw), srcTxt = sl.src === 'yours' ? 'Your times' : sl.src === 'pick' ? 'Auto · option you picked' : 'Auto';
     return row(calc, sl.src === 'yours' ? 'var(--sleep)' : 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', sl.src === 'yours' ? 'stroke="#fff"' : 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), srcTxt + (pend ? ', not confirmed' : '') + ' · ' + dur, I.chev);
   }
-  if(it.kind === 'van') return row('data-go="flight/' + it.f.id + '"', 'var(--fill)', I.car.replace('stroke="currentColor"', 'stroke="var(--label)"'), 'Van · ' + esc(it.f.f.code + ' → ' + it.f.t.code), it.f.van ? 'Pickup you set · ' + esc(cityOfTz(it.f.f.tz)) + ' time' : 'Assumed ' + hrsTxt(+S.van || 2) + ' before departure · tap to set it', I.chev);
+  if(it.kind === 'van') return row('data-go="flight/' + it.f.id + '"', 'var(--fill)', I.car.replace('stroke="currentColor"', 'stroke="var(--label)"'), 'Van to ' + esc(it.f.f.code), 'For ' + esc(it.f.f.code + ' → ' + it.f.t.code) + ' at ' + BC.hm(it.f.f.tz, it.f.a) + ' · ' + (it.f.van ? 'pickup you set' : 'assumed ' + hrsTxt(+S.van || 2) + ' before, tap to set it'), I.chev);
   if(it.kind === 'caf') return row('data-act="cafEdit" data-id="' + it.c.id + '"', 'var(--coffee)', I.cup.replace('stroke="currentColor"', 'stroke="#fff"'), esc(cafName(it.c.mg)), 'Logged · ' + it.c.mg + ' mg', '<span class="tag">Edit</span>');
   if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
     'Crew meetup until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
