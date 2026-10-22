@@ -105,7 +105,7 @@ var PAR = {
   effMin:0.55, solBase:8, solRange:22,
   inMax:22, inTau:0.6, inDur0:1.8, inDurS:1.3,
   prcAmp:0.4, prcAsym:0.25, lowFrac:0.1,
-  warnA:25, warnS:0.70, alcEff:0.85
+  warnS:0.70
 };
 var CW = (function(){
   function raw(p){ return -Math.cos(2*Math.PI*(p-1)/24) - 0.2*Math.cos(2*Math.PI*(p-9.5)/12); }
@@ -155,25 +155,19 @@ function cafMg(log, t){
 function cafF(mg){ return mg > 0 ? mg/(mg + CAF.c50) : 0; }
 function cafLog(S){ return (S && S.caf && Array.isArray(S.caf.log)) ? S.caf.log : []; }
 function habitSleeping(hr, bedH, wakeH){ return bedH > wakeH ? (hr >= bedH || hr < wakeH) : (hr >= bedH && hr < wakeH); }
+/* sleeps as sorted [start, end] intervals, overlapping ones joined */
 function merge(list){
-  var s = list.map(function(x){ return [x.a, x.b, x.alc || false]; }).sort(function(p,q){ return p[0] - q[0]; });
+  var s = list.map(function(x){ return [x.a, x.b]; }).sort(function(p,q){ return p[0] - q[0]; });
   var out = [];
   s.forEach(function(iv){
     var l = out[out.length-1];
-    if(l && iv[0] <= l[1]){ l[1] = Math.max(l[1], iv[1]); l[2] = l[2] || iv[2]; } else out.push([iv[0], iv[1], iv[2]]);
+    if(l && iv[0] <= l[1]) l[1] = Math.max(l[1], iv[1]); else out.push([iv[0], iv[1]]);
   });
   return out;
 }
 
-/* body-clock hour at a model point (UTC plus the body's own offset), and a +-12 h wrap */
-function bodyHour(p){ return (((p.t/H + p.E) % 24) + 24) % 24; }
+/* a time difference in hours, wrapped to -12..+12 */
 function wrap12(x){ return (((x + 12) % 24) + 24) % 24 - 12; }
-/* hours of sleep in [from, to) that fall in the body's own night (its usual bedtime to wake-up) */
-function nightSleepH(E, R, from, to){
-  var h = 0;
-  R.pts.forEach(function(p){ if(p.sl && p.t >= from && p.t < to && habitSleeping(bodyHour(p), E.bedH, E.wakeH)) h += R.dt/H; });
-  return h;
-}
 
 /* when you must be up for a flight: the van (yours, or the usual time before departure) less time to get ready */
 function vanOf(S, f){ return f.van || f.a - (+S.van || 2)*H; }
@@ -248,7 +242,7 @@ function env(S, now){
 /* steady state after the usual routine at home, plus the reference light drift (cached) */
 var seedCache = {};
 function seedFor(E){
-  var S = E.S, home = E.home, bedH = E.bedH, wakeH = E.wakeH, m = (((wakeH - 2.5) % 24) + 24) % 24;
+  var home = E.home, bedH = E.bedH, wakeH = E.wakeH, m = (((wakeH - 2.5) % 24) + 24) % 24;
   var off = offH(home.tz, E.t0);
   var key = [bedH, wakeH, home.code, E.g, dateStr(home.tz, E.t0)].join('|');
   if(seedCache[key]) return seedCache[key];
@@ -276,8 +270,11 @@ function seedFor(E){
   return res;
 }
 
-/* one run of the model over [E.t0, until] with the given sleeps ({a,b,alc}) */
-function run(E, sleeps, until){
+/* One run of the model over [E.t0, until] with the given sleeps ({a, b}).
+   snapAt: also return a checkpoint of the state just before that time, so that many runs which only differ
+   after it (the plans for one layover) can start from there instead of from the beginning of the trip.
+   ck: a checkpoint to start from. The sleeps before the checkpoint must be the same as when it was taken. */
+function run(E, sleeps, until, ck, snapAt){
   var sd = seedFor(E), m = sd.m;
   var t0 = E.t0, t1 = Math.min(E.t1, until || E.t1);
   var dtH = Math.max(0.1, (E.t1 - E.t0)/H/2000), dt = dtH*H, N = Math.ceil((t1 - t0)/dt);
@@ -290,12 +287,29 @@ function run(E, sleeps, until){
     for(var k=si;k<SL.length && SL[k][0] <= t;k++) if(t < SL[k][1]) return SL[k];
     return null;
   }
-  var pts = new Array(N + 1), st = {s:sd.s0, since:0, prev:false}, Ebody = offH(E.home.tz, t0), clog = cafLog(E.S);
-  for(var i=0;i<=N;i++){
-    var t = Math.min(t0 + i*dt, t1), L = E.locAt(t);
-    var c = CW(phiOf(t, Ebody, m)), cl = CW(phiOf(t, L.off, m));
-    var W = 0;
-    for(var wi=0; wi<wakes.length; wi++){
+  var pts = new Array(N + 1), st = {s:sd.s0, since:0, prev:false}, Ebody = offH(E.home.tz, t0), clog = cafLog(E.S), i0 = 0;
+  if(ck && ck.i <= N){
+    i0 = ck.i; st = {s:ck.st.s, since:ck.st.since, prev:ck.st.prev}; Ebody = ck.Ebody;
+    for(var j=0;j<i0;j++) pts[j] = ck.pts[j];
+    wakes.forEach(function(w){ if(ck.s0[w.on] !== undefined) w.s0 = ck.s0[w.on]; if(ck.amp[w.t] !== undefined && w.t < t0 + i0*dt) w.amp = ck.amp[w.t]; });
+  }
+  var snapI = snapAt != null ? Math.max(0, Math.min(N, Math.floor((snapAt - t0)/dt))) : -1, snap = null, w0 = 0;
+  /* where you are and how light it is at each step does not depend on the sleeps, so it is worked out once per trip */
+  var env = E.env && E.env.dt === dt ? E.env : (E.env = {dt:dt, off:[], tz:[], fl:[], lw:[], ni:[]});
+  for(var e0 = env.off.length; e0 <= N; e0++){
+    var te = Math.min(t0 + e0*dt, E.t1), Le = E.locAt(te), Lme = E.locAt(te + dt/2), eme = sunElev(te + dt/2, Lme.lat, Lme.lon);
+    env.off.push(Le.off); env.tz.push(Le.tz); env.fl.push(Le.fl); env.lw.push(lightLevel(eme, false, E.g)); env.ni.push(eme < -0.833);
+  }
+  for(var i=i0;i<=N;i++){
+    var t = Math.min(t0 + i*dt, t1);
+    if(i === snapI){
+      snap = {i:i, st:{s:st.s, since:st.since, prev:st.prev}, Ebody:Ebody, pts:pts.slice(0, i), s0:{}, amp:{}};
+      wakes.forEach(function(w){ if(w.s0 !== null) snap.s0[w.on] = w.s0; if(w.amp !== null) snap.amp[w.t] = w.amp; });
+    }
+    var c = CW(phiOf(t, Ebody, m)), W = 0;
+    /* grogginess after each wake-up, for up to 4 hours (older wake-ups are skipped) */
+    while(w0 < wakes.length - 1 && wakes[w0].amp !== null && t - wakes[w0].t >= 4*H) w0++;
+    for(var wi=w0; wi<wakes.length; wi++){
       var w = wakes[wi];
       if(w.s0 === null && t >= w.on) w.s0 = st.s;
       if(t < w.t) continue;
@@ -306,18 +320,15 @@ function run(E, sleeps, until){
       var dw = (t - w.t)/H;
       if(dw < 4) W += w.amp*Math.exp(-dw/PAR.inTau);
     }
-    var mg = clog.length ? cafMg(clog, t) : 0, cf = cafF(mg);
-    var A0 = 100*(PAR.wS*(1 - st.s) + PAR.wC*c) + CAF.alert*cf;
-    var slp = sleepAt(t);
-    pts[i] = {t:t, A:Math.max(0, Math.min(100, A0 - W)), Ai:Math.max(0, Math.min(100, A0)), S:st.s, cb:c, cl:cl, caf:mg,
-              E:Ebody, off:L.off, tz:L.tz, fl:L.fl, sl:!!slp, ni:sunElev(t, L.lat, L.lon) < -0.833};
+    var mg = clog.length ? cafMg(clog, t) : 0;
+    var A0 = 100*(PAR.wS*(1 - st.s) + PAR.wC*c) + CAF.alert*cafF(mg), slp = sleepAt(t);
     var mid = t + dt/2, sm = sleepAt(mid), asl = !!sm, phi = phiOf(mid, Ebody, m);
-    stepS(st, asl, CW(phi), dtH, sm && sm[2] ? PAR.alcEff : 1, clog.length ? cafF(cafMg(clog, mid)) : 0);
-    var Lm = E.locAt(mid);
-    Ebody += (lightLevel(sunElev(mid, Lm.lat, Lm.lon), asl, E.g)*prc(phi, sd.phiC) - sd.drift)*dtH;
+    pts[i] = {t:t, A:Math.max(0, Math.min(100, A0 - W)), S:st.s, cb:c, caf:mg, E:Ebody, off:env.off[i], tz:env.tz[i], fl:env.fl[i], sl:!!slp, ni:env.ni[i]};
+    stepS(st, asl, CW(phi), dtH, 1, clog.length ? cafF(cafMg(clog, mid)) : 0);
+    Ebody += ((asl ? 0 : env.lw[i])*prc(phi, sd.phiC) - sd.drift)*dtH;
     Ebody = Math.max(E.Elo, Math.min(E.Ehi, Ebody));
   }
-  return {t0:t0, t1:t1, dt:dt, pts:pts, Pref:sd.Pref, s0:sd.s0};
+  return {t0:t0, t1:t1, dt:dt, pts:pts, Pref:sd.Pref, s0:sd.s0, ck:snap};
 }
 /* how easily you would fall asleep at a model point: above 0.85 easy, 0.6 to 0.85 OK, below hard */
 function easeOf(R, p){ return (p.S - 0.5*p.cb)/R.Pref - CAF.ease*cafF(p.caf || 0); }
@@ -340,7 +351,7 @@ function color(a){
 
 /* ---------- sleeps the app assumes: nights at home and crew rest ---------- */
 function homeNights(E){
-  var S = E.S, out = [], home = E.home, F = E.F, lead = ((+S.van || 2) + (+S.ready || 0.75))*H;
+  var S = E.S, out = [], home = E.home, F = E.F;
   var d = dateStr(home.tz, E.t0), last = dateStr(home.tz, E.t1);
   for(var n=0; n<16 && d <= last; n++, d = addDays(d, 1)){
     var a = localToMs(home.tz, d + 'T' + S.bed);
@@ -406,10 +417,10 @@ function usualBeds(E, L){
   return out;
 }
 
-function evalPlan(E, L, base, blocks, scoreRest){
+function evalPlan(E, L, base, blocks, scoreRest, ck){
   var land = L.outF.b, sleeps = base.concat(blocks);
   if(scoreRest) sleeps = sleeps.concat([scoreRest]);
-  var R = run(E, sleeps, land + H);
+  var R = run(E, sleeps, land + H, ck);
   var sum = 0, n = 0, mn = 101, ls = 0, ln = 0, fmin = 101, press = 0;
   R.pts.forEach(function(p){
     if(p.sl) return;
@@ -432,11 +443,11 @@ function evalPlan(E, L, base, blocks, scoreRest){
     /* trying a nap that does not come costs little, so naps are penalised half as much as a main sleep */
     cost += (b.kind === 'nap' ? 12.5 : 25)*Math.max(0, 0.7 - e);
   });
-  var outMin = null, outAvg = null;
+  /* a crew meetup: plans that leave you less than Okay for it lose points */
+  var outMin = null;
   if(L.out){
-    var os = 0, on = 0; outMin = 101;
-    R.pts.forEach(function(p){ if(p.t >= L.out.ns && p.t <= L.out.ne && !p.sl){ os += p.A; on++; if(p.A < outMin) outMin = p.A; } });
-    outAvg = on ? os/on : null;
+    outMin = 101;
+    R.pts.forEach(function(p){ if(p.t >= L.out.ns && p.t <= L.out.ne && !p.sl && p.A < outMin) outMin = p.A; });
     if(outMin < 101) cost += 0.5*Math.max(0, 45 - outMin); else outMin = null;
   }
   var main = blocks.filter(function(b){ return b.kind === 'main' && !b.mid; })[0];
@@ -451,8 +462,8 @@ function evalPlan(E, L, base, blocks, scoreRest){
     var prev = merge(sleeps.filter(function(s){ return s.b <= main.a + 1; }));
     if(prev.length) lastWake = prev[prev.length-1][1];
   }
-  return {net:bad ? -1e9 : score - cost, score:score, cost:cost, land:landA, night:nightSleepH(E, R, L.ws, land), fmin:fmin < 101 ? fmin : landA, mean:sum/n, min:mn,
-          outMin:outMin, outAvg:outAvg, ease:ease, bad:bad, awakeAtBed:(main && lastWake != null) ? (main.a - lastWake)/H : null, run:R};
+  return {net:bad ? -1e9 : score - cost, score:score, cost:cost, land:landA, fmin:fmin < 101 ? fmin : landA, mean:sum/n, min:mn,
+          outMin:outMin, ease:ease, bad:bad, awakeAtBed:(main && lastWake != null) ? (main.a - lastWake)/H : null, run:R};
 }
 
 var NAMES = {none:'No nap', now:'Nap now', later:'Nap later', both:'Short nap now, nap later'};
@@ -481,14 +492,15 @@ function planLayover(E, L, base, fx){
     openEnds = [1, 1.5, 2, 2.5, 3, 3.5].map(function(h){ return openNap.a + h*H; }).filter(function(e){ return e >= now + 15*MIN && e <= L.we; });
     if(!openEnds.length) openEnds = [Math.min(L.we, now + 15*MIN)];
   }
-  var opts = {}, all = [];
+  var opts = {};
+  /* every plan below only differs after T (or after an open nap began), so run the shared part once */
+  var ckT = Math.min(T, fx.open ? fx.open.a : T) - 0.5*H, ck = run(E, base, ckT + H, null, ckT).ck;
   function consider(id, blocks){
-    var r = evalPlan(E, L, base, blocks, scoreRest);
+    var r = evalPlan(E, L, base, blocks, scoreRest, ck);
     if(!r) return;
-    all.push({id:id, blocks:blocks, res:{net:r.net, land:r.land, fmin:r.fmin, night:r.night, bad:r.bad}});
     if(!opts[id] || r.net > opts[id].res.net) opts[id] = {id:id, blocks:blocks, res:r};
   }
-  function blk(a, b, kind, open){ return {a:a, b:b, kind:kind, alc:false, open:!!open}; }
+  function blk(a, b, kind, open){ return {a:a, b:b, kind:kind, open:!!open}; }
   /* the other nights of a long layover: your usual night (on the balance setting's clock), cut short for the van */
   var taken = fx.fixed.concat(fx.skips, fx.open ? [{a:fx.open.a, b:Math.max(now, fx.open.a) + 4*H}] : [], L.out ? [{a:L.out.ns, b:L.out.ne}] : []);
   function midsFor(ma, mb){
@@ -498,7 +510,7 @@ function planLayover(E, L, base, fx){
       if(u.a < Math.max(T, L.ws + 2*H) || b - u.a < 4*H) return;
       if(ma != null && u.a < mb + 6*H && ma < b + 6*H) return;
       if(taken.some(function(x){ return u.a < x.b && x.a < b; })) return;
-      out.push({a:u.a, b:b, kind:'main', mid:true, alc:false, open:false});
+      out.push({a:u.a, b:b, kind:'main', mid:true, open:false});
     });
     return out;
   }
@@ -547,7 +559,7 @@ function planLayover(E, L, base, fx){
   if(L.custom){
     var cb = L.custom.filter(function(x){ return x.b > x.a && x.a >= T - MIN && x.a >= L.arr && x.b <= L.dep; })
       .map(function(x){ var k = blk(x.a, x.b, x.kind === 'nap' ? 'nap' : 'main'); return k; });
-    if(cb.length || L.custom.length){ var rc = evalPlan(E, L, base, cb, scoreRest); if(rc) opts.custom = {id:'custom', blocks:cb, res:rc}; }
+    if(cb.length || L.custom.length){ var rc = evalPlan(E, L, base, cb, scoreRest, ck); if(rc) opts.custom = {id:'custom', blocks:cb, res:rc}; }
   }
   var replan = fx.fixed.length || fx.skips.length || fx.open;
   function nameOf(k){
@@ -564,17 +576,7 @@ function planLayover(E, L, base, fx){
   var good = list.filter(function(o){ return !o.m.bad && o.id !== 'custom'; });
   var pool = good.length ? good : list;
   var sug = pool.length ? pool.reduce(function(p, q){ return q.m.net > p.m.net ? q : p; }, pool[0]) : null;
-  /* body-clock plan: the most sleep in the body's own night, landing within 5 points of the flight's best */
-  var body = null;
-  if(sug && sug.id !== 'custom'){
-    var ref = sug.m;
-    all.forEach(function(c){
-      var r = c.res;
-      if(r.bad || r.land < ref.land - 5 || r.fmin < ref.fmin - 5) return;
-      if(!body || r.night > body.res.night + 0.05 || (Math.abs(r.night - body.res.night) <= 0.05 && r.net > body.res.net)) body = c;
-    });
-  }
-  return {options:list, suggested:sug ? sug.id : null, body:body ? {id:body.id, blocks:body.blocks, m:body.res} : null};
+  return {options:list, suggested:sug ? sug.id : null};
 }
 
 /* ---------- the whole trip ---------- */
@@ -604,7 +606,7 @@ function plan(S, now, opt){
     L.fixed = fixed; L.skips = sk; L.open = op; L.T = T;
     var b = home.concat(rests.filter(function(r){ return r.b <= L.ws; }), done.map(function(x){ return {a:x.a, b:x.b}; }), chosen);
     var P = planLayover(E, L, b, {fixed:fixed, open:op, skips:sk, T:T, now:now});
-    L.options = P.options; L.suggested = P.suggested; L.body = P.body;
+    L.options = P.options; L.suggested = P.suggested;
     var want = L.choice || (L.custom ? 'custom' : null);
     var pick = L.options.filter(function(o){ return o.id === want; })[0] || L.options.filter(function(o){ return o.id === P.suggested; })[0];
     L.picked = pick ? pick.id : null;
@@ -617,7 +619,7 @@ function plan(S, now, opt){
     L.better = null;
     if(pick && sugO && pick.id !== sugO.id && sugO.m.net - pick.m.net >= 2 && (sugO.m.land - pick.m.land >= 2 || sugO.m.fmin - pick.m.fmin >= 2))
       L.better = {id:sugO.id, name:sugO.name, land:sugO.m.land, landMine:pick.m.land, fmin:sugO.m.fmin, fminMine:pick.m.fmin};
-    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, alc:x.alc, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, src:L.src, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
+    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, src:L.src, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
   });
   /* a sleep you are in outside any layover ends at your usual length */
   var extra = [];
@@ -640,7 +642,7 @@ function plan(S, now, opt){
   return val;
 }
 
-/* ---------- sleep calculator ---------- */
+/* ---------- changing a sleep ---------- */
 /* Replace whatever is planned over [w.a, w.b] with that sleep and measure the result. Logged sleeps
    that overlap it are replaced too, so you can also ask "what if I had slept then". */
 function contextFor(Pl, t, fid){
@@ -651,8 +653,7 @@ function contextFor(Pl, t, fid){
 }
 function metricsOf(R, w, ctx, E){
   function A(t){ return ptAt(R, t).A; }
-  var out = {wake15:A(w.b + 15*MIN), wake60:A(w.b + 60*MIN)};
-  out.night = nightSleepH(E, R, w.a, ctx.f ? ctx.f.b : w.b + 12*H);
+  var out = {wake15:A(w.b + 15*MIN)};
   var q = ptAt(R, w.a - R.dt); out.ease = easeOf(R, q);
   if(ctx.L) out.van = A(ctx.L.duty);
   if(ctx.f){
@@ -692,75 +693,28 @@ function nextSleep(Pl, w, m, ctx){
   var q = ptAt(Pl.R, n.a - Pl.R.dt);
   m.nextEase = easeOf(Pl.R, q); m.nextAt = n.a; m.nextKind = n.kind === 'nap' ? 'nap' : 'main';
 }
-/* then: a fixed set of sleeps after w (a whole plan) instead of letting the planner fill the rest */
-function whatIf(S, now, w, then, fid){
-  var Pl = plan(S, now), ctx = contextFor(Pl, w.a, fid), base = metricsOf(Pl.R, w, ctx, Pl.E), P2, rest = null, L2;
-  if(then && ctx.L){
-    var S3 = stateBefore(S, Pl, w.a, ctx.L, w), cfg = S3.lay[ctx.L.id] || (S3.lay[ctx.L.id] = {});
-    cfg.custom = [w].concat(then).map(function(x){ return {a:x.a, b:x.b, kind:x.kind === 'nap' ? 'nap' : 'main'}; });
-    cfg.choice = 'custom';
-    P2 = plan(S3, now, {noCache:true});
-    rest = {name:'', blocks:then};
-  } else {
-    P2 = plan(stateWith(S, Pl, w, ctx.L), Math.max(w.b, now) + MIN, {noCache:true});
-    L2 = ctx.L ? P2.layovers.filter(function(x){ return x.id === ctx.L.id; })[0] : null;
-    if(L2){ var o = L2.options.filter(function(x){ return x.id === L2.picked; })[0]; if(o) rest = {name:o.name, blocks:o.blocks.filter(function(b){ return b.a >= w.b; })}; }
-  }
+/* Take the sleep w as slept, let the planner fill in the rest of the layover, and measure the result
+   against the current plan. fid: the flight to measure against (default the next operating flight). */
+function whatIf(S, now, w, fid){
+  var Pl = plan(S, now), ctx = contextFor(Pl, w.a, fid), base = metricsOf(Pl.R, w, ctx, Pl.E), rest = null;
+  var P2 = plan(stateWith(S, Pl, w, ctx.L), Math.max(w.b, now) + MIN, {noCache:true});
+  var L2 = ctx.L ? P2.layovers.filter(function(x){ return x.id === ctx.L.id; })[0] : null;
+  if(L2){ var o = L2.options.filter(function(x){ return x.id === L2.picked; })[0]; if(o) rest = {name:o.name, blocks:o.blocks.filter(function(b){ return b.a >= w.b; })}; }
   var m = metricsOf(P2.R, w, ctx, P2.E);
   nextSleep(P2, w, m, ctx); nextSleep(Pl, w, base, ctx);
   return {m:m, base:base, ctx:ctx, rest:rest, P2:P2, Pl:Pl,
           wakeBy:ctx.L ? ctx.L.we : (ctx.f ? wakeByOf(S, ctx.f) : null)};
 }
-function bestWake(S, now, a, kind){
-  var Pl = plan(S, now), ctx = contextFor(Pl, a);
-  if(ctx.L){
-    var P2 = plan(stateWith(S, Pl, {a:a, b:null, kind:kind}, ctx.L), a + MIN, {noCache:true});
-    if(P2.openEnd) return P2.openEnd;
-  }
-  var len = kind === 'nap' ? 2*H : ((((hhmmToH(S.wake) - hhmmToH(S.bed)) % 24) + 24) % 24 || 8)*H;
-  var cap = ctx.f ? wakeByOf(S, ctx.f) : a + 12*H;
-  return Math.min(a + len, cap);
-}
-
-/* ---------- find the best sleep ----------
-   mode 'wake': bedtime fixed, try wake-ups; 'bed': wake-up fixed, try bedtimes; 'plan': the whole rest of the layover.
-   goal 'flight': the best alertness from the van to landing, less a penalty if you are unlikely to fall asleep.
-   goal 'body': the most sleep in your body's own night, as long as landing and the lowest point in flight
-   stay within 5 points of the flight's best. */
-function easeCost(m, kind){ return (kind === 'nap' ? 12.5 : 25)*Math.max(0, 0.7 - m.ease); }
-function pickBest(c, goal){
-  if(!c.length) return null;
-  var fb = c.reduce(function(p, q){ return q.net > p.net ? q : p; });
-  if(goal !== 'body') return fb;
-  var r = fb.m, pool = c.filter(function(x){ return (r.land == null || x.m.land >= r.land - 5) && (r.fmin == null || x.m.fmin >= r.fmin - 5); });
-  return pool.reduce(function(p, q){ return (q.m.night > p.m.night + 0.05 || (Math.abs(q.m.night - p.m.night) <= 0.05 && q.net > p.net)) ? q : p; }, fb);
-}
+/* ---------- best wake-up for a bedtime ----------
+   Tries wake-ups from 5 to 10 hours later (30 minutes to 3½ hours for a nap) in 30-minute steps, re-planning
+   the rest of the layover for each, and keeps the one with the best alertness from the van to landing, less a
+   penalty when you would struggle to fall asleep then or at your next sleep. */
+function easeCost(e, kind){ return (kind === 'nap' ? 12.5 : 25)*Math.max(0, 0.7 - e); }
 function findBest(S, now, o){
-  var Pl = plan(S, now), goal = o.goal === 'body' ? 'body' : 'flight';
-  var fl = o.fid != null ? Pl.flights.filter(function(f){ return String(f.id) === String(o.fid); })[0] : null;
-  if(o.mode === 'plan'){
-    var L = fl ? Pl.layovers.filter(function(x){ return x.outF.id === fl.id && now < x.we; })[0]
-               : (Pl.layovers.filter(function(x){ return now >= x.arr - H && now < x.we; })[0] || Pl.layovers.filter(function(x){ return x.arr > now; })[0]);
-    if(!L){
-      /* no layover before that flight (it leaves from home, or the van is due): the planned sleeps before it */
-      var hs = Pl.sleeps.filter(function(x){ return x.kind !== 'rest' && !x.actual && !x.open && x.a >= now - 2*MIN && (!fl || x.b <= wakeByOf(S, fl) + MIN); });
-      if(!hs.length) return {err:'No sleep left to plan before that flight.'};
-      return {a:hs[0].a, b:hs[0].b, kind:hs[0].kind === 'nap' ? 'nap' : 'main', then:hs.slice(1).map(function(b){ return {a:b.a, b:b.b, kind:b.kind === 'nap' ? 'nap' : 'main'}; }), name:'Your usual nights', goal:goal, lay:null, home:true};
-    }
-    var S2 = JSON.parse(JSON.stringify(S)); S2.lay = S2.lay || {};
-    if(S2.lay[L.id]){ delete S2.lay[L.id].custom; delete S2.lay[L.id].choice; }
-    var P2 = plan(S2, now, {noCache:true}), L2 = P2.layovers.filter(function(x){ return x.id === L.id; })[0];
-    var op = !L2 ? null : goal === 'body' ? L2.body : L2.options.filter(function(x){ return x.id === L2.suggested; })[0];
-    if(!op) return {err:'Nothing to plan for that layover.'};
-    var bl = op.blocks.filter(function(b){ return !b.open && b.a >= now - 2*MIN; });
-    if(!bl.length) return {err:'Nothing left to plan before the van. Type a bedtime to try one.'};
-    return {a:bl[0].a, b:bl[0].b, kind:bl[0].kind, then:bl.slice(1).map(function(b){ return {a:b.a, b:b.b, kind:b.kind}; }), name:goal === 'body' ? 'Body-clock plan' : op.name, goal:goal, lay:L.id};
-  }
-  var kind = o.kind === 'nap' ? 'nap' : 'main';
+  var Pl = plan(S, now), kind = o.kind === 'nap' ? 'nap' : 'main';
   var steps = kind === 'nap' ? [0.5, 1, 1.5, 2, 2.5, 3, 3.5] : [5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
-  var tries = steps.map(function(hh){ return o.mode === 'bed' ? {a:o.b - hh*H, b:o.b} : {a:o.a, b:o.a + hh*H}; });
   var acts = (S.actual || []).filter(function(x){ return x.b != null; });
-  var ok = tries.filter(function(w){
+  var ok = steps.map(function(hh){ return {a:o.a, b:o.a + hh*H}; }).filter(function(w){
     if(w.b > now && w.a < now - 2*MIN) return false;
     if(Pl.flights.some(function(f){ return w.a < f.b && f.a < w.b; })) return false;
     if(acts.some(function(x){ return w.a < x.b && x.a < w.b; })) return false;
@@ -775,15 +729,14 @@ function findBest(S, now, o){
     }
     return true;
   });
-  if(!ok.length) return {err:o.mode === 'bed' ? 'No bedtime before that wake-up fits around your flights, the night out and now.' : 'No wake-up after that bedtime fits before you have to be up.'};
-  var c = ok.map(function(w){
-    var r = whatIf(S, now, {a:w.a, b:w.b, kind:kind}, null, o.fid);
-    var net = (r.m.score || 0) - (w.a >= now ? easeCost(r.m, kind) : 0);
-    if(r.m.nextEase != null) net -= easeCost({ease:r.m.nextEase}, r.m.nextKind);
-    return {a:w.a, b:w.b, m:r.m, net:net};
+  if(!ok.length) return {err:'No wake-up after that bedtime fits before you have to be up.'};
+  var best = null;
+  ok.forEach(function(w){
+    var m = whatIf(S, now, {a:w.a, b:w.b, kind:kind}, o.fid).m;
+    var net = (m.score || 0) - (w.a >= now ? easeCost(m.ease, kind) : 0) - (m.nextEase != null ? easeCost(m.nextEase, m.nextKind) : 0);
+    if(!best || net > best.net) best = {a:w.a, b:w.b, net:net};
   });
-  var best = pickBest(c, goal);
-  return {a:best.a, b:best.b, kind:kind, goal:goal, tried:c.length};
+  return {a:best.a, b:best.b, kind:kind, tried:ok.length};
 }
 
 /* ---------- caffeine advice ----------
@@ -810,9 +763,12 @@ function cafAdvice(S, now){
       tc = Math.max(tc, now);
       tc = Math.round(tc/(15*MIN))*15*MIN;
       var after = Pl.sleeps.filter(function(s){ return s.a > tc && s.b - s.a >= 1.5*H; })[0];
-      var S2 = JSON.parse(JSON.stringify(S)); S2.caf = S2.caf || {}; S2.caf.log = cafLog(S2).concat([{t:tc, mg:100}]);
-      var P2 = plan(S2, now, {noCache:true}), f2 = P2.flights.filter(function(x){ return x.id === f.id; })[0];
-      out.coffee = {t:tc, low:lo.t, lowA:lo.A, f:f, inFlight:tc >= f.a && tc < f.b, before:{min:f.minA, land:f.landA}, after:f2 ? {min:f2.minA, land:f2.landA} : null,
+      /* the same plan with one more coffee: a single model run is enough */
+      var E2 = {}; for(var k in Pl.E) E2[k] = Pl.E[k];
+      E2.S = {caf:{log:cafLog(S).concat([{t:tc, mg:100}])}};
+      var R2 = run(E2, Pl.sleeps), mn2 = 101, ld2 = null;
+      R2.pts.forEach(function(p){ if(p.t >= f.a && p.t <= f.b && !p.sl){ if(p.A < mn2) mn2 = p.A; ld2 = p.A; } });
+      out.coffee = {t:tc, low:lo.t, lowA:lo.A, f:f, inFlight:tc >= f.a && tc < f.b, before:{min:f.minA, land:f.landA}, after:{min:mn2 < 101 ? mn2 : null, land:ld2},
                     conflict:after && after.a - tc < cut ? after : null};
     }
   }
@@ -829,6 +785,7 @@ function clock(S, now){
   if(E.F.length){
     var last = E.F[E.F.length - 1], back = last.t.code === E.home.code;
     var E2 = {}; for(var k in E) E2[k] = E[k];
+    E2.env = null;
     if(back) E2.t1 = Math.min(E.t0 + 14*24*H, last.b + 7*24*H);
     var extra = back ? homeNights(E2).filter(function(n){ return n.a >= E.t1 - 12*H && !Pl.sleeps.some(function(s){ return s.a < n.b && n.a < s.b; }); }) : [];
     var R2 = run(E2, Pl.sleeps.concat(extra));
@@ -836,6 +793,7 @@ function clock(S, now){
     /* the same days spent at home on your usual nights: the trip's effect is the difference from this,
        which takes out the model's own slow drift (and daylight saving, which moves both) */
     var E3 = {}; for(var k3 in E2) E3[k3] = E2[k3];
+    E3.env = null;
     E3.F = [];
     E3.locAt = function(t){ return {ap:home, tz:homeTz, lat:home.lat, lon:home.lon, off:offH(homeTz, t), fl:false}; };
     var Rb = run(E3, homeNights(E3));
@@ -862,10 +820,9 @@ function clock(S, now){
 }
 
 return {
-  vanOf:vanOf, wakeByOf:wakeByOf, findBest:findBest, clock:clock, wrap12:wrap12, cafAdvice:cafAdvice, cafMg:cafMg, cafF:cafF, easeOf:easeOf, gateOf:gateOf, CAF:CAF,
-  whatIf:whatIf, bestWake:bestWake, contextFor:contextFor,
+  vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
-  flightsOf:flightsOf, plan:plan, run:run, ptAt:ptAt, word:word, color:color, sunElev:sunElev, restVariants:restVariants
+  flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev
 };
 })();
