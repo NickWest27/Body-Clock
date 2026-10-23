@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Crew Rest</title>
+<meta name="description" content="Splits the crew rest window into equal breaks and gives start, wake-up and end times in UTC.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<style>
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --label:#000000; --sec:#5F5F66; --ter:#8A8A90; --sep:rgba(60,60,67,.18);
+  --fill:rgba(118,118,128,.12); --tint:#0A66D8; --danger:#C4161C;
+  --c1:#5856D6; --c2:#0A84A8; --c3:#C2378A; --c4:#B7791F; --flight:#1C1C1E;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#000000; --card:#1C1C1E; --label:#FFFFFF; --sec:#A1A1A8; --ter:#7C7C82; --sep:rgba(84,84,88,.6);
+    --fill:rgba(118,118,128,.24); --tint:#3E9BFF; --danger:#FF6961;
+    --c1:#8D8BFF; --c2:#4CC3E6; --c3:#F06BB8; --c4:#E0A84A; --flight:#E5E5EA;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--label);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:17px;line-height:1.3}
+.wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 40px)}
+a{color:var(--tint);text-decoration:none}
+.back{display:inline-flex;align-items:center;gap:2px;min-height:44px;font-size:17px}
+h1{margin:0 4px 2px;font-size:34px;line-height:41px;font-weight:700}
+.sub{margin:0 4px 12px;font-size:15px;color:var(--sec)}
+.grp-h{margin:18px 16px 6px;font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.02em}
+.list{background:var(--card);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;padding:10px 16px;min-height:52px}
+.row+.row{border-top:1px solid var(--sep)}
+.row .main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.t3{font-size:13px;color:var(--sec)}
+.pill{padding:6px 10px;border-radius:8px;background:var(--fill);font:inherit;font-size:17px;font-variant-numeric:tabular-nums;border:0;color:var(--label);-webkit-appearance:none;appearance:none;min-height:36px}
+.code{width:74px;text-transform:uppercase;text-align:center;font-weight:600;letter-spacing:.04em}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:2px;border-radius:9px;background:var(--fill);min-width:150px}
+.seg button{min-height:32px;border:0;border-radius:7px;background:transparent;font-size:14px;font-weight:600;cursor:pointer;color:var(--label);padding:0 8px}
+.seg button[aria-pressed=true]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.stepper{display:flex;align-items:center;border-radius:8px;background:var(--fill);overflow:hidden;flex:none}
+.stepper button{width:40px;height:34px;border:0;background:none;font-size:20px;cursor:pointer;color:var(--label)}
+.stepper span{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;font-size:16px}
+.link{border:0;background:none;color:var(--tint);font:inherit;font-size:15px;cursor:pointer;padding:4px 0}
+.card{background:var(--card);border-radius:16px;padding:14px 16px}
+.bar{position:relative;height:30px;border-radius:8px;background:var(--fill);margin:10px 0 22px}
+.bar i{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-style:normal}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--label);opacity:.8}
+.bar .lb{position:absolute;top:34px;font-size:12px;color:var(--sec);transform:translateX(-50%);white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--sec);font-weight:600;text-align:left;padding:4px 4px 6px;text-transform:uppercase;letter-spacing:.02em}
+td{padding:9px 4px;border-top:1px solid var(--sep);font-size:16px}
+td.who{font-weight:600}
+td .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
+.wake{font-weight:700}
+.sum{font-size:15px;color:var(--sec);margin-top:10px;line-height:20px}
+.err{margin:10px 4px 0;color:var(--danger);font-size:15px}
+.foot{margin:8px 16px 0;font-size:13px;line-height:18px;color:var(--sec)}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="index.html#settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Settings</a>
+  <h1>Crew rest</h1>
+  <div class="sub">Equal breaks, times in UTC (Z).</div>
+
+  <h2 class="grp-h">Flight</h2>
+  <div class="list">
+    <div class="row"><span class="main"><span>From · To</span><span class="t3" id="cities"></span></span><input class="pill code" id="from" maxlength="3" autocomplete="off" autocapitalize="characters"><input class="pill code" id="to" maxlength="3" autocomplete="off" autocapitalize="characters"></div>
+    <div class="row"><span class="main"><span>Date</span><span class="t3">Departure, local</span></span><input class="pill" type="date" id="date"></div>
+    <div class="row"><span class="main"><span>Times typed in</span></span><div class="seg" role="group" aria-label="Times typed in"><button type="button" data-k="mode" data-v="local">Local</button><button type="button" data-k="mode" data-v="z">UTC (Z)</button></div></div>
+    <div class="row"><span class="main"><span>Off</span><span class="t3" id="offZ"></span></span><input class="pill" type="time" id="off"></div>
+    <div class="row"><span class="main"><span>On (estimated)</span><span class="t3" id="onZ"></span></span><input class="pill" type="time" id="on"></div>
+  </div>
+
+  <h2 class="grp-h">Breaks</h2>
+  <div class="list">
+    <div class="row"><span class="main"><span>Crew</span></span><div class="seg" role="group" aria-label="Crew"><button type="button" data-k="crew" data-v="2">2</button><button type="button" data-k="crew" data-v="3">3</button><button type="button" data-k="crew" data-v="4">4</button></div></div>
+    <div class="row"><span class="main"><span>Breaks each</span><span class="t3">Two on longer flights</span></span><div class="seg" role="group" aria-label="Breaks each"><button type="button" data-k="each" data-v="1">1</button><button type="button" data-k="each" data-v="2">2</button></div></div>
+    <div class="row"><span class="main"><span>First break starts</span><span class="t3" id="startHint"></span></span><input class="pill" type="time" id="start"></div>
+    <div class="row"><span class="main"><span>Last break ends</span><span class="t3">minutes before on</span></span><div class="stepper"><button type="button" data-step="endBefore" data-d="-5" aria-label="Less">−</button><span id="endBeforeV"></span><button type="button" data-step="endBefore" data-d="5" aria-label="More">+</button></div></div>
+    <div class="row"><span class="main"><span>Wake-up call</span><span class="t3">minutes before each break ends</span></span><div class="stepper"><button type="button" data-step="wakeBefore" data-d="-5" aria-label="Less">−</button><span id="wakeBeforeV"></span><button type="button" data-step="wakeBefore" data-d="5" aria-label="More">+</button></div></div>
+    <div class="row"><span class="main"><span>Round break times</span></span><div class="seg" role="group" aria-label="Round to"><button type="button" data-k="round" data-v="1">1 min</button><button type="button" data-k="round" data-v="5">5 min</button></div></div>
+  </div>
+
+  <h2 class="grp-h">Breaks in UTC</h2>
+  <section class="card" id="out" aria-live="polite"></section>
+  <p class="foot">The rest window runs from the first break start to the set time before on, split equally between the breaks. Check it against your company’s rules and the captain’s plan.</p>
+</main>
+<script src="airports.js"></script>
+<script src="engine.js"></script>
+<script>
+(function(){
+'use strict';
+var KEY = 'bc-crewrest', H = 3600000, MIN = 60000;
+var today = new Date(); var iso = function(d){ return d.toISOString().slice(0, 10); };
+var D = {from:'GRU', to:'JFK', date:iso(today), mode:'local', off:'22:30', on:'07:05', crew:3, each:1, start:'', endBefore:45, wakeBefore:10, round:1};
+var st = D;
+try{ var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if(sv && typeof sv === 'object'){ st = {}; Object.keys(D).forEach(function(k){ st[k] = sv[k] !== undefined ? sv[k] : D[k]; }); } }catch(e){}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} }
+function $(id){ return document.getElementById(id); }
+function z(ms, ref){ var s = BC.hm('UTC', ms).replace(':', '') + 'Z'; if(ref != null && BC.dateStr('UTC', ms) !== BC.dateStr('UTC', ref)) s += '<sup>+1</sup>'; return s; }
+function dur(ms){ var m = Math.round(ms/MIN), h = Math.floor(m/60), r = m % 60; return h ? h + ' h' + (r ? ' ' + String(r).padStart(2, '0') : '') : r + ' min'; }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+var COLS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)'];
+
+/* the flight's off and on as UTC instants */
+function times(){
+  var fa = BC.airport((st.from || '').toUpperCase()), ta = BC.airport((st.to || '').toUpperCase());
+  if(!st.date || !st.off || !st.on) return {err:'Enter the date, off and on times.'};
+  var off, on;
+  if(st.mode === 'local'){
+    if(!fa || !ta) return {err:'Enter airport codes the app knows (like GRU and JFK), or type the times in UTC.'};
+    off = BC.localToMs(fa.tz, st.date + 'T' + st.off);
+    for(var k=0;k<3;k++){ on = BC.localToMs(ta.tz, BC.addDays(st.date, k) + 'T' + st.on); if(on > off) break; }
+  } else {
+    off = Date.parse(st.date + 'T' + st.off + ':00Z'); on = Date.parse(st.date + 'T' + st.on + ':00Z');
+    while(on <= off) on += 24*H;
+  }
+  if(isNaN(off) || isNaN(on)) return {err:'Check the times.'};
+  if(on - off > 20*H) return {err:'That flight is over 20 hours. Check the on time and date.'};
+  return {off:off, on:on, fa:fa, ta:ta};
+}
+
+function compute(){
+  var T = times(), out = $('out');
+  $('cities').textContent = [BC.airport((st.from || '').toUpperCase()), BC.airport((st.to || '').toUpperCase())].map(function(a){ return a ? a.city.replace(/ (Heathrow|Gatwick|O’Hare|Narita|Haneda|Incheon|Kansai)$/, '').replace('Dallas–Fort Worth', 'Dallas') : '–'; }).join(' → ');
+  if(T.err){ $('offZ').textContent = ''; $('onZ').textContent = ''; $('startHint').textContent = ''; out.innerHTML = '<p class="err" style="margin:0">' + esc(T.err) + '</p>'; return; }
+  $('offZ').innerHTML = st.mode === 'local' ? z(T.off) : (T.fa ? BC.hm(T.fa.tz, T.off) + ' ' + esc(T.fa.code) + ' local' : '');
+  $('onZ').innerHTML = st.mode === 'local' ? z(T.on, T.off) : (T.ta ? BC.hm(T.ta.tz, T.on) + ' ' + esc(T.ta.code) + ' local' : '');
+  /* first break: the time you set (in Z), or off + 10 minutes */
+  var start = T.off + 10*MIN;
+  if(st.start){
+    var s0 = Date.parse(BC.dateStr('UTC', T.off) + 'T' + st.start + ':00Z');
+    while(s0 < T.off - 2*H) s0 += 24*H;
+    while(s0 > T.off + 22*H) s0 -= 24*H;
+    start = s0;
+  }
+  $('startHint').innerHTML = st.start ? 'UTC · <button class="link" type="button" id="useAuto">Use off + 10 (' + z(T.off + 10*MIN) + ')</button>' : 'UTC · off + 10 min = ' + z(T.off + 10*MIN);
+  var end = T.on - st.endBefore*MIN, n = st.crew*st.each, unit = st.round === 5 ? 5*MIN : MIN;
+  if(start < T.off){ out.innerHTML = '<p class="err" style="margin:0">The first break starts before off.</p>'; return; }
+  if(end - start < n*15*MIN){ out.innerHTML = '<p class="err" style="margin:0">That leaves less than 15 minutes per break. Check the times.</p>'; return; }
+  var step = (end - start)/n, bounds = [start];
+  for(var k=1;k<n;k++) bounds.push(Math.round((start + k*step)/unit)*unit);
+  bounds.push(end);
+  var br = [];
+  for(var j=0;j<n;j++) br.push({who:(j % st.crew) + 1, round:Math.floor(j/st.crew) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - st.wakeBefore*MIN});
+  /* timeline from off to on */
+  var span = T.on - T.off, pc = function(t){ return ((t - T.off)/span*100).toFixed(2) + '%'; };
+  var h = '<div class="bar">';
+  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[x.who - 1] + '">' + x.who + '</i>'; });
+  br.forEach(function(x){ h += '<b style="left:' + pc(x.wake) + '" title="Wake-up"></b>'; });
+  h += '<span class="lb" style="left:0;transform:none">Off ' + z(T.off) + '</span><span class="lb" style="left:auto;right:0;transform:none">On ' + z(T.on, T.off) + '</span></div>';
+  h += '<table><thead><tr><th>' + (st.each > 1 ? 'Crew · break' : 'Crew') + '</th><th>Start</th><th>Wake-up</th><th>End</th></tr></thead><tbody>';
+  br.forEach(function(x){
+    h += '<tr><td class="who"><span class="sw" style="background:' + COLS[x.who - 1] + '"></span>' + x.who + (st.each > 1 ? ' · ' + (x.round === 1 ? '1st' : '2nd') : '') + '</td><td>' + z(x.a, T.off) + '</td><td class="wake">' + z(x.wake, T.off) + '</td><td>' + z(x.b, T.off) + '</td></tr>';
+  });
+  h += '</tbody></table>';
+  var lens = br.map(function(x){ return x.b - x.a; }), mn = Math.min.apply(null, lens), mx = Math.max.apply(null, lens);
+  h += '<div class="sum">Rest window ' + z(start, T.off) + '–' + z(end, T.off) + ', ' + dur(end - start) + '. ' + n + ' breaks of ' + (mx - mn < MIN ? dur(mn) : dur(mn) + ' to ' + dur(mx)) + ', wake-up ' + st.wakeBefore + ' min before each ends. Flight ' + dur(span) + '.</div>';
+  out.innerHTML = h;
+  var ua = $('useAuto'); if(ua) ua.onclick = function(){ st.start = ''; $('start').value = ''; save(); compute(); };
+}
+
+function paint(){
+  ['from', 'to', 'date', 'off', 'on', 'start'].forEach(function(k){ if(document.activeElement !== $(k)) $(k).value = st[k] || ''; });
+  document.querySelectorAll('[data-k]').forEach(function(b){ b.setAttribute('aria-pressed', String(st[b.dataset.k]) === b.dataset.v); });
+  $('endBeforeV').textContent = st.endBefore + ' min'; $('wakeBeforeV').textContent = st.wakeBefore + ' min';
+  compute();
+}
+/* inputs only update the results, never redraw themselves, so pickers stay open */
+['from', 'to', 'date', 'off', 'on', 'start'].forEach(function(k){
+  var el = $(k);
+  el.addEventListener('input', function(){ st[k] = (k === 'from' || k === 'to') ? el.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) : el.value; save(); compute(); });
+  el.addEventListener('change', function(){ st[k] = (k === 'from' || k === 'to') ? el.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) : el.value; save(); compute(); });
+});
+document.addEventListener('click', function(e){
+  var b = e.target.closest('[data-k]');
+  if(b){
+    var k = b.dataset.k, v = b.dataset.v;
+    if(k === 'mode' && v !== st.mode){
+      /* keep the same instants when switching how times are typed */
+      var T = times();
+      if(!T.err){
+        if(v === 'z'){ st.date = BC.dateStr('UTC', T.off); st.off = BC.hm('UTC', T.off); st.on = BC.hm('UTC', T.on); }
+        else if(T.fa && T.ta){ st.date = BC.dateStr(T.fa.tz, T.off); st.off = BC.hm(T.fa.tz, T.off); st.on = BC.hm(T.ta.tz, T.on); }
+      }
+    }
+    st[k] = (k === 'mode') ? v : +v;
+    save(); paint(); return;
+  }
+  var s = e.target.closest('[data-step]');
+  if(s){ var key = s.dataset.step; st[key] = Math.max(0, Math.min(key === 'endBefore' ? 120 : 30, st[key] + (+s.dataset.d))); save(); paint(); }
+});
+paint();
+})();
+</script>
+</body>
+</html>
