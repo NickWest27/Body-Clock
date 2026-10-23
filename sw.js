@@ -1,11 +1,11 @@
 /* Offline cache for Body Clock. Serves the saved copy immediately and refreshes it in the background,
    so an update arrives the next time the app is opened. Change VERSION when you ship a new build.
    The classic app under classic/ has its own service worker and cache, which this one leaves alone. */
-const VERSION = '2026-10-22.34';
+const VERSION = '2026-10-23.35';
 /* one cache per install location, so a preview copy under next/ and the main app never touch each other */
 const PREFIX = 'bc2-' + (self.registration.scope.indexOf('/next/') >= 0 ? 'next-' : 'main-');
 const CACHE = PREFIX + VERSION;
-const ASSETS = ['./', './index.html', './engine.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const ASSETS = ['./', './index.html', './crew-rest.html', './engine.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS); }).then(function(){ return self.skipWaiting(); }));

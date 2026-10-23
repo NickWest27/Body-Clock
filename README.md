@@ -43,6 +43,10 @@ Each layover plan is scored on alertness from wake-up to landing, the last 90 mi
 
 Planned sleeps on Trip are labelled Auto (the app's plan, which moves whenever anything it depends on changes), Auto · option you picked (you chose nap now or later on the layover; the times still follow changes) or Your times (you set them with Change sleep; they stay put). Logged sleeps are facts. Every change re-plans at once, and a Plan updated card on Now and Trip says what moved: alertness at landing or the low point, the planned sleep times, and, when you are on your own times or a picked option, a better plan from the app with one tap to use it. If your times no longer fit (a flight or van moved), the app's plan comes back and the card says so.
 
+## Crew rest calculator (preview)
+
+Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The first break starts when you set it (off + 10 minutes until you do), the last ends a set time before on (45 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Each break shows start, wake-up call (10 minutes before it ends by default) and end, in UTC. It is a standalone page for now; later it can fill in your crew rest on the flight.
+
 ## Data
 
 Everything stays on the device. Back up trip saves a file you can keep or AirDrop to another device; Restore from file loads it. Import trip from the classic app reads the trip saved by the old app on the same device (flights whose labels name two known airport codes, like DFWGRU).
@@ -60,5 +64,6 @@ Settings › Update app checks for a newer build and reloads. GitHub Pages can t
 - `index.html`: the app's screens.
 - `engine.js`: time zones, the sleep model and the layover planner.
 - `airports.js`: airport codes with time zones and positions, and the starting destination list.
+- `crew-rest.html`: the crew rest calculator.
 - `sw.js`, `manifest.webmanifest`, icons: offline use and home-screen install.
 - `classic/`: the frozen classic app.

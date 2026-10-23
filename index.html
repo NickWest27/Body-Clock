@@ -188,7 +188,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '22 Oct 2026 · build 34';
+var BUILD = '23 Oct 2026 · build 35';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -1218,6 +1218,7 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">No caffeine before sleep</span><span class="t3">hours</span></span>' + num('sCut', S.caf.cut, 3, 10, 0.5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Last drink before the van</span><span class="t3">hours</span></span>' + num('sLast', S.night.last, 8, 24, 1) + '</label></div>' +
        '<p class="foot">About 6 hours keeps most caffeine out of your sleep; some people clear it faster or slower. For alcohol use your company’s rule; the FAA minimum is 8 hours.</p>';
+  h += '<h2 class="grp-h">Tools</h2><div class="list"><a class="row" href="crew-rest.html" style="color:var(--tint)">' + I.moon + '<span class="main"><span class="t1">Crew rest calculator</span><span class="t3" style="color:var(--sec)">Preview · equal breaks in UTC</span></span>' + I.chev + '</a></div>';
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
        '<button class="row" type="button" data-act="restore" style="color:var(--tint)">Restore from file</button>' +
