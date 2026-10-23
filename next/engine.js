@@ -169,6 +169,39 @@ function merge(list){
 /* a time difference in hours, wrapped to -12..+12 */
 function wrap12(x){ return (((x + 12) % 24) + 24) % 24 - 12; }
 
+/* ---------- crew rest on board ----------
+   Two crew are always at the controls, so crew - 2 rest at once. Breaks go by seat, most junior first:
+   3 crew FB, then CPT, then FO; 4 crew FB + FC as a pair, then CPT + FO. The rest window runs from the first
+   break (off + 10 minutes unless set) to 45 minutes before on, split equally; the wake-up call is 10 minutes
+   before each break ends. Off and on are the schedule unless the actual off or estimated on is given (Z). */
+var SEATS = {3:[['FB'], ['CPT'], ['FO']], 4:[['FB', 'FC'], ['CPT', 'FO']]};
+function zNear(hhmm, ref){
+  var d = isoUTC(ref).slice(0, 10), best = NaN;
+  for(var k=-1;k<=1;k++){ var c = parseLocal(addDays(d, k) + 'T' + hhmm); if(!isNaN(c) && (isNaN(best) || Math.abs(c - ref) < Math.abs(best - ref))) best = c; }
+  return best;
+}
+function crewBreaks(off, on, crew, each, start, rules){
+  rules = rules || {};
+  var groups = SEATS[crew]; if(!groups) return null;
+  var end = on - (rules.end != null ? +rules.end : 45)*MIN, wakeB = (rules.wake != null ? +rules.wake : 10)*MIN, unit = (+rules.round === 5 ? 5 : 1)*MIN;
+  var n = groups.length*(each === 2 ? 2 : 1);
+  if(!(end - start >= n*15*MIN) || start < off) return {err:'The rest window is too short for ' + n + ' breaks.', off:off, on:on, start:start, end:end, breaks:[]};
+  var step = (end - start)/n, bounds = [start], out = [];
+  for(var k=1;k<n;k++) bounds.push(Math.round((start + k*step)/unit)*unit);
+  bounds.push(end);
+  for(var j=0;j<n;j++) out.push({seats:groups[j % groups.length], round:Math.floor(j/groups.length) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - wakeB});
+  return {off:off, on:on, start:start, end:end, breaks:out};
+}
+function crewPlan(S, x){
+  var r = x.r, crew = +r.crew || 0;
+  if(!SEATS[crew]) return null;
+  var rules = S.restRules || {}, off = r.offZ ? zNear(r.offZ, x.a) : x.a, on = r.onZ ? zNear(r.onZ, x.b) : x.b;
+  var start = r.restStart ? zNear(r.restStart, off + (rules.start != null ? +rules.start : 10)*MIN) : off + (rules.start != null ? +rules.start : 10)*MIN;
+  var cp = crewBreaks(off, on, crew, +r.each === 2 ? 2 : 1, start, rules);
+  if(cp) cp.mine = cp.breaks.filter(function(b){ return b.seats.indexOf(r.seat) >= 0; });
+  return cp;
+}
+
 /* when you must be up for a flight: the van (yours, or the usual time before departure) less time to get ready */
 function vanOf(S, f){ return f.van || f.a - (+S.van || 2)*H; }
 function wakeByOf(S, f){ return vanOf(S, f) - (+S.ready || 0.75)*H; }
@@ -184,6 +217,11 @@ function flightsOf(S){
     var role = r.role || (b - a >= 5*H ? 'operate' : 'commute');
     var van = r.van ? localToMs(f.tz, r.van) : NaN;
     var x = {id:r.id, r:r, f:f, t:t, a:a, b:b, role:role, rest:role === 'operate' ? (+r.rest || 0) : 0, restWin:null, van:(van < a && van > a - 8*H) ? van : null};
+    x.crewPlan = role === 'operate' ? crewPlan(S, x) : null;
+    if(x.crewPlan && x.crewPlan.mine && x.crewPlan.mine.length && !(r.restUTC && r.restUTC.s && r.restUTC.e)){
+      x.restWins = x.crewPlan.mine.map(function(m){ return [m.a, m.wake]; });
+      x.restWin = x.restWins[0]; x.restAuto = true;
+    }
     if(r.restUTC && r.restUTC.s && r.restUTC.e){
       var day = isoUTC(a).slice(0,10), s = NaN;
       for(var k=-1;k<=1 && isNaN(s);k++){
@@ -378,6 +416,11 @@ function restVariants(f){
   if(hi < lo) return [[f.a + (f.b - f.a - r)/2, f.a + (f.b - f.a + r)/2]];
   return [[lo, lo + r], [(lo + hi)/2, (lo + hi)/2 + r], [hi, hi + r]];
 }
+/* the crew rest you will get on a flight: your breaks from the crew plan, the times you typed, or a guess */
+function assumedRests(f){
+  if(f.restWins && f.restWins.length) return f.restWins.map(function(w){ return {a:w[0], b:w[1], kind:'rest', actual:false, flight:f.id, label:'Crew rest'}; });
+  var one = assumedRest(f); return one ? [one] : [];
+}
 function assumedRest(f){
   var v = restVariants(f);
   if(!v.length) return null;
@@ -419,7 +462,7 @@ function usualBeds(E, L){
 
 function evalPlan(E, L, base, blocks, scoreRest, ck){
   var land = L.outF.b, sleeps = base.concat(blocks);
-  if(scoreRest) sleeps = sleeps.concat([scoreRest]);
+  if(scoreRest) sleeps = sleeps.concat(scoreRest);
   var R = run(E, sleeps, land + H, ck);
   var sum = 0, n = 0, mn = 101, ls = 0, ln = 0, fmin = 101, press = 0;
   R.pts.forEach(function(p){
@@ -471,7 +514,7 @@ var NAMES = {none:'No nap', now:'Nap now', later:'Nap later', both:'Short nap no
    (no wake time yet), fx.skips are planned sleeps you said you did not take, fx.T is the moment
    from which the plan may still change (after the last thing you logged). */
 function planLayover(E, L, base, fx){
-  var rest = assumedRest(L.outF), scoreRest = rest ? {a:rest.a, b:rest.b} : null, T = fx.T, now = fx.now;
+  var scoreRest = assumedRests(L.outF).map(function(r){ return {a:r.a, b:r.b}; }), T = fx.T, now = fx.now;
   var ubAll = usualBeds(E, L), ub = ubAll.filter(function(u){ return u.a >= L.ws + 2*H && u.a <= L.we - 5*H; });
   var cut = L.out ? L.out.ns : (ub.length ? ub[ub.length-1].a - 4*H : L.ws + 6*H);
   var mainF = fx.fixed.filter(function(k){ return k.kind === 'main'; })[0] || null;
@@ -589,7 +632,7 @@ function planLayover(E, L, base, fx){
 var cache = {key:null, val:null};
 function plan(S, now, opt){
   var noCache = opt && opt.noCache;
-  var key = JSON.stringify([S.home, S.bed, S.wake, S.landBed, S.van, S.ready, S.balance, S.light, S.night, S.flights, S.lay, S.actual, S.skips, cafLog(S)]) + '|' + Math.floor(now/(5*MIN));
+  var key = JSON.stringify([S.home, S.bed, S.wake, S.landBed, S.van, S.ready, S.balance, S.light, S.night, S.flights, S.lay, S.actual, S.skips, cafLog(S), S.restRules]) + '|' + Math.floor(now/(5*MIN));
   if(!noCache && cache.key === key) return cache.val;
   var E = env(S, now);
   var actual = (S.actual || []).filter(function(x){ return x.a > 0; }).map(function(x){ return {id:x.id, a:x.a, b:x.b == null ? null : x.b, kind:x.kind || ((x.b || now) - x.a >= 4*H ? 'main' : 'nap'), actual:true}; });
@@ -599,7 +642,7 @@ function plan(S, now, opt){
   function clash(s){ return actual.concat(skips).some(function(x){ var xb = x.b == null ? now + 12*H : x.b; return s.a < xb && x.a < s.b; }); }
   var home = homeNights(E).filter(function(s){ return !clash(s); });
   var rests = [];
-  E.F.forEach(function(f){ if(f.role === 'operate'){ var r = assumedRest(f); if(r && !clash(r)) rests.push(r); } });
+  E.F.forEach(function(f){ if(f.role === 'operate') assumedRests(f).forEach(function(r){ if(!clash(r)) rests.push(r); }); });
   var Ls = layoversOf(E), chosen = [];
   var inLay = function(L, x){ return x.a >= L.arr - H && x.a < L.dep; };
   Ls.forEach(function(L){
@@ -826,7 +869,7 @@ function clock(S, now){
 }
 
 return {
-  vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, SEATS:SEATS, vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev

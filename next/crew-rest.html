@@ -67,7 +67,7 @@ td .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-righ
 <main class="wrap">
   <a class="back" href="index.html#settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Settings</a>
   <h1>Crew rest</h1>
-  <div class="sub">Equal breaks, times in UTC (Z).</div>
+  <div class="sub">Equal breaks by seat, two crew always at the controls. Times in UTC (Z).</div>
 
   <h2 class="grp-h">Flight</h2>
   <div class="list">
@@ -154,13 +154,14 @@ function compute(){
   bounds.push(end);
   var br = [];
   for(var j=0;j<n;j++){
-    var g = j % groups, ids = []; for(var q=0;q<atOnce;q++) ids.push(g*atOnce + q + 1);
-    br.push({who:ids[0], ids:ids, label:ids.join(' + '), round:Math.floor(j/groups) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - st.wakeBefore*MIN});
+    /* by seat, most junior first: 3 crew FB, CPT, FO; 4 crew FB + FC, then CPT + FO */
+    var g = j % groups, seats = BC.SEATS[st.crew][g];
+    br.push({who:g*atOnce + 1, label:seats.join(' + '), round:Math.floor(j/groups) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - st.wakeBefore*MIN});
   }
   /* timeline from off to on */
   var span = T.on - T.off, pc = function(t){ return ((t - T.off)/span*100).toFixed(2) + '%'; };
   var h = '<div class="bar">';
-  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[(x.who - 1)/atOnce] + '">' + x.label.replace(/ /g, '') + '</i>'; });
+  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[(x.who - 1)/atOnce] + '">' + x.label.replace(/ \+ /g, '+') + '</i>'; });
   br.forEach(function(x){ h += '<b style="left:' + pc(x.wake) + '" title="Wake-up"></b>'; });
   h += '<span class="lb" style="left:0;transform:none">Off ' + z(T.off) + '</span><span class="lb" style="left:auto;right:0;transform:none">On ' + z(T.on, T.off) + '</span></div>';
   h += '<table><thead><tr><th>' + (st.each > 1 ? 'Crew · break' : 'Crew') + '</th><th>Start</th><th>Wake-up</th><th>End</th></tr></thead><tbody>';
