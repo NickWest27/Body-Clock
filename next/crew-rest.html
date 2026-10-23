@@ -142,27 +142,34 @@ function compute(){
     start = s0;
   }
   $('startHint').innerHTML = st.start ? 'UTC · <button class="link" type="button" id="useAuto">Use off + 10 (' + z(T.off + 10*MIN) + ')</button>' : 'UTC · off + 10 min = ' + z(T.off + 10*MIN);
-  var end = T.on - st.endBefore*MIN, n = st.crew*st.each, unit = st.round === 5 ? 5*MIN : MIN;
+  /* two crew are always at the controls, so crew - 2 can rest at once: with 3 crew one at a time,
+     with 4 crew two at a time (1 + 2, then 3 + 4), with 2 crew nobody */
+  var atOnce = st.crew - 2;
+  if(atOnce < 1){ out.innerHTML = '<p class="err" style="margin:0">With 2 crew both are always at the controls, so there are no in-flight breaks.</p>'; return; }
+  var groups = st.crew/atOnce, end = T.on - st.endBefore*MIN, n = groups*st.each, unit = st.round === 5 ? 5*MIN : MIN;
   if(start < T.off){ out.innerHTML = '<p class="err" style="margin:0">The first break starts before off.</p>'; return; }
   if(end - start < n*15*MIN){ out.innerHTML = '<p class="err" style="margin:0">That leaves less than 15 minutes per break. Check the times.</p>'; return; }
   var step = (end - start)/n, bounds = [start];
   for(var k=1;k<n;k++) bounds.push(Math.round((start + k*step)/unit)*unit);
   bounds.push(end);
   var br = [];
-  for(var j=0;j<n;j++) br.push({who:(j % st.crew) + 1, round:Math.floor(j/st.crew) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - st.wakeBefore*MIN});
+  for(var j=0;j<n;j++){
+    var g = j % groups, ids = []; for(var q=0;q<atOnce;q++) ids.push(g*atOnce + q + 1);
+    br.push({who:ids[0], ids:ids, label:ids.join(' + '), round:Math.floor(j/groups) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - st.wakeBefore*MIN});
+  }
   /* timeline from off to on */
   var span = T.on - T.off, pc = function(t){ return ((t - T.off)/span*100).toFixed(2) + '%'; };
   var h = '<div class="bar">';
-  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[x.who - 1] + '">' + x.who + '</i>'; });
+  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[(x.who - 1)/atOnce] + '">' + x.label.replace(/ /g, '') + '</i>'; });
   br.forEach(function(x){ h += '<b style="left:' + pc(x.wake) + '" title="Wake-up"></b>'; });
   h += '<span class="lb" style="left:0;transform:none">Off ' + z(T.off) + '</span><span class="lb" style="left:auto;right:0;transform:none">On ' + z(T.on, T.off) + '</span></div>';
   h += '<table><thead><tr><th>' + (st.each > 1 ? 'Crew · break' : 'Crew') + '</th><th>Start</th><th>Wake-up</th><th>End</th></tr></thead><tbody>';
   br.forEach(function(x){
-    h += '<tr><td class="who"><span class="sw" style="background:' + COLS[x.who - 1] + '"></span>' + x.who + (st.each > 1 ? ' · ' + (x.round === 1 ? '1st' : '2nd') : '') + '</td><td>' + z(x.a, T.off) + '</td><td class="wake">' + z(x.wake, T.off) + '</td><td>' + z(x.b, T.off) + '</td></tr>';
+    h += '<tr><td class="who"><span class="sw" style="background:' + COLS[(x.who - 1)/atOnce] + '"></span>' + x.label + (st.each > 1 ? ' · ' + (x.round === 1 ? '1st' : '2nd') : '') + '</td><td>' + z(x.a, T.off) + '</td><td class="wake">' + z(x.wake, T.off) + '</td><td>' + z(x.b, T.off) + '</td></tr>';
   });
   h += '</tbody></table>';
   var lens = br.map(function(x){ return x.b - x.a; }), mn = Math.min.apply(null, lens), mx = Math.max.apply(null, lens);
-  h += '<div class="sum">Rest window ' + z(start, T.off) + '–' + z(end, T.off) + ', ' + dur(end - start) + '. ' + n + ' breaks of ' + (mx - mn < MIN ? dur(mn) : dur(mn) + ' to ' + dur(mx)) + ', wake-up ' + st.wakeBefore + ' min before each ends. Flight ' + dur(span) + '.</div>';
+  h += '<div class="sum">Rest window ' + z(start, T.off) + '–' + z(end, T.off) + ', ' + dur(end - start) + '. ' + (atOnce > 1 ? atOnce + ' resting at a time, ' : 'One resting at a time, ') + n + ' breaks of ' + (mx - mn < MIN ? dur(mn) : dur(mn) + ' to ' + dur(mx)) + ', wake-up ' + st.wakeBefore + ' min before each ends. Flight ' + dur(span) + '.</div>';
   out.innerHTML = h;
   var ua = $('useAuto'); if(ua) ua.onclick = function(){ st.start = ''; $('start').value = ''; save(); compute(); };
 }
