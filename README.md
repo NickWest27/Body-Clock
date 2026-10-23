@@ -29,9 +29,9 @@ When you log a sleep or caffeine you can type the time on the local clock, the c
 
 ## The model
 
-The two-process model of sleep (Borbély, Daan and Beersma): sleep pressure rises while you are awake and clears while you sleep, and a body-clock rhythm shifts slowly with daylight where you are. Sleep inertia after waking is included. Alertness is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25. The numbers are for comparing plans, not a fitness-for-duty measure.
+The two-process model of sleep (Borbély, Daan and Beersma): sleep pressure rises while you are awake and clears while you sleep, and a body-clock rhythm shifts slowly with daylight where you are. Sleep inertia after waking is included. A third part, sleep debt, keeps a running balance of sleep owed beyond a usual day: each hour awake runs up half an hour owed (with an 8 h usual night), each hour asleep pays one back, bunk sleep in crew rest counts at three quarters, and unpaid debt fades over about three days. Each hour of debt takes 3 points off alertness and makes sleep come a little more easily. A planned sleep you have not logged that should already have started counts from the moment you open the app, because you are clearly awake. Alertness is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25. The numbers are for comparing plans, not a fitness-for-duty measure.
 
-Each layover plan is scored on alertness from wake-up to landing, the last 90 minutes counting most. Plans lose points when you would have to fall asleep at a time you probably could not, when they leave you up for long stretches under high sleep pressure, when they put the main sleep far from your usual night,. Until you enter actual crew rest, the plan assumes your expected rest in the middle of the flight.
+Each layover plan is scored on alertness from wake-up to landing, the last 90 minutes counting most. Plans lose points when you would have to fall asleep at a time you probably could not, when they leave you up for long stretches under high sleep pressure, when they put the main sleep far from your usual night. Until you enter actual crew rest, the plan assumes your expected rest in the middle of the flight.
 
 ## Find the best
 

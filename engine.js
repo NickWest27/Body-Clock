@@ -107,6 +107,14 @@ var PAR = {
   prcAmp:0.4, prcAsym:0.25, lowFrac:0.1,
   warnS:0.70
 };
+/* Sleep debt. Your usual night (bedtime to wake time in Settings, say 8 h) pays for a usual day (16 h),
+   so each hour awake runs up 8/16 of an hour of sleep owed (R) and each hour asleep pays an hour back.
+   A usual day's share (U) runs up the same way but stops at one night's worth, and sleep pays it first.
+   The debt is R - U: nothing on a usual day however late it gets, naps pay it down, and staying awake
+   past a usual day adds to it. Unpaid debt fades slowly (about a third left after 3 days). Each hour of
+   debt costs some alertness and makes sleep come more easily. Sleep in a crew rest bunk counts at bunk
+   value (lighter, more broken sleep). */
+var DEBT = {alert:3, ease:0.07, max:12, bunk:0.75, tau:72};
 var CW = (function(){
   function raw(p){ return -Math.cos(2*Math.PI*(p-1)/24) - 0.2*Math.cos(2*Math.PI*(p-9.5)/12); }
   var mn = 1e9, mx = -1e9, arg = 0;
@@ -156,12 +164,26 @@ function cafF(mg){ return mg > 0 ? mg/(mg + CAF.c50) : 0; }
 function cafLog(S){ return (S && S.caf && Array.isArray(S.caf.log)) ? S.caf.log : []; }
 function habitSleeping(hr, bedH, wakeH){ return bedH > wakeH ? (hr >= bedH || hr < wakeH) : (hr >= bedH && hr < wakeH); }
 /* sleeps as sorted [start, end] intervals, overlapping ones joined */
+/* the third value is how much the sleep is worth: 1, or DEBT.bunk for crew rest in a bunk */
 function merge(list){
-  var s = list.map(function(x){ return [x.a, x.b]; }).sort(function(p,q){ return p[0] - q[0]; });
+  var s = list.map(function(x){ return [x.a, x.b, x.kind === 'rest' ? DEBT.bunk : 1]; }).sort(function(p,q){ return p[0] - q[0]; });
   var out = [];
   s.forEach(function(iv){
     var l = out[out.length-1];
-    if(l && iv[0] <= l[1]) l[1] = Math.max(l[1], iv[1]); else out.push([iv[0], iv[1]]);
+    if(l && iv[0] <= l[1]){ l[1] = Math.max(l[1], iv[1]); l[2] = Math.max(l[2], iv[2]); } else out.push([iv[0], iv[1], iv[2]]);
+  });
+  return out;
+}
+/* A planned sleep you have not logged that should have started already: you are looking at the app,
+   so you are awake, and it starts now. Less than 20 minutes left and it is dropped. */
+function fromNow(list, now){
+  if(now == null) return list;
+  var out = [];
+  list.forEach(function(x){
+    if(x.actual || x.open || !(x.a < now && now < x.b)){ out.push(x); return; }
+    if(x.b - now < 20*MIN) return;
+    var y = {}; for(var k in x) y[k] = x[k];
+    y.was = x.a; y.a = now; y.late = true; out.push(y);
   });
   return out;
 }
@@ -319,6 +341,10 @@ function run(E, sleeps, until, ck, snapAt){
   var SL = merge(sleeps), sleepLen = ((E.wakeH - E.bedH) % 24 + 24) % 24 || 8;
   var wakes = [{t:t0, dur:sleepLen, amp:null, on:t0, s0:sd.sBed}];
   SL.forEach(function(iv){ if(iv[1] > t0) wakes.push({t:iv[1], dur:(iv[1] - iv[0])/H, amp:null, on:iv[0], s0:(iv[0] <= t0 ? sd.sBed : null)}); });
+  /* sleep debt starts as a usual day at home: owed what the hours since your usual wake time ran up */
+  var dayH = 24 - sleepLen, rate = sleepLen/dayH, h0 = todH(t0, offH(E.home.tz, t0));
+  var a0 = habitSleeping(h0, E.bedH, E.wakeH) ? 0 : ((h0 - E.wakeH) % 24 + 24) % 24;
+  var dbt = {R:Math.min(a0, dayH)*rate, U:Math.min(a0, dayH)*rate}, fade = Math.exp(-dtH/DEBT.tau);
   var si = 0;
   function sleepAt(t){
     while(si < SL.length && SL[si][1] <= t) si++;
@@ -327,7 +353,7 @@ function run(E, sleeps, until, ck, snapAt){
   }
   var pts = new Array(N + 1), st = {s:sd.s0, since:0, prev:false}, Ebody = offH(E.home.tz, t0), clog = cafLog(E.S), i0 = 0;
   if(ck && ck.i <= N){
-    i0 = ck.i; st = {s:ck.st.s, since:ck.st.since, prev:ck.st.prev}; Ebody = ck.Ebody;
+    i0 = ck.i; st = {s:ck.st.s, since:ck.st.since, prev:ck.st.prev}; Ebody = ck.Ebody; dbt = {R:ck.dbt.R, U:ck.dbt.U};
     for(var j=0;j<i0;j++) pts[j] = ck.pts[j];
     wakes.forEach(function(w){ if(ck.s0[w.on] !== undefined) w.s0 = ck.s0[w.on]; if(ck.amp[w.t] !== undefined && w.t < t0 + i0*dt) w.amp = ck.amp[w.t]; });
   }
@@ -341,7 +367,7 @@ function run(E, sleeps, until, ck, snapAt){
   for(var i=i0;i<=N;i++){
     var t = Math.min(t0 + i*dt, t1);
     if(i === snapI){
-      snap = {i:i, st:{s:st.s, since:st.since, prev:st.prev}, Ebody:Ebody, pts:pts.slice(0, i), s0:{}, amp:{}};
+      snap = {i:i, st:{s:st.s, since:st.since, prev:st.prev}, Ebody:Ebody, pts:pts.slice(0, i), s0:{}, amp:{}, dbt:{R:dbt.R, U:dbt.U}};
       wakes.forEach(function(w){ if(w.s0 !== null) snap.s0[w.on] = w.s0; if(w.amp !== null) snap.amp[w.t] = w.amp; });
     }
     var c = CW(phiOf(t, Ebody, m)), W = 0;
@@ -358,19 +384,23 @@ function run(E, sleeps, until, ck, snapAt){
       var dw = (t - w.t)/H;
       if(dw < 4) W += w.amp*Math.exp(-dw/PAR.inTau);
     }
-    var mg = clog.length ? cafMg(clog, t) : 0;
-    var A0 = 100*(PAR.wS*(1 - st.s) + PAR.wC*c) + CAF.alert*cafF(mg), slp = sleepAt(t);
+    var mg = clog.length ? cafMg(clog, t) : 0, slp = sleepAt(t);
+    var debt = Math.min(DEBT.max, dbt.R - dbt.U);
+    var A0 = 100*(PAR.wS*(1 - st.s) + PAR.wC*c) + CAF.alert*cafF(mg) - DEBT.alert*debt;
     var mid = t + dt/2, sm = sleepAt(mid), asl = !!sm, phi = phiOf(mid, Ebody, m);
-    pts[i] = {t:t, A:Math.max(0, Math.min(100, A0 - W)), S:st.s, cb:c, caf:mg, E:Ebody, off:env.off[i], tz:env.tz[i], fl:env.fl[i], sl:!!slp, ni:env.ni[i]};
-    stepS(st, asl, CW(phi), dtH, 1, clog.length ? cafF(cafMg(clog, mid)) : 0);
+    pts[i] = {t:t, A:Math.max(0, Math.min(100, A0 - W)), S:st.s, cb:c, caf:mg, E:Ebody, off:env.off[i], tz:env.tz[i], fl:env.fl[i], sl:!!slp, ni:env.ni[i], debt:debt};
+    stepS(st, asl, CW(phi), dtH, asl ? sm[2] : 1, clog.length ? cafF(cafMg(clog, mid)) : 0);
+    if(asl){ dbt.R = Math.max(0, dbt.R - sm[2]*dtH); dbt.U = Math.max(0, dbt.U - sm[2]*dtH); }
+    else { dbt.R += rate*dtH; dbt.U = Math.min(sleepLen, dbt.U + rate*dtH); }
+    dbt.R = dbt.U + (dbt.R - dbt.U)*fade;
     Ebody += ((asl ? 0 : env.lw[i])*prc(phi, sd.phiC) - sd.drift)*dtH;
     Ebody = Math.max(E.Elo, Math.min(E.Ehi, Ebody));
   }
   return {t0:t0, t1:t1, dt:dt, pts:pts, Pref:sd.Pref, s0:sd.s0, ck:snap};
 }
 /* how easily you would fall asleep at a model point: above 0.85 easy, 0.6 to 0.85 OK, below hard */
-function easeOf(R, p){ return (p.S - 0.5*p.cb)/R.Pref - CAF.ease*cafF(p.caf || 0); }
-function gateOf(R, p){ return R.Pref*(0.6 + CAF.ease*cafF(p.caf || 0)) + 0.5*p.cb; }
+function easeOf(R, p){ return (p.S - 0.5*p.cb)/R.Pref - CAF.ease*cafF(p.caf || 0) + DEBT.ease*(p.debt || 0); }
+function gateOf(R, p){ return R.Pref*(0.6 + CAF.ease*cafF(p.caf || 0) - DEBT.ease*(p.debt || 0)) + 0.5*p.cb; }
 function ptAt(R, t){ var i = Math.round((t - R.t0)/R.dt); return R.pts[Math.max(0, Math.min(R.pts.length - 1, i))]; }
 
 /* ---------- words and colours ---------- */
@@ -545,6 +575,7 @@ function planLayover(E, L, base, fx){
   /* every plan below only differs after T (or after an open nap began), so run the shared part once */
   var ckT = Math.min(T, fx.open ? fx.open.a : T) - 0.5*H, ck = run(E, base, ckT + H, null, ckT).ck;
   function consider(id, blocks){
+    blocks = fromNow(blocks, now);
     var r = evalPlan(E, L, base, blocks, scoreRest, ck);
     if(!r) return;
     if(!opts[id] || r.net > opts[id].res.net) opts[id] = {id:id, blocks:blocks, res:r};
@@ -606,8 +637,8 @@ function planLayover(E, L, base, fx){
     });
   });
   if(L.custom){
-    var cb = L.custom.filter(function(x){ return x.b > x.a && x.a >= T - MIN && x.a >= L.arr && x.b <= L.dep; })
-      .map(function(x){ var k = blk(x.a, x.b, x.kind === 'nap' ? 'nap' : 'main'); return k; });
+    var cb = fromNow(L.custom.filter(function(x){ return x.b > x.a && x.a >= T - MIN && x.a >= L.arr && x.b <= L.dep; })
+      .map(function(x){ return blk(x.a, x.b, x.kind === 'nap' ? 'nap' : 'main'); }), now);
     if(cb.length || L.custom.length){ var rc = evalPlan(E, L, base, cb, scoreRest, ck); if(rc) opts.custom = {id:'custom', blocks:cb, res:rc}; }
   }
   var replan = fx.fixed.length || fx.skips.length || fx.open;
@@ -640,9 +671,10 @@ function plan(S, now, opt){
   var open = actual.filter(function(x){ return x.b == null; })[0] || null;
   var done = actual.filter(function(x){ return x.b != null && x.b > x.a; });
   function clash(s){ return actual.concat(skips).some(function(x){ var xb = x.b == null ? now + 12*H : x.b; return s.a < xb && x.a < s.b; }); }
-  var home = homeNights(E).filter(function(s){ return !clash(s); });
+  var home = fromNow(homeNights(E).filter(function(s){ return !clash(s); }), now);
   var rests = [];
   E.F.forEach(function(f){ if(f.role === 'operate') assumedRests(f).forEach(function(r){ if(!clash(r)) rests.push(r); }); });
+  rests = fromNow(rests, now);
   var Ls = layoversOf(E), chosen = [];
   var inLay = function(L, x){ return x.a >= L.arr - H && x.a < L.dep; };
   Ls.forEach(function(L){
@@ -668,7 +700,7 @@ function plan(S, now, opt){
     L.better = null;
     if(pick && sugO && pick.id !== sugO.id && sugO.m.net - pick.m.net >= 2 && (sugO.m.land - pick.m.land >= 2 || sugO.m.fmin - pick.m.fmin >= 2))
       L.better = {id:sugO.id, name:sugO.name, land:sugO.m.land, landMine:pick.m.land, fmin:sugO.m.fmin, fminMine:pick.m.fmin};
-    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, src:L.src, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
+    if(pick) pick.blocks.forEach(function(x){ chosen.push({a:x.a, b:x.b, kind:x.kind, mid:!!x.mid, lay:L.id, open:x.open, late:!!x.late, was:x.was, src:L.src, label:x.kind === 'main' ? 'Sleep' : 'Nap'}); });
   });
   /* a sleep you are in outside any layover ends at your usual length */
   var extra = [];
@@ -869,7 +901,7 @@ function clock(S, now){
 }
 
 return {
-  crewBreaks:crewBreaks, SEATS:SEATS, vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, SEATS:SEATS, DEBT:DEBT, vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev

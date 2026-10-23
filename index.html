@@ -188,7 +188,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '23 Oct 2026 · build 37';
+var BUILD = '23 Oct 2026 · build 38';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -426,6 +426,8 @@ function pendingBlock(Pl){
 }
 
 /* ---------- why text for a planned block ---------- */
+/* sleep debt to the nearest half hour, or '' when under 45 minutes */
+function debtTxt(d){ return d >= 0.75 ? 'About ' + (Math.round(d*2)/2) + ' h' : ''; }
 function whyFor(Pl, s){
   var L = layOfBlock(Pl, s);
   if(s.kind === 'home') return 'Back on your usual night at home.';
@@ -756,7 +758,7 @@ function viewNow(){
       var lead = soon ? durTxt(s.b - s.a) : 'Next · in ' + durTxt(s.a - nw);
       h += '<div class="hero-h"><div class="hero-l">' + I.moon + esc(label) + '</div><div class="lab" style="font-size:13px">' + esc(lead) + '</div></div>' +
            '<div class="two"><div><div class="lab">Bed</div><div class="big">' + BC.hm(stz, s.a) + '</div></div><div><div class="lab">Wake</div><div class="big">' + BC.hm(stz, s.b) + '</div></div></div>' +
-           '<p class="why">' + esc(whyFor(Pl, s)) + (sL && stz !== tz ? ' ' + esc(sL.ap.city) + ' time.' : '') + '</p>';
+           '<p class="why">' + (s.late && s.was ? 'Planned for ' + BC.hm(stz, s.was) + '. You are still up, so it counts from now. ' : '') + esc(whyFor(Pl, s)) + (sL && stz !== tz ? ' ' + esc(sL.ap.city) + ' time.' : '') + '</p>';
       var adjV = s.a + '_' + s.b + '_' + (s.kind === 'nap' ? 'nap' : 'main');
       if(s.kind !== 'rest' && (cur || s.a - nw < 3*H)){
         h += '<div class="two" style="margin-top:14px;gap:8px;grid-template-columns:2fr 1fr"><button class="btn' + (soon ? '' : ' sec') + '" type="button" data-act="bedNow" data-kind="' + (s.kind === 'nap' ? 'nap' : 'main') + '">Going to bed' + (soon ? '' : ' now') + '</button><button class="btn sec" type="button" data-act="adjust" data-v="' + adjV + '">Change</button></div>';
@@ -787,7 +789,8 @@ function viewNow(){
   if(b - a > 2*H){
     h += '<button class="card" type="button" data-go="chart" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px 12px">' +
          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span><span class="eyebrow" style="display:block">Alertness</span><span style="display:block;font-size:17px;font-weight:600;margin-top:2px">' + (target && b === target.b ? 'Until you land at ' + esc(target.t.code) + ' · ' + esc(BC.dow(target.t.tz, target.b)) + ' ' + BC.hm(target.t.tz, target.b) : 'Next 36 hours') + '</span></span>' + I.chev + '</div>' +
-         ribbon(Pl, a, b, tz, {endLabel:target && b === target.b ? 'Land' : '', out:Pl.layovers.some(function(x){ return x.out && x.out.ne > a && x.out.ns < b; })}) + '</button>';
+         ribbon(Pl, a, b, tz, {endLabel:target && b === target.b ? 'Land' : '', out:Pl.layovers.some(function(x){ return x.out && x.out.ne > a && x.out.ns < b; })}) +
+         (function(){ var d = nw >= Pl.R.t0 && nw <= Pl.R.t1 ? BC.ptAt(Pl.R, nw).debt : 0; return debtTxt(d) ? '<div class="t3" style="margin-top:8px">Sleep debt ' + debtTxt(d).toLowerCase() + '. It pulls this line down until you sleep it off.</div>' : ''; })() + '</button>';
   }
   h += clockCard(Pl, nw);
   return h;
@@ -1145,19 +1148,22 @@ function viewChart(){
     var R = Pl.R, rows2 = [], from = Math.max(nw, a);
     if(nw >= a && nw <= b){
       var pn = BC.ptAt(R, nw);
+      /* a planned sleep that should have started counts from now, but you are looking at this, so you are awake */
+      if(pn.sl && !Pl.open) pn = BC.ptAt(R, nw - R.dt);
       if(pn.sl) rows2.push(['Asleep now', 'Sleep pressure is clearing', pressWord(pn.S)]);
       else {
         var lastWake = null; Pl.sleeps.forEach(function(x){ if(x.b <= nw && (lastWake === null || x.b > lastWake)) lastWake = x.b; });
         rows2.push(['Sleep pressure now', lastWake ? 'Awake for ' + durTxt(Math.round((nw - lastWake)/(15*60000))*15*60000) : 'Since your last sleep', pressWord(pn.S)]);
+        if(debtTxt(pn.debt)) rows2.push(['Sleep debt', 'Short on sleep over the last few days', debtTxt(pn.debt)]);
         var ez = BC.easeOf(R, pn);
-        rows2.push(['If you lay down now', ez >= 0.6 ? 'Your body clock and sleep pressure agree' : pn.cb > 0.6 ? 'Your body clock is keeping you awake' : 'Not enough sleep pressure yet', easeWord(ez) + ' to fall asleep']);
+        rows2.push(['If you lay down now', ez >= 0.6 ? (pn.debt >= 1 && BC.easeOf(R, {S:pn.S, cb:pn.cb, caf:pn.caf, debt:0}) < 0.6 ? 'Sleep debt is tipping it' : 'Your body clock and sleep pressure agree') : pn.cb > 0.6 ? 'Your body clock is keeping you awake' : 'Not enough sleep pressure yet', easeWord(ez) + ' to fall asleep']);
       }
     }
     var win = null;
     for(var i=0;i<R.pts.length;i++){ var p = R.pts[i]; if(p.t < from || p.t > b) continue; var on = !p.sl && p.S > gateOf(R, p); if(on && !win) win = {a:p.t}; if(win && p.sl) break; if(win && !on){ win.b = p.t; break; } }
     if(win){ var wtz = E.locAt(win.a).tz; rows2.push(['Next window to fall asleep', E.locAt(win.a).fl ? 'In flight, ' + E.locAt(win.a).flight.f.city + ' time' : (E.locAt(win.a).ap || E.home).city + ' time', whenTxt(wtz, win.a, nw) + (win.b ? '–' + whenTxt(wtz, win.b, win.a) : ' on')]); }
     h += '<div class="list" style="margin-top:14px">' + rows2.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
-    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is the sleep threshold: above it you can fall asleep. It is set by your body clock, low in your body’s night and high in its late afternoon, which is why you can be exhausted and still not sleep at the wrong body time. Red is when sleep pressure is above it, green when it is below.</p>';
+    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is the sleep threshold: above it you can fall asleep. It is set by your body clock, low in your body’s night and high in its late afternoon, which is why you can be exhausted and still not sleep at the wrong body time. Red is when sleep pressure is above it, green when it is below. Sleep debt (sleep you are short over the last few days, with bunk sleep counted at three quarters) lowers the line, so sleep comes more easily, and lowers alertness.</p>';
     return h;
   }
   h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Crew meetup</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
