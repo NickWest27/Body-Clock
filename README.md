@@ -45,7 +45,7 @@ Planned sleeps on Trip are labelled Auto (the app's plan, which moves whenever a
 
 ## Crew rest calculator (preview)
 
-Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The first break starts when you set it (off + 10 minutes until you do), the last ends a set time before on (45 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Each break shows start, wake-up call (10 minutes before it ends by default) and end, in UTC. It is a standalone page for now; later it can fill in your crew rest on the flight.
+Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The first break starts when you set it (off + 10 minutes until you do), the last ends a set time before on (45 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Two crew are always at the controls, so with 3 crew one rests at a time, with 4 crew two at a time (1 + 2, then 3 + 4), and with 2 crew there are no breaks. Each break shows start, wake-up call (10 minutes before it ends by default) and end, in UTC. It is a standalone page for now; later it can fill in your crew rest on the flight.
 
 ## Data
 
