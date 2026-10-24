@@ -194,8 +194,9 @@ function wrap12(x){ return (((x + 12) % 24) + 24) % 24 - 12; }
 /* ---------- crew rest on board ----------
    Two crew are always at the controls, so crew - 2 rest at once. Breaks go by seat, most junior first:
    3 crew FB, then CPT, then FO; 4 crew FB + FC as a pair, then CPT + FO. The rest window runs from the first
-   break (off + 10 minutes unless set) to 45 minutes before on, split equally; the wake-up call is 10 minutes
-   before each break ends. Off and on are the schedule unless the actual off or estimated on is given (Z). */
+   break (off + 10 minutes unless set) to 30 minutes before on, split equally with no gap between breaks; the
+   wake-up call is 10 minutes before each break ends. Off and on are the schedule unless the actual off or
+   estimated on is given (Z). */
 var SEATS = {3:[['FB'], ['CPT'], ['FO']], 4:[['FB', 'FC'], ['CPT', 'FO']]};
 function zNear(hhmm, ref){
   var d = isoUTC(ref).slice(0, 10), best = NaN;
@@ -205,7 +206,7 @@ function zNear(hhmm, ref){
 function crewBreaks(off, on, crew, each, start, rules){
   rules = rules || {};
   var groups = SEATS[crew]; if(!groups) return null;
-  var end = on - (rules.end != null ? +rules.end : 45)*MIN, wakeB = (rules.wake != null ? +rules.wake : 10)*MIN, unit = (+rules.round === 5 ? 5 : 1)*MIN;
+  var end = on - (rules.end != null ? +rules.end : 30)*MIN, wakeB = (rules.wake != null ? +rules.wake : 10)*MIN, unit = (+rules.round === 5 ? 5 : 1)*MIN;
   var n = groups.length*(each === 2 ? 2 : 1);
   if(!(end - start >= n*15*MIN) || start < off) return {err:'The rest window is too short for ' + n + ' breaks.', off:off, on:on, start:start, end:end, breaks:[]};
   var step = (end - start)/n, bounds = [start], out = [];
@@ -224,9 +225,12 @@ function crewPlan(S, x){
   return cp;
 }
 
-/* when you must be up for a flight: the van (yours, or the usual time before departure) less time to get ready */
-function vanOf(S, f){ return f.van || f.a - (+S.van || 2)*H; }
-function wakeByOf(S, f){ return vanOf(S, f) - (+S.ready || 0.75)*H; }
+/* The van is optional: often there is none (a same-day connection at the airport, or you drive from home).
+   vanOf is the pickup you entered, or null. For planning you still have to leave for the airport: at the van,
+   or without one 2 hours before departure; wakeByOf is that less time to get ready. */
+function vanOf(S, f){ return f.van || null; }
+function leaveOf(S, f){ return f.van || f.a - (+S.van || 2)*H; }
+function wakeByOf(S, f){ return leaveOf(S, f) - (+S.ready || 0.75)*H; }
 
 /* ---------- trip environment ---------- */
 function flightsOf(S){
@@ -242,6 +246,7 @@ function flightsOf(S){
     x.crewPlan = role === 'operate' ? crewPlan(S, x) : null;
     if(x.crewPlan && x.crewPlan.mine && x.crewPlan.mine.length && !(r.restUTC && r.restUTC.s && r.restUTC.e)){
       x.restWins = x.crewPlan.mine.map(function(m){ return [m.a, m.wake]; });
+      x.restBreaks = x.crewPlan.mine;
       x.restWin = x.restWins[0]; x.restAuto = true;
     }
     if(r.restUTC && r.restUTC.s && r.restUTC.e){
@@ -465,12 +470,12 @@ function layoversOf(E){
     var a = F[i], b = F[i+1];
     if(a.t.code === E.home.code || b.a - a.b < 8*H) continue;
     var ap = a.t, id = a.id + '>' + b.id, cfg = (S.lay || {})[id] || {};
-    var ws = a.b + (+S.landBed || 2)*H, duty = vanOf(S, b), we = duty - (+S.ready || 0.75)*H;
+    var ws = a.b + (+S.landBed || 2)*H, duty = leaveOf(S, b), we = duty - (+S.ready || 0.75)*H;
     if(we - ws < 4*H) continue;
     var lastRule = (+((S.night || {}).last) || 12)*H;
     /* crew meetup: an optional time you will be out and awake, set per layover */
     var mt = cfg.meet && cfg.meet.a < cfg.meet.b && cfg.meet.a >= a.b - H && cfg.meet.b <= we ? {ns:cfg.meet.a, ne:cfg.meet.b, lastDrink:duty - lastRule} : null;
-    out.push({id:id, i:i, ap:ap, inF:a, outF:b, arr:a.b, dep:b.a, ws:ws, we:we, duty:duty, out:mt, lastDrink:duty - lastRule,
+    out.push({id:id, i:i, ap:ap, inF:a, outF:b, arr:a.b, dep:b.a, ws:ws, we:we, duty:duty, van:b.van || null, out:mt, lastDrink:duty - lastRule,
               choice:cfg.choice || null, custom:Array.isArray(cfg.custom) ? cfg.custom : null});
   }
   return out;
@@ -646,7 +651,7 @@ function planLayover(E, L, base, fx){
     if(openNap && openNap.a < cut) return k === 'now' ? 'Keep napping' : 'Short nap now, nap later';
     if(!replan && !(k === 'later' && !opts.now)) return NAMES[k];
     if(k === 'none') return mainF ? 'Skip the nap' : openMain ? 'Sleep in, no nap' : 'One long sleep, no nap';
-    if(k === 'later') return mainF ? 'Nap before the van' : openMain ? 'Wake earlier, nap later' : 'Sleep, then nap before the van';
+    if(k === 'later') return mainF ? 'Nap before you leave' : openMain ? 'Wake earlier, nap later' : 'Sleep, then nap before you leave';
     return NAMES[k];
   }
   var list = ['custom', 'now', 'later', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
@@ -901,7 +906,7 @@ function clock(S, now){
 }
 
 return {
-  crewBreaks:crewBreaks, SEATS:SEATS, DEBT:DEBT, vanOf:vanOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, SEATS:SEATS, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev

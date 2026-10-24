@@ -13,17 +13,17 @@ Live at https://nickwest27.github.io/Body-Clock/ (add it to your home screen fro
 - **Charts** (tap the ribbon): Alertness; Sleep pressure, coloured low to high, with the sleep threshold (shaded red between the lines when you are tired enough to sleep, green when not), how long you have been awake and how easily you would fall asleep now; Body clock as the big three-ring clock with thin rings for the days before.
 - **Body clock card** on Now, when a trip moves you an hour or more: a 24-hour dial on the local clock, noon at the top, with three named rings of daylight: outer where you are, middle the day your body expects (wider and outlined), inner home. When the middle ring lines up with the outer one you have adjusted. Tap it for a big version with thin rings for the six days before: where you were (between the outer and body rings) and your body's day (between the body and home rings).
 - **Crew rest**: enter the rest times in UTC, as the crew gives them. You get Lie down and Alarm times on the departure city's clock (the one you left on), and a timer length.
-- **Settings**: home airport, usual bedtime and wake time, landing to hotel bed, van and get-ready times, layover balance, caffeine advice and cut-off, last drink before the van, destinations, backups.
+- **Settings**: home airport, usual bedtime and wake time, landing to hotel bed, van and get-ready times, layover balance, caffeine advice and cut-off, last drink before you leave, destinations, backups.
 
 ## Caffeine
 
 The Now screen has a caffeine card: the last time for caffeine before your next sleep of 1.5 hours or more (6 hours by default, crew rest included), the best coffee time for your next operating flight (about 45 minutes before the predicted low point, or as you wake from crew rest) with what it does to the lowest point and landing, and how much is in you now. Log caffeine from the card or the + on Trip (tea or cola about 50 mg, coffee about 100 mg, large or strong about 200 mg). Logged caffeine is in the model: it peaks about 45 minutes after you drink it and half is gone after 5 hours; while it is in you it lifts alertness a little, makes falling asleep harder and sleep less restful. Turn the advice off or change the cut-off in Settings.
 
-The layover screen shows the last-drink time (12 hours before the van by default; set your company rule in Settings, the FAA minimum is 8 hours). Alcohol is not modelled.
+The layover screen shows the last-drink time (12 hours before you leave for the airport by default; set your company rule in Settings, the FAA minimum is 8 hours). Alcohol is not modelled.
 
 ## Crew meetup and van pickup
 
-On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. Each flight can carry its own van pickup time; if it is left empty the van is assumed 2 hours before departure.
+On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. Each flight can carry its own van pickup time. It is optional: with none (a same-day connection at the airport, or driving from home) no van is shown, and the plan only assumes you leave for the airport 2 hours before departure, less your get-ready time, to know when you must be up.
 
 When you log a sleep or caffeine you can type the time on the local clock, the clock of the city you departed from, or UTC; the buttons are named by city.
 
@@ -35,7 +35,7 @@ Each layover plan is scored on alertness from wake-up to landing, the last 90 mi
 
 ## Find the best
 
-- **The flight**: every candidate (5 to 10 hours of sleep, or 30 minutes to 3½ hours for a nap, in 30-minute steps) is tried with the rest of the layover re-planned around it, and scored on alertness from the van to landing, the last 90 minutes counting most, less a penalty when you are unlikely to fall asleep at that time or at your next sleep.
+- **The flight**: every candidate (5 to 10 hours of sleep, or 30 minutes to 3½ hours for a nap, in 30-minute steps) is tried with the rest of the layover re-planned around it, and scored on alertness from leaving for the airport to landing, the last 90 minutes counting most, less a penalty when you are unlikely to fall asleep at that time or at your next sleep.
 - **Body clock**: the most sleep in your body's own night (your usual bedtime to wake-up on your body's clock, an "anchor sleep"), as long as landing and the lowest point in flight stay within 5 points of the best for the flight.
 - **Whole plan**: the layover planner's own comparison of nap now, nap later, both and none, with the main sleep earlier or later; every other night of a long layover is your usual night on the clock the balance setting picks.
 
@@ -45,7 +45,7 @@ Planned sleeps on Trip are labelled Auto (the app's plan, which moves whenever a
 
 ## Crew rest calculator (preview)
 
-Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The first break starts when you set it (off + 10 minutes until you do), the last ends a set time before on (45 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Two crew are always at the controls, so with 3 crew one rests at a time, with 4 crew two at a time (1 + 2, then 3 + 4), and with 2 crew there are no breaks. Each break shows start, wake-up call (10 minutes before it ends by default) and end, in UTC. The same plan is built into flights: set the crew (2, 3 or 4) and your seat (CPT, FO, FB, FC) on an operated flight and your break becomes its crew rest in the sleep plan. Fine-tune the actual off, estimated on and first break on the flight's Crew rest screen, or type your break by hand. Two crew are always at the controls: with 3 crew the FB rests first, then the CPT, then the FO; with 4 crew FB + FC rest first, then CPT + FO. The timing rules are under Settings › Crew rest.
+Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The screen shows the current UTC time. Rest begins at off + 10 minutes (the 10 is adjustable), at a time you type, or now (Rest begins › Now, which takes the current time plus a minute so you can write the plan down); rest ends a set time before on (30 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Two crew are always at the controls, so with 3 crew one rests at a time, with 4 crew two at a time (1 + 2, then 3 + 4), and with 2 crew there are no breaks. Each break starts as the one before ends, with no changeover gap. The summary shows off, on, flight time, rest begins, rest ends and rest each; the table shows each break's start, end and wake-up call (10 minutes before it ends by default), in UTC. The same plan is built into flights: set the crew (2, 3 or 4) and your seat (CPT, FO, FB, FC) on an operated flight and your break becomes its crew rest in the sleep plan. Fine-tune the actual off, estimated on and rest begins (or tap Now) on the flight's Crew rest screen, or type your break by hand. Two crew are always at the controls: with 3 crew the FB rests first, then the CPT, then the FO; with 4 crew FB + FC rest first, then CPT + FO. The timing rules are under Settings › Crew rest.
 
 ## Data
 
