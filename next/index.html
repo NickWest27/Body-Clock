@@ -190,7 +190,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '28 Oct 2026 · build 40';
+var BUILD = '28 Oct 2026 · build 41';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -1203,11 +1203,11 @@ function viewRest(id){
       h += '<h2 class="grp-h">' + (brs.length > 1 ? (k ? 'Second break' : 'First break') + ' · ' : 'Your break · ') + 'On ' + esc(dep) + ' time</h2><section class="watch"><div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(f.f.tz, x.a) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(f.f.tz, x.wake) + '</div></div></div>' +
            '<div style="height:1px;background:rgba(255,255,255,.3);margin:14px 0"></div><div style="display:flex;justify-content:space-between;font-size:17px;font-variant-numeric:tabular-nums"><span class="lab" style="font-size:17px">' + z(x.a).replace('Z', '') + '–' + z(x.b) + (x.wake !== x.b ? ' · up ' + z(x.wake) : '') + '</span><b style="white-space:nowrap">' + durTxt(x.b - x.a) + '</b></div></section>';
     });
-    h += '<p class="foot">' + (manual ? 'Using the times you typed. ' : cp ? 'From the crew plan below. The alarm is the wake-up call, ' + S.restRules.wake + ' min before your break ends. ' : '') + esc(dep) + ' time is the clock you left on.</p>';
+    h += '<p class="foot">' + (manual ? 'Using the times you typed. ' : cp ? 'From the crew plan below. The alarm is the wake-up call, ' + BC.rulesOf(S, raw).wake + ' min before your break ends. ' : '') + esc(dep) + ' time is the clock you left on.</p>';
   }
   /* the whole crew plan */
   if(cp){
-    var rule = S.restRules, startAuto = !raw.restStart;
+    var rule = BC.rulesOf(S, raw), startAuto = !raw.restStart;
     function srow(t1, t3, val){ return '<div class="row static"><span class="main"><span class="t1">' + t1 + '</span>' + (t3 ? '<span class="t3">' + t3 + '</span>' : '') + '</span><span class="val" style="color:var(--label);font-variant-numeric:tabular-nums">' + val + '</span></div>'; }
     h += '<h2 class="grp-h">Crew plan · UTC</h2><div class="list">' +
          '<label class="row static"><span class="main"><span class="t1">Off</span><span class="t3">' + (raw.offZ ? 'Actual' : 'Scheduled · type the actual') + '</span></span><input class="pill" type="time" id="roff" value="' + esc(raw.offZ || BC.hm('UTC', cp.off)) + '"></label>' +
@@ -1229,7 +1229,22 @@ function viewRest(id){
       });
       h += '</tbody></table><div class="lab" style="font-size:13px;margin-top:8px">Each break starts as the one before ends. The wake-up call is ' + rule.wake + ' min before the end, for the changeover.</div></div>';
     }
-    h += '<p class="foot">Change the crew or which rest you take on the flight. Off + ' + rule.start + ', on − ' + rule.end + ' and the wake-up call are in Settings.</p>';
+    /* the timing rules, for this flight */
+    var defs = BC.rulesOf(S, null), own = ['start', 'end', 'wake', 'round'].some(function(k){ return rule[k] !== defs[k]; });
+    function step(k, label, sub){
+      return '<div class="row static"><span class="main"><span class="t1">' + label + '</span><span class="t3">' + sub + '</span></span><span class="val" style="color:var(--label);font-variant-numeric:tabular-nums;margin-right:10px">' + rule[k] + ' min</span>' +
+             '<span class="stepper"><button type="button" data-act="rrule" data-k="' + k + '" data-d="-5" aria-label="Less">−</button><span></span><button type="button" data-act="rrule" data-k="' + k + '" data-d="5" aria-label="More">+</button></span></div>';
+    }
+    h += '<h2 class="grp-h">Timing for this flight</h2><div class="list">' +
+         step('start', 'Off to first rest', 'Rest begins this long after off') +
+         step('end', 'Rest ends', 'This long before on') +
+         step('wake', 'Wake-up call', 'This long before each break ends') +
+         '<div class="row static"><span class="main"><span class="t1">Round times to</span></span><div class="seg" role="group" aria-label="Round times to" style="width:140px">' +
+         [1, 5].map(function(v){ return '<button type="button" data-act="rround" data-v="' + v + '" aria-pressed="' + (rule.round === v) + '">' + v + ' min</button>'; }).join('') + '</div></div></div>';
+    h += own ? '<div class="two" style="margin-top:10px;gap:8px"><button class="btn sec small" type="button" data-act="rrDefault">Save as default</button><button class="btn sec small" type="button" data-act="rrReset">Use defaults</button></div>'
+             : '<p class="foot">These are your defaults from Settings. Changing them here changes this flight only.</p>';
+
+    h += '<p class="foot">Change the crew or which rest you take on the flight.</p>';
   }
   /* typing the times by hand */
   h += '<h2 class="grp-h">' + (cp ? 'Or type your break (UTC)' : 'Your rest, as given (UTC)') + '</h2><div class="list">' +
@@ -1267,11 +1282,11 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">Last drink before the flight</span><span class="t3">hours</span></span>' + num('sLast', S.night.last, 8, 24, 1) + '</label></div>' +
        '<p class="foot">About 6 hours keeps most caffeine out of your sleep; some people clear it faster or slower. For alcohol use your company’s rule; the FAA minimum is 8 hours.</p>';
   h += '<h2 class="grp-h">Crew rest</h2><div class="list">' +
-       '<label class="row static"><span class="main"><span class="t1">First break starts</span><span class="t3">minutes after off</span></span>' + num('rrStart', S.restRules.start, 0, 60, 5) + '</label>' +
-       '<label class="row static"><span class="main"><span class="t1">Last break ends</span><span class="t3">minutes before on</span></span>' + num('rrEnd', S.restRules.end, 0, 120, 5) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Off to first rest</span><span class="t3">minutes after off</span></span>' + num('rrStart', S.restRules.start, 0, 60, 5) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Rest ends</span><span class="t3">minutes before on</span></span>' + num('rrEnd', S.restRules.end, 0, 120, 5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Wake-up call</span><span class="t3">minutes before a break ends</span></span>' + num('rrWake', S.restRules.wake, 0, 30, 5) + '</label>' +
-       '<label class="row static"><span class="main"><span class="t1">Round break times to</span></span>' + sel('rrRound', String(S.restRules.round), [['1', '1 minute'], ['5', '5 minutes']]) + '</label></div>' +
-       '<p class="foot">Two crew are always at the controls. With 3 crew the FB rests first, then relieves the CPT, then the FO; with 4 crew FB + FC rest first, then CPT + FO.</p>';
+       '<label class="row static"><span class="main"><span class="t1">Round times to</span></span>' + sel('rrRound', String(S.restRules.round), [['1', '1 minute'], ['5', '5 minutes']]) + '</label></div>' +
+       '<p class="foot">Defaults for every crew plan. Change them for one flight on its Crew rest screen. Two crew are always at the controls: with 3 crew one rests at a time in three numbered rests, with 4 crew two at a time in two. Who takes which rest varies by flight (often FB, then PF, then PM); you pick yours on the flight.</p>';
   h += '<h2 class="grp-h">Tools</h2><div class="list"><a class="row" href="crew-rest.html" style="color:var(--tint)">' + I.moon + '<span class="main"><span class="t1">Crew rest calculator</span><span class="t3" style="color:var(--sec)">Preview · equal breaks in UTC</span></span>' + I.chev + '</a></div>';
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
@@ -1356,7 +1371,7 @@ function renderSheet(){
          (+fl.crew >= 3 ? '<div class="row static"><span class="main"><span class="t1">Breaks each</span><span class="t3">Two on longer flights</span></span><div class="seg" role="group" aria-label="Breaks each" style="width:120px">' + segB('feach', 1, +fl.each !== 2, 1) + segB('feach', 2, +fl.each === 2, 2) + '</div></div>' : '') +
          '</div>';
     if(+fl.crew >= 3 && !isNaN(d.a) && !isNaN(d.b) && d.b > d.a){
-      var cp = BC.crewBreaks(d.a, d.b, +fl.crew, +fl.each === 2 ? 2 : 1, d.a + (+S.restRules.start)*60000, S.restRules), mine = cp && cp.breaks ? cp.breaks.filter(function(x){ return x.slot === +fl.slot; }) : [];
+      var cp = BC.crewBreaks(d.a, d.b, +fl.crew, +fl.each === 2 ? 2 : 1, d.a + BC.rulesOf(S, fl).start*60000, BC.rulesOf(S, fl)), mine = cp && cp.breaks ? cp.breaks.filter(function(x){ return x.slot === +fl.slot; }) : [];
       h += '<p class="foot">' + (mine.length ? 'Your break' + (mine.length > 1 ? 's' : '') + ': ' + mine.map(function(m){ return BC.hm('UTC', m.a).replace(':', '') + '–' + BC.hm('UTC', m.b).replace(':', '') + 'Z, wake-up ' + BC.hm('UTC', m.wake).replace(':', '') + 'Z'; }).join('; ') + ', from the scheduled times. Fine-tune it on the flight’s Crew rest screen.' : (cp && cp.err ? cp.err : '')) + '</p>';
     } else if(+fl.crew === 2) h += '<p class="foot">With 2 crew both stay at the controls, so there is no crew rest.</p>';
   }
@@ -1375,7 +1390,7 @@ function saveFlight(){
   if(fl.van){ var vm = BC.localToMs(d.f.tz, fl.van); if(isNaN(vm) || !(vm < d.a) || d.a - vm > 8*H){ V.flightErr = 'The van pickup should be before departure, within 8 hours.'; renderSheet(); return; } }
   var rec = {id:fl.id || nextId(), from:d.f.code, to:d.t.code, dep:fl.dep, arr:fl.arr, role:fl.role || null, rest:+fl.rest || 0};
   if((fl.role || (d.dur >= 5*H ? 'operate' : 'commute')) === 'operate' && fl.crew){ rec.crew = +fl.crew; rec.slot = +fl.slot || 1; rec.each = +fl.each === 2 ? 2 : 1; S.lastSlot = rec.slot; if(+fl.crew === 2) rec.rest = 0; }
-  ['offZ', 'onZ', 'restStart'].forEach(function(k){ if(fl[k]) rec[k] = fl[k]; });
+  ['offZ', 'onZ', 'restStart', 'rules', 'restUTC'].forEach(function(k){ if(fl[k] && !rec[k]) rec[k] = fl[k]; });
   if(fl.van) rec.van = fl.van;
   if(fl.restUTC) rec.restUTC = fl.restUTC;
   var i = S.flights.findIndex(function(x){ return x.id === rec.id; });
@@ -1634,6 +1649,17 @@ document.addEventListener('click', function(e){
   if(act === 'sleepDel'){
     if(!V.confirmDel){ V.confirmDel = true; renderSleep(); return; }
     S.actual = S.actual.filter(function(x){ return x.id !== V.sleep.id; }); save(); V.sleep = null; V.confirmDel = false; renderSleep(); render(); return;
+  }
+  if(act === 'rrule' || act === 'rround' || act === 'rrDefault' || act === 'rrReset'){
+    var rawT = S.flights.filter(function(x){ return String(x.id) === String(V.arg); })[0]; if(!rawT) return;
+    var cur = BC.rulesOf(S, rawT);
+    if(act === 'rrule'){ var k = b.dataset.k, lim = {start:[0, 60], end:[0, 120], wake:[0, 30]}[k]; cur[k] = Math.max(lim[0], Math.min(lim[1], cur[k] + (+b.dataset.d))); rawT.rules = cur; }
+    else if(act === 'rround'){ cur.round = +b.dataset.v; rawT.rules = cur; }
+    else if(act === 'rrDefault'){ ['start', 'end', 'wake', 'round'].forEach(function(k){ S.restRules[k] = cur[k]; }); delete rawT.rules; }
+    else delete rawT.rules;
+    /* a flight that matches the defaults keeps no rules of its own, so it follows later changes to them */
+    if(rawT.rules){ var df = BC.rulesOf(S, null); if(['start', 'end', 'wake', 'round'].every(function(k){ return rawT.rules[k] === df[k]; })) delete rawT.rules; }
+    save(); render(); return;
   }
   if(act === 'restStartNow' || act === 'restStartAuto'){
     var rawS = S.flights.filter(function(x){ return String(x.id) === String(id); })[0]; if(!rawS) return;

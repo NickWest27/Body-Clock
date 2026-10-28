@@ -231,10 +231,16 @@ function crewBreaks(off, on, crew, each, start, rules){
   for(var j=0;j<n;j++) out.push({slot:j % g + 1, label:'Rest ' + (j % g + 1), round:Math.floor(j/g) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - wakeB});
   return {off:off, on:on, start:start, end:end, breaks:out};
 }
+/* the crew rest timing for a flight: the flight's own, or the defaults in Settings */
+function rulesOf(S, r){
+  var d = S.restRules || {}, o = (r && r.rules) || {}, out = {};
+  [['start', 10], ['end', 30], ['wake', 10], ['round', 1]].forEach(function(k){ out[k[0]] = o[k[0]] != null ? +o[k[0]] : d[k[0]] != null ? +d[k[0]] : k[1]; });
+  return out;
+}
 function crewPlan(S, x){
   var r = x.r, crew = +r.crew || 0;
   if(!restSlots(crew)) return null;
-  var rules = S.restRules || {}, off = r.offZ ? zNear(r.offZ, x.a) : x.a, on = r.onZ ? zNear(r.onZ, x.b) : x.b;
+  var rules = rulesOf(S, r), off = r.offZ ? zNear(r.offZ, x.a) : x.a, on = r.onZ ? zNear(r.onZ, x.b) : x.b;
   var start = r.restStart ? zNear(r.restStart, off + (rules.start != null ? +rules.start : 10)*MIN) : off + (rules.start != null ? +rules.start : 10)*MIN;
   var cp = crewBreaks(off, on, crew, +r.each === 2 ? 2 : 1, start, rules);
   if(cp){ cp.slot = slotOf(r); cp.mine = cp.breaks.filter(function(b){ return b.slot === cp.slot; }); }
@@ -922,7 +928,7 @@ function clock(S, now){
 }
 
 return {
-  crewBreaks:crewBreaks, restSlots:restSlots, slotOf:slotOf, cafLevel:cafLevel, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, rulesOf:rulesOf, restSlots:restSlots, slotOf:slotOf, cafLevel:cafLevel, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev
