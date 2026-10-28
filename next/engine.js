@@ -161,6 +161,14 @@ function cafMg(log, t){
   return c;
 }
 function cafF(mg){ return mg > 0 ? mg/(mg + CAF.c50) : 0; }
+/* a word for how much caffeine is in you, with what it does at that level */
+function cafLevel(mg){
+  if(mg < 5) return {word:'Clear', note:'None left to speak of.'};
+  if(mg < 25) return {word:'Trace', note:'Next to no effect.'};
+  if(mg < 75) return {word:'Light', note:'A small lift. It can still delay sleep a little.'};
+  if(mg < 150) return {word:'Strong', note:'A clear lift. Sleep will be slower to come and lighter.'};
+  return {word:'Wired', note:'Close to the most caffeine can do. Sleep will be hard.'};
+}
 function cafLog(S){ return (S && S.caf && Array.isArray(S.caf.log)) ? S.caf.log : []; }
 function habitSleeping(hr, bedH, wakeH){ return bedH > wakeH ? (hr >= bedH || hr < wakeH) : (hr >= bedH && hr < wakeH); }
 /* sleeps as sorted [start, end] intervals, overlapping ones joined */
@@ -192,12 +200,20 @@ function fromNow(list, now){
 function wrap12(x){ return (((x + 12) % 24) + 24) % 24 - 12; }
 
 /* ---------- crew rest on board ----------
-   Two crew are always at the controls, so crew - 2 rest at once. Breaks go by seat, most junior first:
-   3 crew FB, then CPT, then FO; 4 crew FB + FC as a pair, then CPT + FO. The rest window runs from the first
+   Two crew are always at the controls, so crew - 2 rest at once: with 3 crew one at a time in three rests
+   (1, 2, 3), with 4 crew two at a time in two rests. Who takes which rest varies by flight (often the FB
+   first, then the pilot flying, then the pilot monitoring), so rests are numbered, not named. The window runs from the first
    break (off + 10 minutes unless set) to 30 minutes before on, split equally with no gap between breaks; the
    wake-up call is 10 minutes before each break ends. Off and on are the schedule unless the actual off or
    estimated on is given (Z). */
-var SEATS = {3:[['FB'], ['CPT'], ['FO']], 4:[['FB', 'FC'], ['CPT', 'FO']]};
+function restSlots(crew){ return +crew === 3 ? 3 : +crew === 4 ? 2 : 0; }
+/* your rest number; flights saved before rests were numbered had a seat (3 crew FB, CPT, FO; 4 crew FB + FC, CPT + FO) */
+function slotOf(r){
+  var n = restSlots(r.crew);
+  if(+r.slot >= 1 && +r.slot <= n) return +r.slot;
+  var old = n === 3 ? {FB:1, FC:1, CPT:2, FO:3} : {FB:1, FC:1, CPT:2, FO:2};
+  return old[r.seat] || 1;
+}
 function zNear(hhmm, ref){
   var d = isoUTC(ref).slice(0, 10), best = NaN;
   for(var k=-1;k<=1;k++){ var c = parseLocal(addDays(d, k) + 'T' + hhmm); if(!isNaN(c) && (isNaN(best) || Math.abs(c - ref) < Math.abs(best - ref))) best = c; }
@@ -205,23 +221,23 @@ function zNear(hhmm, ref){
 }
 function crewBreaks(off, on, crew, each, start, rules){
   rules = rules || {};
-  var groups = SEATS[crew]; if(!groups) return null;
+  var g = restSlots(crew); if(!g) return null;
   var end = on - (rules.end != null ? +rules.end : 30)*MIN, wakeB = (rules.wake != null ? +rules.wake : 10)*MIN, unit = (+rules.round === 5 ? 5 : 1)*MIN;
-  var n = groups.length*(each === 2 ? 2 : 1);
+  var n = g*(each === 2 ? 2 : 1);
   if(!(end - start >= n*15*MIN) || start < off) return {err:'The rest window is too short for ' + n + ' breaks.', off:off, on:on, start:start, end:end, breaks:[]};
   var step = (end - start)/n, bounds = [start], out = [];
   for(var k=1;k<n;k++) bounds.push(Math.round((start + k*step)/unit)*unit);
   bounds.push(end);
-  for(var j=0;j<n;j++) out.push({seats:groups[j % groups.length], round:Math.floor(j/groups.length) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - wakeB});
+  for(var j=0;j<n;j++) out.push({slot:j % g + 1, label:'Rest ' + (j % g + 1), round:Math.floor(j/g) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - wakeB});
   return {off:off, on:on, start:start, end:end, breaks:out};
 }
 function crewPlan(S, x){
   var r = x.r, crew = +r.crew || 0;
-  if(!SEATS[crew]) return null;
+  if(!restSlots(crew)) return null;
   var rules = S.restRules || {}, off = r.offZ ? zNear(r.offZ, x.a) : x.a, on = r.onZ ? zNear(r.onZ, x.b) : x.b;
   var start = r.restStart ? zNear(r.restStart, off + (rules.start != null ? +rules.start : 10)*MIN) : off + (rules.start != null ? +rules.start : 10)*MIN;
   var cp = crewBreaks(off, on, crew, +r.each === 2 ? 2 : 1, start, rules);
-  if(cp) cp.mine = cp.breaks.filter(function(b){ return b.seats.indexOf(r.seat) >= 0; });
+  if(cp){ cp.slot = slotOf(r); cp.mine = cp.breaks.filter(function(b){ return b.slot === cp.slot; }); }
   return cp;
 }
 
@@ -906,7 +922,7 @@ function clock(S, now){
 }
 
 return {
-  crewBreaks:crewBreaks, SEATS:SEATS, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, restSlots:restSlots, slotOf:slotOf, cafLevel:cafLevel, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev

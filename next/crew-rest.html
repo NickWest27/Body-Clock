@@ -71,7 +71,7 @@ td .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-righ
 <main class="wrap">
   <a class="back" href="index.html#settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Settings</a>
   <h1>Crew rest</h1>
-  <div class="sub">Equal breaks by seat, two crew always at the controls. Times in UTC (Z).</div>
+  <div class="sub">Equal numbered rests, two crew always at the controls. Times in UTC (Z).</div>
   <div class="zc"><span class="t3">Now</span><b id="zNow"></b></div>
 
   <h2 class="grp-h">Flight</h2>
@@ -159,22 +159,22 @@ function compute(){
   if(start < T.off){ sum.innerHTML = sh; out.innerHTML = '<p class="err" style="margin:0">Rest begins before off.</p>'; bindAuto(); return; }
   var cp = BC.crewBreaks(T.off, T.on, st.crew, st.each, start, {end:st.endBefore, wake:st.wakeBefore, round:st.round});
   if(!cp || cp.err){ sum.innerHTML = sh; out.innerHTML = '<p class="err" style="margin:0">That leaves less than 15 minutes per break. Check the times.</p>'; bindAuto(); return; }
-  var atOnce = st.crew - 2, groups = BC.SEATS[st.crew].length;
-  var br = cp.breaks.map(function(x, j){ return {g:j % groups, label:x.seats.join(' + '), round:x.round, a:x.a, b:x.b, wake:x.wake}; });
+  var atOnce = st.crew - 2;
+  var br = cp.breaks.map(function(x){ return {g:x.slot - 1, label:x.label, round:x.round, a:x.a, b:x.b, wake:x.wake}; });
   var lens = br.map(function(x){ return x.b - x.a; }), mn = Math.min.apply(null, lens), mx = Math.max.apply(null, lens);
   sh += row('Rest each', br.length + ' breaks · ' + (atOnce > 1 ? 'two at a time' : 'one at a time'), mx - mn <= MIN ? dur(mn) : dur(mn) + '–' + dur(mx), 'wake');
   sum.innerHTML = sh;
   /* timeline from off to on */
   var span = T.on - T.off, pc = function(t){ return ((t - T.off)/span*100).toFixed(2) + '%'; };
   var h = '<div class="bar">';
-  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[x.g] + '">' + x.label.replace(/ \+ /g, '+') + '</i>'; });
+  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[x.g] + '">' + (x.g + 1) + '</i>'; });
   br.forEach(function(x){ h += '<b style="left:' + pc(x.wake) + '" title="Wake-up"></b>'; });
   h += '<span class="lb" style="left:0;transform:none">Off ' + z(T.off) + '</span><span class="lb" style="left:auto;right:0;transform:none">On ' + z(T.on, T.off) + '</span></div>';
-  h += '<table><thead><tr><th>' + (st.each > 1 ? 'Crew · break' : 'Crew') + '</th><th>Start</th><th>End</th><th>Wake-up</th></tr></thead><tbody>';
+  h += '<table><thead><tr><th>Rest</th><th>Start</th><th>End</th><th>Wake-up</th></tr></thead><tbody>';
   br.forEach(function(x){
     h += '<tr><td class="who"><span class="sw" style="background:' + COLS[x.g] + '"></span>' + x.label + (st.each > 1 ? ' · ' + (x.round === 1 ? '1st' : '2nd') : '') + '</td><td>' + z(x.a, T.off) + '</td><td>' + z(x.b, T.off) + '</td><td class="wake">' + z(x.wake, T.off) + '</td></tr>';
   });
-  h += '</tbody></table><div class="sum">Wake-up ' + st.wakeBefore + ' min before each break ends. ' + (atOnce > 1 ? 'Two rest at a time, in pairs.' : 'One rests at a time.') + '</div>';
+  h += '</tbody></table><div class="sum">Wake-up ' + st.wakeBefore + ' min before each break ends. ' + (atOnce > 1 ? 'Two rest at a time, in pairs.' : 'One rests at a time. Who takes which rest varies by flight, often the FB first, then the pilot flying, then the pilot monitoring.') + '</div>';
   out.innerHTML = h;
   bindAuto();
 }
