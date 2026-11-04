@@ -190,7 +190,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '28 Oct 2026 · build 41';
+var BUILD = '4 Nov 2026 · build 42';
 var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
 
 /* ---------- state ---------- */
@@ -225,6 +225,147 @@ function fix(o){
 }
 var S = load();
 function store(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+
+/* ---------- sync between your devices ----------
+   Your data goes to one file in a private (secret) gist on your GitHub account, encrypted on the device with
+   your passphrase first (PBKDF2 then AES-GCM), so GitHub only ever holds scrambled data. Each device keeps the
+   token and the key made from the passphrase (not the passphrase itself), plus a copy of what was last synced
+   (the base). A sync merges three ways: this device, the gist and the base. Something changed on one side only
+   takes that side's version; something changed on both keeps this device's; flights, logged sleeps and
+   coffees are merged one by one by id, so adding things on both devices loses nothing, and deleting
+   something on one device deletes it on the other. */
+var SYNC_KEY = 'bodyclock2-sync', SYNC_BASE = 'bodyclock2-syncbase', GIST_DESC = 'Body Clock sync', GIST_FILE = 'bodyclock-sync.json';
+var SY = loadSync(), syncBusy = false, syncAgain = false, syncTimer = null, syncApplying = false;
+function loadSync(){ try{ var o = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); return o && o.token && o.gist && o.key && o.salt ? o : null; }catch(e){ return null; } }
+function storeSync(){ try{ if(SY) localStorage.setItem(SYNC_KEY, JSON.stringify(SY)); else localStorage.removeItem(SYNC_KEY); }catch(e){} }
+function loadBase(){ try{ return JSON.parse(localStorage.getItem(SYNC_BASE) || 'null'); }catch(e){ return null; } }
+function storeBase(o){ try{ if(o) localStorage.setItem(SYNC_BASE, JSON.stringify(o)); else localStorage.removeItem(SYNC_BASE); }catch(e){} }
+/* what is synced: everything except this device's own notices */
+function syncable(o){ var c = JSON.parse(JSON.stringify(o)); delete c.notice; return c; }
+function same(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
+function isObj(x){ return !!x && typeof x === 'object' && !Array.isArray(x); }
+function merge3(l, r, b){
+  if(same(l, r)) return l;
+  if(same(l, b)) return r;
+  if(same(r, b)) return l;
+  if(Array.isArray(l) && Array.isArray(r)){
+    var keyOf = function(x){ return isObj(x) && x.id != null ? 'id:' + x.id : 'v:' + JSON.stringify(x); };
+    var bm = {}, lm = {}, rm = {}, order = [], out = [];
+    (Array.isArray(b) ? b : []).forEach(function(x){ bm[keyOf(x)] = x; });
+    l.forEach(function(x){ var k = keyOf(x); lm[k] = x; if(order.indexOf(k) < 0) order.push(k); });
+    r.forEach(function(x){ var k = keyOf(x); rm[k] = x; if(order.indexOf(k) < 0) order.push(k); });
+    order.forEach(function(k){ var v = merge3(lm[k], rm[k], bm[k]); if(v !== undefined) out.push(v); });
+    return out;
+  }
+  if(isObj(l) && isObj(r)){
+    var bo = isObj(b) ? b : {}, res = {}, seen = {};
+    Object.keys(l).concat(Object.keys(r)).forEach(function(k){
+      if(seen[k]) return; seen[k] = true;
+      var v = merge3(l[k], r[k], bo[k]); if(v !== undefined) res[k] = v;
+    });
+    return res;
+  }
+  return l;
+}
+function b64(buf){ var a = new Uint8Array(buf), s = ''; for(var i=0;i<a.length;i++) s += String.fromCharCode(a[i]); return btoa(s); }
+function unb64(s){ var t = atob(s), a = new Uint8Array(t.length); for(var i=0;i<t.length;i++) a[i] = t.charCodeAt(i); return a; }
+async function deriveKey(pass, salt){
+  var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt:salt, iterations:310000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, true, ['encrypt', 'decrypt']);
+}
+async function seal(key, salt64, obj, rev){
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ct = await crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, key, new TextEncoder().encode(JSON.stringify(obj)));
+  return JSON.stringify({app:'body-clock', v:1, rev:rev, at:Date.now(), salt:salt64, iv:b64(iv), ct:b64(ct)});
+}
+async function unseal(key, blob){ return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(blob.iv)}, key, unb64(blob.ct)))); }
+async function gh(token, method, path, body){
+  var r = await fetch('https://api.github.com' + path, {method:method, cache:'no-store', headers:{'Accept':'application/vnd.github+json', 'Authorization':'Bearer ' + token, 'Content-Type':'application/json'}, body:body ? JSON.stringify(body) : undefined});
+  if(!r.ok){ var e = new Error('GitHub ' + r.status); e.status = r.status; throw e; }
+  return r.json();
+}
+async function gistBlob(token, id){
+  var g = await gh(token, 'GET', '/gists/' + id), f = g.files && g.files[GIST_FILE];
+  if(!f){ var e = new Error('no sync file'); e.status = 404; throw e; }
+  var txt = f.truncated ? await (await fetch(f.raw_url, {cache:'no-store'})).text() : f.content;
+  return JSON.parse(txt);
+}
+function syncErr(e){
+  if(e && e.msg) return e.msg;
+  if(e && e.status === 401) return 'GitHub did not accept the token. It may have expired: make a new one and turn sync on again.';
+  if(e && (e.status === 403 || e.status === 404)) return 'GitHub refused. The token needs the “gist” permission, or the synced gist was deleted.';
+  if(e && e.name === 'OperationError') return 'Your passphrase does not open the synced data. It was set up again with another one: turn sync off and on with that passphrase.';
+  return 'Could not reach GitHub. It tries again when you are online.';
+}
+function syncSoon(){ clearTimeout(syncTimer); syncTimer = setTimeout(function(){ syncNow(); }, 2500); }
+async function syncNow(manual){
+  if(!SY) return;
+  if(syncBusy){ syncAgain = true; return; }
+  syncBusy = true; clearTimeout(syncTimer);
+  try{
+    var key = await crypto.subtle.importKey('raw', unb64(SY.key), 'AES-GCM', true, ['encrypt', 'decrypt']);
+    var blob = await gistBlob(SY.token, SY.gist);
+    if(blob.salt !== SY.salt) throw {msg:'The synced data was set up again with another passphrase. Turn sync off and on again with that passphrase.'};
+    var base = loadBase(), L = syncable(S), R;
+    /* GitHub can hand back an older copy for a short while after a change: then there is nothing new there */
+    if((+blob.rev || 0) < (+SY.rev || 0)) R = base || L;
+    else R = await unseal(key, blob);
+    /* the first sync on a device has no base: everything is merged, and where both differ the synced copy wins,
+       so a new device takes your settings rather than its defaults */
+    var M = fix(JSON.parse(JSON.stringify(base ? merge3(L, R, base) : merge3(R, L, {}))));
+    ['actual', 'skips'].forEach(function(k){ M[k].sort(function(p, q){ return p.a - q.a; }); });
+    M.caf.log.sort(function(p, q){ return p.t - q.t; });
+    var Ms = syncable(M), rev = Math.max(+blob.rev || 0, +SY.rev || 0);
+    if(!same(Ms, R) || (+blob.rev || 0) < rev){
+      rev += 1;
+      var files = {}; files[GIST_FILE] = {content:await seal(key, SY.salt, Ms, rev)};
+      await gh(SY.token, 'PATCH', '/gists/' + SY.gist, {files:files});
+    }
+    var changedHere = !same(Ms, L);
+    storeBase(Ms); SY.rev = rev; SY.at = Date.now(); SY.err = null; storeSync();
+    if(changedHere){
+      var keep = S.notice; S = M; if(keep) S.notice = keep;
+      syncApplying = true; var t0 = now(); save(); syncApplying = false;
+      var item = {txt:'Updated from your other device.'};
+      if(S.notice && S.notice.t >= t0) S.notice.items.unshift(item); else S.notice = {t:t0, items:[item]};
+      store();
+    }
+    if(changedHere || manual || V.view === 'settings') render();
+  }catch(e){
+    if(window.console) console.warn('sync', e);
+    var was = SY && SY.err;
+    if(SY){ SY.err = syncErr(e); storeSync(); }
+    if(manual || (V.view === 'settings' && SY && SY.err !== was)) render();
+  }finally{
+    syncBusy = false;
+    if(syncAgain){ syncAgain = false; syncNow(); }
+  }
+}
+/* turning sync on: join the gist your other device made, or make it */
+async function syncSetup(token, pass){
+  token = (token || '').trim();
+  if(!token) throw {msg:'Paste your GitHub token.'};
+  if((pass || '').length < 8) throw {msg:'Use a passphrase of at least 8 characters.'};
+  if(!(window.crypto && crypto.subtle)) throw {msg:'This browser cannot encrypt here. Open the app from its web address.'};
+  var list = await gh(token, 'GET', '/gists?per_page=100');
+  var g = list.filter(function(x){ return x.description === GIST_DESC && x.files && x.files[GIST_FILE]; })[0], key, raw;
+  if(g){
+    var blob = await gistBlob(token, g.id);
+    key = await deriveKey(pass, unb64(blob.salt));
+    try{ await unseal(key, blob); }catch(e){ throw {msg:'That passphrase does not open your synced data. Use the one you set on your other device.'}; }
+    raw = b64(await crypto.subtle.exportKey('raw', key));
+    SY = {token:token, gist:g.id, salt:blob.salt, key:raw, rev:0, at:0}; storeBase(null); storeSync();
+    await syncNow();
+    if(SY && SY.err) throw {msg:SY.err};
+    return 'joined';
+  }
+  var salt = crypto.getRandomValues(new Uint8Array(16)), salt64 = b64(salt);
+  key = await deriveKey(pass, salt); raw = b64(await crypto.subtle.exportKey('raw', key));
+  var files = {}; files[GIST_FILE] = {content:await seal(key, salt64, syncable(S), 1)};
+  var made = await gh(token, 'POST', '/gists', {description:GIST_DESC, public:false, files:files});
+  SY = {token:token, gist:made.id, salt:salt64, key:raw, rev:1, at:Date.now()}; storeBase(syncable(S)); storeSync();
+  return 'made';
+}
 /* Every change re-plans straight away. save() also compares the plan with how it looked before the change and
    leaves a notice saying what moved: alertness at landing and the low point, planned sleep times, a better plan
    when you are on your own times, and your times being dropped if they no longer fit. */
@@ -239,6 +380,7 @@ function save(){
   }catch(err){ if(window.console) console.error(err); }
   if(notes.length) S.notice = {t:now(), items:notes};
   store();
+  if(SY && !syncApplying) syncSoon();
 }
 function planSummary(Pl){
   var nw = now(), sum = {n:Pl.flights.length, f:{}, lay:{}};
@@ -280,7 +422,10 @@ function noticeCard(){
   });
   return h + '<div style="margin-top:6px"><button class="btn sec small" type="button" data-act="noticeOk">OK</button></div></section>';
 }
-function nextId(){ var m = 0; S.flights.forEach(function(f){ if(f.id > m) m = f.id; }); return m + 1; }
+/* A new id for a list: unique across your devices too (time-based), so two devices adding things
+   offline never give two different things the same id. */
+function uid(list){ var m = 0; list.forEach(function(x){ if(+x.id > m) m = +x.id; }); return Math.max(m + 1, Math.floor(Date.now()/1000)*10 + Math.floor(Math.random()*10)); }
+function nextId(){ return uid(S.flights); }
 
 /* ---------- helpers ---------- */
 function $(s){ return document.querySelector(s); }
@@ -698,7 +843,7 @@ function saveCaf(){
   var c = V.caf, t = BC.localToMs(c.tz, c.t);
   if(isNaN(t)) return;
   if(c.id){ S.caf.log.forEach(function(x){ if(x.id === c.id){ x.t = t; x.mg = +c.mg; } }); }
-  else { var m = 0; S.caf.log.forEach(function(x){ if(x.id > m) m = x.id; }); S.caf.log.push({id:m + 1, t:t, mg:+c.mg}); }
+  else S.caf.log.push({id:uid(S.caf.log), t:t, mg:+c.mg});
   S.caf.log.sort(function(p, q){ return p.t - q.t; });
   S.caf.log = S.caf.log.filter(function(x){ return x.t > now() - 21*24*H; });
   save(); V.caf = null; renderCaf(); render();
@@ -1288,6 +1433,7 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">Round times to</span></span>' + sel('rrRound', String(S.restRules.round), [['1', '1 minute'], ['5', '5 minutes']]) + '</label></div>' +
        '<p class="foot">Defaults for every crew plan. Change them for one flight on its Crew rest screen. Two crew are always at the controls: with 3 crew one rests at a time in three numbered rests, with 4 crew two at a time in two. Who takes which rest varies by flight (often FB, then PF, then PM); you pick yours on the flight.</p>';
   h += '<h2 class="grp-h">Tools</h2><div class="list"><a class="row" href="crew-rest.html" style="color:var(--tint)">' + I.moon + '<span class="main"><span class="t1">Crew rest calculator</span><span class="t3" style="color:var(--sec)">Preview · equal breaks in UTC</span></span>' + I.chev + '</a></div>';
+  h += syncSection();
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
        '<button class="row" type="button" data-act="restore" style="color:var(--tint)">Restore from file</button>' +
@@ -1424,7 +1570,7 @@ function renderSleep(){
   h += '</div></div>';
   box.innerHTML = h;
 }
-function nextActualId(){ var m = 0; S.actual.forEach(function(a){ if(a.id > m) m = a.id; }); return m + 1; }
+function nextActualId(){ return uid(S.actual); }
 function saveSleep(){
   var sl = V.sleep, a = BC.localToMs(sl.tz, sl.bed), b = sl.wake ? BC.localToMs(sl.tz, sl.wake) : null;
   if(isNaN(a)){ V.sleepErr = 'Enter when you fell asleep.'; renderSleep(); return; }
@@ -1485,6 +1631,24 @@ async function backup(){
   setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
   V.flash = 'Backup saved as ' + name + '.'; render();
 }
+function syncSection(){
+  var h = '<h2 class="grp-h">Sync with your other devices</h2>';
+  if(SY){
+    var dtz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', when = SY.at ? BC.dow(dtz, SY.at) + ' ' + BC.hm(dtz, SY.at) : 'not yet';
+    h += '<div class="list"><div class="row static"><span class="main"><span class="t1">Sync is on</span><span class="t3">' + (SY.err ? '<span style="color:var(--danger)">' + esc(SY.err) + '</span>' : 'Last synced ' + esc(when)) + '</span></span></div>' +
+         '<button class="row" type="button" data-act="syncNow" style="color:var(--tint)">' + (V.syncing ? 'Syncing…' : 'Sync now') + '</button>' +
+         '<button class="row" type="button" data-act="syncOff" style="color:var(--danger)">' + (V.confirmSyncOff ? 'Tap again to turn sync off on this device' : 'Turn off sync on this device') + '</button></div>' +
+         '<p class="foot">Syncs when you open the app, when you come back to it and a few seconds after each change. Encrypted with your passphrase before it leaves this device. Turning sync off here keeps your data on this device and in the gist.</p>';
+  } else {
+    h += '<div class="list"><label class="row static"><span class="main"><span class="t1">GitHub token</span></span><input class="pill" type="password" id="syTok" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_…" style="width:170px"></label>' +
+         '<label class="row static"><span class="main"><span class="t1">Passphrase</span><span class="t3">Same on every device</span></span><input class="pill" type="password" id="syPass" autocomplete="new-password" placeholder="8 or more" style="width:170px"></label></div>' +
+         '<div style="margin-top:10px"><button class="btn" type="button" data-act="syncOn"' + (V.syncing ? ' disabled' : '') + '>' + (V.syncing ? 'Turning on…' : 'Turn on sync') + '</button></div>' +
+         (V.syncMsg ? '<p class="err">' + esc(V.syncMsg) + '</p>' : '') +
+         '<div class="foot">Keeps your phone and iPad the same, through a private gist on your GitHub account. To make the token:<ol style="margin:6px 0;padding-left:20px"><li>On github.com, open Settings › Developer settings › Personal access tokens › Tokens (classic).</li><li>Select Generate new token (classic).</li><li>Tick only “gist”. Set no expiry, or a long one.</li><li>Copy the token and paste it here.</li></ol>Use the same token and passphrase on your other device. Your data is encrypted with the passphrase on this device, so GitHub only holds scrambled data. If you forget the passphrase, the synced copy cannot be opened, but the data on each device stays.</div>';
+  }
+  if(V.syncDone) h += '<p class="msg">' + esc(V.syncDone) + '</p>';
+  return h;
+}
 function restoreFile(file){
   var rd = new FileReader();
   rd.onload = function(){
@@ -1535,7 +1699,10 @@ function go(path){
   try{ history.replaceState(null, '', '#' + path); }catch(e){}
   render(); window.scrollTo(0, 0);
 }
+var rendering = false, renderAgain = false;
 function render(){
+  /* replacing the screen can blur a field, whose change handler renders again: do that afterwards */
+  if(rendering){ renderAgain = true; return; }
   var app = $('#app'), h;
   try{
     if(V.view === 'trip') h = viewTrip();
@@ -1546,7 +1713,9 @@ function render(){
     else if(V.view === 'dest') h = viewDest();
     else { V.view = 'now'; h = viewNow(); }
   }catch(err){ h = '<p class="err">Something went wrong drawing this screen: ' + esc(err.message) + '</p>'; if(window.console) console.error(err); }
-  app.innerHTML = '<div class="stack">' + h + '</div>';
+  rendering = true;
+  try{ app.innerHTML = '<div class="stack">' + h + '</div>'; }finally{ rendering = false; }
+  if(renderAgain){ renderAgain = false; setTimeout(render, 0); }
   try{ V.lastSum = planSummary(P()); }catch(e3){}
   var tab = {now:'now', chart:'now', trip:'trip', lay:'trip', rest:V.from === 'now' ? 'now' : 'trip', settings:'settings', dest:'settings'}[V.view];
   document.querySelectorAll('.tab').forEach(function(t){ if(t.dataset.go === tab) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
@@ -1675,6 +1844,19 @@ document.addEventListener('click', function(e){
   }
   if(act === 'cafOn'){ S.caf.on = !(S.caf.on !== false); save(); render(); return; }
   if(act === 'backup'){ backup(); return; }
+  if(act === 'syncOn'){
+    var tok = $('#syTok').value, pass = $('#syPass').value;
+    V.syncing = true; V.syncMsg = ''; V.syncDone = ''; render();
+    syncSetup(tok, pass).then(function(how){
+      V.syncDone = how === 'joined' ? 'Sync is on. This device now has your data from your other device, merged with what was here.' : 'Sync is on. Now turn it on on your other device with the same token and passphrase.';
+    }).catch(function(e){ V.syncMsg = syncErr(e); if(SY && !SY.rev && !SY.at){ SY = null; storeSync(); } }).then(function(){ V.syncing = false; render(); });
+    return;
+  }
+  if(act === 'syncNow'){ V.syncing = true; V.syncDone = ''; render(); syncNow(true).then(function(){ V.syncing = false; render(); }); return; }
+  if(act === 'syncOff'){
+    if(!V.confirmSyncOff){ V.confirmSyncOff = true; render(); setTimeout(function(){ if(V.confirmSyncOff){ V.confirmSyncOff = false; render(); } }, 3500); return; }
+    V.confirmSyncOff = false; SY = null; storeSync(); storeBase(null); V.syncDone = 'Sync is off on this device. Your data stays here.'; render(); return;
+  }
   if(act === 'restore'){ $('#impFile').click(); return; }
   if(act === 'import'){ V.flash = importClassic(); if(V.view === 'now'){ render(); } else render(); return; }
   if(act === 'example'){ exampleTrip(); V.flash = 'Example trip loaded: Atlanta, Dallas, São Paulo and back.'; render(); return; }
@@ -1781,7 +1963,13 @@ document.addEventListener('keydown', function(e){
 setInterval(function(){ if(!document.hidden && !V.flight && !V.sleep && (V.view === 'now' || V.view === 'chart')) render(); }, 60000);
 /* the UTC clock on the crew rest screen */
 setInterval(function(){ var el = document.querySelector('[data-zclock]'); if(el) el.textContent = BC.hm('UTC', now()).replace(':', '') + 'Z'; }, 5000);
-document.addEventListener('visibilitychange', function(){ if(!document.hidden && !V.flight && !V.sleep) render(); });
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && !V.flight && !V.sleep) render();
+  if(!document.hidden && SY && Date.now() - (SY.at || 0) > 20000) syncNow();
+});
+/* while the app is open, pick up changes from your other device every few minutes */
+setInterval(function(){ if(!document.hidden && SY && Date.now() - (SY.at || 0) > 4*60000) syncNow(); }, 60000);
+if(SY) setTimeout(function(){ syncNow(); }, 800);
 
 window.addEventListener('hashchange', function(){ var hsh = decodeURIComponent((location.hash || '').replace(/^#/, '')); if(hsh && hsh !== V.view + (V.arg ? '/' + V.arg : '')) go(hsh); });
 var start = decodeURIComponent((location.hash || '').replace(/^#/, ''));
