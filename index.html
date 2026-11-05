@@ -200,7 +200,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 45';
+var BUILD = '5 Nov 2026 · build 46';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -587,13 +587,16 @@ function pendingBlock(Pl){
 /* ---------- why text for a planned block ---------- */
 /* sleep debt to the nearest half hour, or '' when under 45 minutes */
 function debtTxt(d){ return d >= 0.75 ? 'About ' + (Math.round(d*2)/2) + ' h' : ''; }
+/* what the model expects you to get from an assumed crew rest starting at a */
+function bunkOf(Pl, a){ var k = ((Pl.R && Pl.R.bunks) || []).filter(function(x){ return Math.abs(x.a - a) < 2*60000; })[0]; return k || null; }
 /* the crew rest card under an operated flight on Trip */
 function restCard(f, past){
   var t1, t2, set = !!f.restWin;
   if(set && f.restAuto && f.crewPlan){
     var rb = f.restBreaks[0], n = BC.restSlots(f.r.crew);
     t1 = 'Crew rest · Rest ' + f.crewPlan.slot + ' of ' + n + (f.restBreaks.length > 1 ? ', twice' : '');
-    t2 = BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z · wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z<br>' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, rb.a) + '–' + BC.hm(f.f.tz, rb.b);
+    var bk = bunkOf(P(), rb.a);
+    t2 = BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z · wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z<br>' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, rb.a) + '–' + BC.hm(f.f.tz, rb.b) + (bk && !past ? '<br>' + esc(BC.bunkWord(bk.g)) : '');
   } else if(set){
     t1 = 'Crew rest';
     t2 = BC.hm('UTC', f.restWin[0]).replace(':', '') + '–' + BC.hm('UTC', f.restWin[1]).replace(':', '') + 'Z<br>' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, f.restWin[0]) + '–' + BC.hm(f.f.tz, f.restWin[1]);
@@ -1381,6 +1384,12 @@ function viewRest(id){
       h += '<h2 class="grp-h">' + (brs.length > 1 ? (k ? 'Your second rest' : 'Your first rest') : 'Your rest') + ' · ' + esc(dep) + ' time</h2><section class="watch"><div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(f.f.tz, x.a) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(f.f.tz, x.wake) + '</div></div></div>' +
            '<div style="height:1px;background:rgba(255,255,255,.3);margin:14px 0"></div><div style="display:flex;justify-content:space-between;font-size:17px;font-variant-numeric:tabular-nums"><span class="lab" style="font-size:17px">' + z(x.a).replace('Z', '') + '–' + z(x.b) + (x.wake !== x.b ? ' · up ' + z(x.wake) : '') + '</span><b style="white-space:nowrap">' + durTxt(x.b - x.a) + '</b></div></section>';
     });
+    var bks = brs.map(function(x){ return bunkOf(Pl, x.a); }).filter(Boolean);
+    if(bks.length && !manual){
+      h += '<div class="card" style="margin-top:10px;padding:12px 16px"><div style="font-weight:600">' + bks.map(function(k){ return esc(BC.bunkWord(k.g)); }).join(', then ') + '</div><div class="t3" style="margin-top:4px">' +
+           (bks[0].g >= 0.75 ? 'Sleep pressure is high enough and your body clock is ready for sleep at that time.' : bks[0].g >= 0.4 ? 'You may take a while to fall asleep, and sleep will be light.' : 'Your body clock is near its alert time or sleep pressure is low, so expect to lie awake or doze. The plan counts it that way.') +
+           '</div><button class="btn sec small" type="button" data-act="logBunk" data-a="' + brs[0].a + '" data-b="' + brs[0].wake + '" style="margin-top:10px">Log the sleep you got</button><div class="t3" style="margin-top:6px">Set when you fell asleep and woke up. The plan then uses that instead.</div></div>';
+    }
     h += '<p class="foot">' + (manual ? 'Using the times you typed. ' : cp ? 'The alarm is the wake-up call, ' + rule.wake + ' min before your rest ends. ' : '') + esc(dep) + ' time is the clock you left on.</p>';
   }
   /* rest typed by hand in an earlier build (only on a flight without a crew plan) */
@@ -1756,6 +1765,7 @@ document.addEventListener('click', function(e){
   if(act === 'menuBg' && e.target === b || act === 'menuBg2'){ $('#sheet').innerHTML = ''; return; }
   if(act === 'menuFlight'){ $('#sheet').innerHTML = ''; openFlight('new'); return; }
   if(act === 'menuSleep'){ $('#sheet').innerHTML = ''; openSleep(null); return; }
+  if(act === 'logBunk'){ openSleep(null, {a:+b.dataset.a, b:+b.dataset.b, kind:'nap'}); return; }
   if(act === 'menuCaf'){ $('#sheet').innerHTML = ''; openCaf(null); return; }
   if(act === 'menuMeet'){ $('#sheet').innerHTML = ''; var Lq = layNowOrNext(P(), now()); if(Lq){ if(Lq.out) go('lay/' + Lq.id); else addMeet(Lq.id); } else { V.flash = 'Add a layover first: a crew meetup belongs to a layover.'; render(); } return; }
   if(act === 'cUse' || act === 'cLog'){

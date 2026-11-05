@@ -133,11 +133,11 @@ function lightLevel(elev, asleep, g){
   var f = elev >= 5 ? 1 : (elev <= -6 ? 0.2 : 0.2 + 0.8*(elev + 6)/11);
   return f*g;
 }
-function stepS(st, asleep, c, dtH, effMul, cf){
+function stepS(st, asleep, c, dtH, effMul, cf, solMin){
   cf = cf || 0;
   if(asleep){
     if(!st.prev) st.since = 0;
-    var sol = (PAR.solBase + PAR.solRange*c*(1 - st.s))/60 + CAF.sol*cf;
+    var sol = Math.max(solMin || 0, (PAR.solBase + PAR.solRange*c*(1 - st.s))/60 + CAF.sol*cf);
     effMul = (effMul || 1)*(1 - CAF.eff*cf);
     if(st.since < sol) st.s = 1 - (1 - st.s)*Math.exp(-dtH/PAR.tauRise);
     else {
@@ -172,16 +172,28 @@ function cafLevel(mg){
 function cafLog(S){ return (S && S.caf && Array.isArray(S.caf.log)) ? S.caf.log : []; }
 function habitSleeping(hr, bedH, wakeH){ return bedH > wakeH ? (hr >= bedH || hr < wakeH) : (hr >= bedH && hr < wakeH); }
 /* sleeps as sorted [start, end] intervals, overlapping ones joined */
-/* the third value is how much the sleep is worth: 1, or DEBT.bunk for crew rest in a bunk */
+/* The third value is how much the sleep is worth: 1, or DEBT.bunk in a crew rest bunk (lighter, broken).
+   The fourth is true for a crew rest the app assumes (not a sleep you logged): whether you sleep in it at
+   all is then predicted from how easy sleep is when it starts (see run). */
 function merge(list){
-  var s = list.map(function(x){ return [x.a, x.b, x.kind === 'rest' ? DEBT.bunk : 1]; }).sort(function(p,q){ return p[0] - q[0]; });
+  var s = list.map(function(x){ var bunk = x.kind === 'rest' || x.bunk; return [x.a, x.b, bunk ? DEBT.bunk : 1, x.kind === 'rest' && !x.actual]; }).sort(function(p,q){ return p[0] - q[0]; });
   var out = [];
   s.forEach(function(iv){
     var l = out[out.length-1];
-    if(l && iv[0] <= l[1]){ l[1] = Math.max(l[1], iv[1]); l[2] = Math.max(l[2], iv[2]); } else out.push([iv[0], iv[1], iv[2]]);
+    if(l && iv[0] <= l[1]){ l[1] = Math.max(l[1], iv[1]); l[2] = Math.max(l[2], iv[2]); l[3] = l[3] && iv[3]; } else out.push([iv[0], iv[1], iv[2], iv[3]]);
   });
   return out;
 }
+/* A crew rest is not a hotel bed: how much you sleep in one depends on how easy sleep is when it starts
+   (sleep pressure, body clock, caffeine, sleep debt). g runs from 1 (easy: you fall asleep in about 15
+   minutes and sleep at bunk value) to 0 (very hard: about 90 minutes before you doze off, then light
+   dozing worth a quarter as much). */
+var BUNK = {easy:0.85, hard:0.1, sol0:0.25, sol1:1.5, q0:0.25};
+function bunkOdds(e){
+  var g = Math.max(0, Math.min(1, (e - BUNK.hard)/(BUNK.easy - BUNK.hard)));
+  return {g:g, sol:BUNK.sol0 + (1 - g)*(BUNK.sol1 - BUNK.sol0), q:BUNK.q0 + (1 - BUNK.q0)*g};
+}
+function bunkWord(g){ return g >= 0.75 ? 'Should sleep well' : g >= 0.4 ? 'Some sleep likely' : g >= 0.15 ? 'Mostly dozing' : 'Little or no sleep'; }
 /* A planned sleep you have not logged that should have started already: you are looking at the app,
    so you are awake, and it starts now. Less than 20 minutes left and it is dropped. */
 function fromNow(list, now){
@@ -376,6 +388,9 @@ function run(E, sleeps, until, ck, snapAt){
   var dayH = 24 - sleepLen, rate = sleepLen/dayH, h0 = todH(t0, offH(E.home.tz, t0));
   var a0 = habitSleeping(h0, E.bedH, E.wakeH) ? 0 : ((h0 - E.wakeH) % 24 + 24) % 24;
   var dbt = {R:Math.min(a0, dayH)*rate, U:Math.min(a0, dayH)*rate}, fade = Math.exp(-dtH/DEBT.tau);
+  /* what each assumed crew rest is likely to give, decided when it starts */
+  var bunks = ck && ck.bunks ? ck.bunks.slice() : [];
+  function bunkFor(iv){ for(var q=bunks.length-1;q>=0;q--) if(bunks[q].a === iv[0]) return bunks[q]; return null; }
   var si = 0;
   function sleepAt(t){
     while(si < SL.length && SL[si][1] <= t) si++;
@@ -398,7 +413,7 @@ function run(E, sleeps, until, ck, snapAt){
   for(var i=i0;i<=N;i++){
     var t = Math.min(t0 + i*dt, t1);
     if(i === snapI){
-      snap = {i:i, st:{s:st.s, since:st.since, prev:st.prev}, Ebody:Ebody, pts:pts.slice(0, i), s0:{}, amp:{}, dbt:{R:dbt.R, U:dbt.U}};
+      snap = {i:i, st:{s:st.s, since:st.since, prev:st.prev}, Ebody:Ebody, pts:pts.slice(0, i), s0:{}, amp:{}, dbt:{R:dbt.R, U:dbt.U}, bunks:bunks.slice()};
       wakes.forEach(function(w){ if(w.s0 !== null) snap.s0[w.on] = w.s0; if(w.amp !== null) snap.amp[w.t] = w.amp; });
     }
     var c = CW(phiOf(t, Ebody, m)), W = 0;
@@ -420,14 +435,24 @@ function run(E, sleeps, until, ck, snapAt){
     var A0 = 100*(PAR.wS*(1 - st.s) + PAR.wC*c) + CAF.alert*cafF(mg) - DEBT.alert*debt;
     var mid = t + dt/2, sm = sleepAt(mid), asl = !!sm, phi = phiOf(mid, Ebody, m);
     pts[i] = {t:t, A:Math.max(0, Math.min(100, A0 - W)), S:st.s, cb:c, caf:mg, E:Ebody, off:env.off[i], tz:env.tz[i], fl:env.fl[i], sl:!!slp, ni:env.ni[i], debt:debt};
-    stepS(st, asl, CW(phi), dtH, asl ? sm[2] : 1, clog.length ? cafF(cafMg(clog, mid)) : 0);
-    if(asl){ dbt.R = Math.max(0, dbt.R - sm[2]*dtH); dbt.U = Math.max(0, dbt.U - sm[2]*dtH); }
+    var cfm = clog.length ? cafF(cafMg(clog, mid)) : 0, bk = null;
+    if(asl && sm[3]){
+      bk = bunkFor(sm);
+      if(!bk){
+        var ez = (st.s - 0.5*c)/sd.Pref - CAF.ease*cfm + DEBT.ease*Math.max(0, debt), od = bunkOdds(ez);
+        bk = {a:sm[0], b:sm[1], ease:ez, g:od.g, sol:od.sol, q:od.q}; bunks.push(bk);
+      }
+    }
+    var worth = asl ? sm[2]*(bk ? bk.q : 1) : 1, onset = bk && (st.prev ? st.since : 0) < bk.sol;
+    stepS(st, asl, CW(phi), dtH, worth, cfm, bk ? bk.sol : 0);
+    if(asl && !onset){ dbt.R = Math.max(0, dbt.R - worth*dtH); dbt.U = Math.max(0, dbt.U - worth*dtH); }
+    else if(asl){ /* lying awake in the bunk: no sleep owed or paid */ }
     else { dbt.R += rate*dtH; dbt.U = Math.min(sleepLen, dbt.U + rate*dtH); }
     dbt.R = dbt.U + (dbt.R - dbt.U)*fade;
     Ebody += ((asl ? 0 : env.lw[i])*prc(phi, sd.phiC) - sd.drift)*dtH;
     Ebody = Math.max(E.Elo, Math.min(E.Ehi, Ebody));
   }
-  return {t0:t0, t1:t1, dt:dt, pts:pts, Pref:sd.Pref, s0:sd.s0, ck:snap};
+  return {t0:t0, t1:t1, dt:dt, pts:pts, Pref:sd.Pref, s0:sd.s0, ck:snap, bunks:bunks};
 }
 /* how easily you would fall asleep at a model point: above 0.85 easy, 0.6 to 0.85 OK, below hard */
 function easeOf(R, p){ return (p.S - 0.5*p.cb)/R.Pref - CAF.ease*cafF(p.caf || 0) + DEBT.ease*(p.debt || 0); }
@@ -697,7 +722,9 @@ function plan(S, now, opt){
   var key = JSON.stringify([S.home, S.bed, S.wake, S.landBed, S.van, S.ready, S.balance, S.light, S.night, S.flights, S.lay, S.actual, S.skips, cafLog(S), S.restRules]) + '|' + Math.floor(now/(5*MIN));
   if(!noCache && cache.key === key) return cache.val;
   var E = env(S, now);
-  var actual = (S.actual || []).filter(function(x){ return x.a > 0; }).map(function(x){ return {id:x.id, a:x.a, b:x.b == null ? null : x.b, kind:x.kind || ((x.b || now) - x.a >= 4*H ? 'main' : 'nap'), actual:true}; });
+  /* a sleep you logged during a flight you operate was in the bunk */
+  function inBunk(x){ return E.F.some(function(f){ return f.role === 'operate' && x.a >= f.a && x.a < f.b; }); }
+  var actual = (S.actual || []).filter(function(x){ return x.a > 0; }).map(function(x){ return {id:x.id, a:x.a, b:x.b == null ? null : x.b, kind:x.kind || ((x.b || now) - x.a >= 4*H ? 'main' : 'nap'), actual:true, bunk:inBunk(x)}; });
   var skips = (S.skips || []).slice();
   var open = actual.filter(function(x){ return x.b == null; })[0] || null;
   var done = actual.filter(function(x){ return x.b != null && x.b > x.a; });
@@ -716,7 +743,7 @@ function plan(S, now, opt){
     fixed.concat(sk).forEach(function(x){ if(x.b > T) T = x.b; });
     if(op) T = Math.max(T, now);
     L.fixed = fixed; L.skips = sk; L.open = op; L.T = T;
-    var b = home.concat(rests.filter(function(r){ return r.b <= L.ws; }), done.map(function(x){ return {a:x.a, b:x.b}; }), chosen);
+    var b = home.concat(rests.filter(function(r){ return r.b <= L.ws; }), done.map(function(x){ return {a:x.a, b:x.b, bunk:x.bunk}; }), chosen);
     var P = planLayover(E, L, b, {fixed:fixed, open:op, skips:sk, T:T, now:now});
     L.options = P.options; L.suggested = P.suggested;
     var want = L.choice || (L.custom ? 'custom' : null);
@@ -737,9 +764,12 @@ function plan(S, now, opt){
   var extra = [];
   if(open && !Ls.some(function(L){ return L.open === open; })){
     var len = ((((E.wakeH - E.bedH) % 24) + 24) % 24 || 8)*H;
-    extra.push({a:open.a, b:Math.max(now + 15*MIN, open.a + (open.kind === 'main' ? len : 2*H)), kind:open.kind, open:true});
+    /* asleep in the bunk: until your rest's alarm, or half an hour before landing */
+    var ofl = open.bunk ? E.F.filter(function(f){ return f.role === 'operate' && open.a >= f.a && open.a < f.b; })[0] : null;
+    var oend = ofl ? ((ofl.restWins || []).map(function(w){ return w[1]; }).filter(function(w){ return w > now; })[0] || ofl.b - 30*MIN) : open.a + (open.kind === 'main' ? len : 2*H);
+    extra.push({a:open.a, b:Math.max(now + 15*MIN, oend), kind:open.kind, open:true, bunk:open.bunk});
   }
-  var logged = done.map(function(x){ return {a:x.a, b:x.b, kind:x.kind, actual:true, id:x.id, label:x.kind === 'main' ? 'Sleep' : 'Nap'}; });
+  var logged = done.map(function(x){ return {a:x.a, b:x.b, kind:x.kind, actual:true, bunk:x.bunk, id:x.id, label:x.kind === 'main' ? 'Sleep' : 'Nap'}; });
   var sleeps = home.concat(rests, logged, chosen, extra).sort(function(p,q){ return p.a - q.a; });
   var R = run(E, sleeps);
   E.F.forEach(function(f){
@@ -932,7 +962,7 @@ function clock(S, now){
 }
 
 return {
-  crewBreaks:crewBreaks, rulesOf:rulesOf, restSlots:restSlots, slotOf:slotOf, cafLevel:cafLevel, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
+  crewBreaks:crewBreaks, bunkWord:bunkWord, rulesOf:rulesOf, restSlots:restSlots, slotOf:slotOf, cafLevel:cafLevel, DEBT:DEBT, vanOf:vanOf, leaveOf:leaveOf, findBest:findBest, clock:clock, cafAdvice:cafAdvice, easeOf:easeOf, gateOf:gateOf, whatIf:whatIf,
   H:H, PAR:PAR, airport:airport, offH:offH, localToMs:localToMs, msToLocal:msToLocal, hm:hm, dow:dow, dayKey:dayKey,
   dayShort:dayShort, dayLong:dayLong, dateStr:dateStr, addDays:addDays, zabbr:zabbr, pad:pad, isoUTC:isoUTC, parseLocal:parseLocal,
   flightsOf:flightsOf, plan:plan, ptAt:ptAt, word:word, color:color, sunElev:sunElev
