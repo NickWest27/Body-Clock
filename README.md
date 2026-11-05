@@ -1,61 +1,71 @@
-# Body Clock Overlay
+# Body Clock
 
-A single-page tool for planning sleep, flights and caffeine around your body clock. It plots your home body-clock rhythm against the clock where you actually are, with an alertness estimate, sleep pressure, sun-based night shading and drag-to-edit sleep blocks.
+A phone-first, offline web app that plans your sleep around long-haul trips. Enter your flights with airport codes; it works out the time zones, daylight saving and sun times, models your sleep pressure and body clock, and tells you when to sleep.
 
-Everything runs in the browser. Your trips are stored on your own device and are never sent anywhere.
+Live at https://nickwest27.github.io/Body-Clock/ (add it to your home screen from Safari's Share menu).
 
-## Plan sleep
+## Screens
 
-Enter your real flights and sleeps. In each flight, set your role: **Operate** (the planner scores it) or **Commute** (it does not, and it assumes you cannot sleep aboard). On an Operate flight you can also enter the **expected relief rest** in hours. Settings holds **Landing to bed** (default 2 h) and **When the clocks disagree** (home time, balanced, or local time).
+- **Now**: what to do now (for example "Nap now, bed 11:00, wake 13:00", with the reason), the next few things coming up, and a colour ribbon of your alertness until you land. During an operating flight it shows your crew rest times on the departure city's clock.
+- **Trip**: one timeline of the whole trip, past and future, with a Now line: flights, crew rest, sleeps and naps you logged, sleeps the app plans, caffeine you logged and each layover's plan. Tap a flight or a logged sleep to change it; tap a planned sleep to open it in the calculator. + adds a flight, a sleep you took or caffeine.
+- **Layover**: the main decision, nap now or later. The app compares nap now, nap later, both and no nap, each with your main sleep moved earlier or later, and suggests one, with the last-drink time.
+- **Change a sleep**: tap a planned sleep on Trip (or Change on Now) to try other bed and wake times, or Best wake-up for this bedtime. A timeline shows what follows: the app's re-plan of the rest of the layover, caffeine cut-off and coffee time, the van, the lowest point in flight and landing, each against the current plan. Use this keeps it; Back to the app's plan undoes it; for a past sleep, Log as a sleep I took records it.
+- **Charts** (tap the ribbon): Alertness; Sleep pressure, coloured low to high, with the sleep threshold (shaded red between the lines when you are tired enough to sleep, green when not), how long you have been awake and how easily you would fall asleep now; Body clock as the big three-ring clock with thin rings for the days before.
+- **Body clock card** on Now, when a trip moves you an hour or more: a 24-hour dial on the local clock, noon at the top, with three named rings of daylight: outer where you are, middle the day your body expects (wider and outlined), inner home. When the middle ring lines up with the outer one you have adjusted. Tap it for a big version with thin rings for the six days before: where you were (between the outer and body rings) and your body's day (between the body and home rings).
+- **Crew rest**: enter the rest times in UTC, as the crew gives them. You get Lie down and Alarm times on the departure city's clock (the one you left on), and a timer length.
+- **Settings**: home airport, usual bedtime and wake time, landing to hotel bed, van and get-ready times, layover balance, caffeine advice and cut-off, last drink before you leave, destinations, backups.
 
-Tap **Plan sleep**, choose the Operate flight and give the van pickup time (on the clock you choose), how long you need to get ready and the earliest you can go to bed. The earliest bedtime starts at the layover, which is the previous Operate flight's landing plus your landing-to-bed time. **Compare plans** shows up to five options: normal night, sleep sooner, stay up later, nap after landing and nap before the flight. Each card gives alertness at landing, the lowest point, hours asleep, how easily you would fall asleep, how much of the sleep falls in your usual night, and hours under high sleep pressure. Tap a card and **Add to plan** puts its blocks on the chart as planned sleeps you can still slide. Adding a plan replaces the planned sleeps inside the layover. Planned sleeps outside it stay, and so do sleeps marked Actual.
+## Caffeine
 
-**Clear planned sleeps** is at the bottom of the Log. It removes every sleep marked Planned, including planned naps and relief rests. Actual sleeps, flights and coffees stay. It asks you to tap twice.
+The Now screen has a caffeine card: how much caffeine is in you, as a word (Trace under 25 mg, Light under 75, Strong under 150, Wired above) with the amount, the last time for caffeine before your next sleep of 1.5 hours or more (6 hours by default, crew rest included), the best coffee time for your next operating flight (about 45 minutes before the predicted low point, or as you wake from crew rest) with what it does to the lowest point and landing, and how much is in you now. Log caffeine from the card or the + on Trip (tea or cola about 50 mg, coffee about 100 mg, large or strong about 200 mg). Logged caffeine is in the model: it peaks about 45 minutes after you drink it and half is gone after 5 hours; while it is in you it lifts alertness a little, makes falling asleep harder and sleep less restful. Turn the advice off or change the cut-off in Settings.
 
-With no flight ahead, choose "No flight, just a wake-up time" and it aims at the 8 hours after you get up.
+The layover screen shows the last-drink time (12 hours before you leave for the airport by default; set your company rule in Settings, the FAA minimum is 8 hours). Alcohol is not modelled.
 
-A warning's **Plan sleep** button opens a new planned sleep in the editor. Set the times yourself, or tap **Auto plan** to let the planner fill them in.
+## Crew meetup and van pickup
 
-## Zoom the chart
+On a layover you can add a crew meetup (Trip + or the layover screen) with its start and end; the plan keeps you awake for it and sleeps around it, and you can change the end if it ran late. Each flight can carry its own van pickup time. It is optional: with none (a same-day connection at the airport, or driving from home) no van is shown, and the plan only assumes you leave for the airport 2 hours before departure, less your get-ready time, to know when you must be up.
 
-Pinch the chart with two fingers to zoom the time axis, and drag with two fingers to move along it. The buttons under the chart do the same: plus and minus zoom, the arrows move by half a screen, Fit shows the whole trip. On a computer, hold Ctrl and scroll. One finger still moves the pointer, drags blocks and scrolls the page. Tick labels get finer as you zoom, down to half hours, and the line under the chart shows which stretch is on screen (home clock).
+When you log a sleep or caffeine you can type the time on the local clock, the clock of the city you departed from, or UTC; the buttons are named by city.
 
-## Night and places
+## The model
 
-Night shading is drawn where you are: for the city used for each zone (Atlanta for US Eastern, Dallas for US Central, São Paulo, London, Doha, Delhi and so on), and along the straight line between cities during a flight. The sun position is checked against an independent sunrise equation to within a minute. A custom UTC offset has no city, so it assumes 40°N, which makes nights too long near the equator and in the southern hemisphere. Pick a listed zone when you can.
+The two-process model of sleep (Borbély, Daan and Beersma): sleep pressure rises while you are awake and clears while you sleep, and a body-clock rhythm shifts slowly with daylight where you are. Sleep inertia after waking is included. A third part, sleep debt, keeps a running balance of sleep owed beyond a usual day: each hour awake runs up half an hour owed (with an 8 h usual night), each hour asleep pays one back, bunk sleep in crew rest counts at three quarters, and unpaid debt fades over about three days. Each hour of debt takes 3 points off alertness and makes sleep come a little more easily. A planned sleep you have not logged that should already have started counts from the moment you open the app, because you are clearly awake. Alertness is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25. The numbers are for comparing plans, not a fitness-for-duty measure.
 
-## Flight summary
+Each layover plan is scored on alertness from wake-up to landing, the last 90 minutes counting most. Plans lose points when you would have to fall asleep at a time you probably could not, when they leave you up for long stretches under high sleep pressure, when they put the main sleep far from your usual night. Until you enter actual crew rest, the plan assumes your expected rest in the middle of the flight.
 
-Under the readout, each Operate flight gets one line: the lowest alertness while you are awake on board, when it happens (home clock), and your alertness at landing. Numbers below 25 show in red. Time asleep on board, such as a relief rest, is left out, but sleep inertia after waking is counted.
+## Find the best
 
-## Warnings
+- **The flight**: every candidate (5 to 10 hours of sleep, or 30 minutes to 3½ hours for a nap, in 30-minute steps) is tried with the rest of the layover re-planned around it, and scored on alertness from leaving for the airport to landing, the last 90 minutes counting most, less a penalty when you are unlikely to fall asleep at that time or at your next sleep.
+- **Body clock**: the most sleep in your body's own night (your usual bedtime to wake-up on your body's clock, an "anchor sleep"), as long as landing and the lowest point in flight stay within 5 points of the best for the flight.
+- **Whole plan**: the layover planner's own comparison of nap now, nap later, both and none, with the main sleep earlier or later; every other night of a long layover is your usual night on the clock the balance setting picks.
 
-Where, while you are awake, sleep pressure is above 70% or alertness is below 25, the chart is shaded amber and the same stretch shows as an amber bar in the sleep row, so you can slide a sleep block over it. Shading looks ahead from now to 6 hours after your last landing. One warning box under the readout lists every flagged stretch, with past stretches in grey, and says when to plan a sleep by. When only past stretches remain, the box turns grey and the Plan sleep button goes away.
+## Auto plans, your times and change notices
 
-## Fatigue ratings
+Planned sleeps on Trip are labelled Auto (the app's plan, which moves whenever anything it depends on changes), Auto · option you picked (you chose nap now or later on the layover; the times still follow changes) or Your times (you set them with Change sleep; they stay put). Logged sleeps are facts. Every change re-plans at once, and a Plan updated card on Now and Trip says what moved: alertness at landing or the low point, the planned sleep times, and, when you are on your own times or a picked option, a better plan from the app with one tap to use it. If your times no longer fit (a flight or van moved), the app's plan comes back and the card says so.
 
-Off by default. Turn on "Rate how tired you feel" in Settings to add Fatigue rating to the Add menu. Pick 1 to 7 on the Samn-Perelli scale (1 fully alert, 7 completely exhausted); the time defaults to now, on the home clock when you are in the air. Ratings show as numbered circles on the alertness line and in the Log. After 5 ratings the Trip summary shows the correlation between your ratings and the model's alertness (a perfect match is −1). Ratings carry over when you start a new trip or load the example, so the comparison builds across trips. Ratings the model has you asleep for are left out. Turning the setting off hides ratings but keeps them.
+## Crew rest calculator (preview)
 
-## Start a new trip
+Settings › Tools › Crew rest calculator (`crew-rest.html`). Enter the airports, date, off and estimated on (local or UTC), crew 2/3/4 and 1 or 2 breaks each. The screen shows the current UTC time. Rest begins at off + 10 minutes (the 10 is adjustable), at a time you type, or now (Rest begins › Now, which takes the current time plus a minute so you can write the plan down); rest ends a set time before on (30 minutes by default), and the window is split equally between the breaks, to the minute or to 5 minutes. Two crew are always at the controls, so with 3 crew one rests at a time, with 4 crew two at a time in pairs, and with 2 crew there are no breaks. Rests are numbered (rest 1, 2, 3) because who takes which varies by flight; a common pattern is the FB first, then the pilot flying, then the pilot monitoring. Each break starts as the one before ends, with no changeover gap. The summary shows off, on, flight time, rest begins, rest ends and rest each; the table shows each break's start, end and wake-up call (10 minutes before it ends by default), in UTC. The same plan is built into flights: set the crew (2, 3 or 4) and which rest you take (1st, 2nd or 3rd) on an operated flight and your break becomes its crew rest in the sleep plan. Fine-tune the actual off, estimated on and rest begins (or tap Now) on the flight's Crew rest screen, or type your break by hand. The timing (off to first rest, rest ends before on, wake-up call, rounding) has defaults under Settings › Crew rest and can be changed for one flight under Timing for this flight on its Crew rest screen, with Save as default to make them the new defaults.
 
-Open Settings. **Start new trip** clears all flights, sleeps and coffees. It keeps your home zone, bed and wake times, light setting and graph options. The chart starts at your most recent usual wake-up. **Load example trip** replaces everything with the built-in DFW → LHR → DFW → ATL trip, which is handy for testing. Both buttons ask you to click twice. Use **Back up trip** first if you want to keep what you have.
+## Sync between devices
 
-## Install on a phone
+Settings › Sync with your other devices keeps a phone and an iPad the same through one file in a private (secret) gist on your GitHub account. You need a classic GitHub token with only the “gist” permission and a passphrase of 8 or more characters; use the same token and passphrase on each device. The first device makes the gist; the next finds it and merges. The data is encrypted on the device before it is sent (PBKDF2-SHA-256, 310,000 rounds, then AES-GCM 256), so GitHub only holds scrambled data. Each device keeps the token and the key made from the passphrase, not the passphrase itself.
 
-1. Open the site's address in Safari (iPhone) or Chrome (Android).
-2. iPhone: tap Share, then **Add to Home Screen**. Android: open the menu and tap **Install app**.
-3. Open it from the new icon. From then on it works offline.
+Sync runs when the app opens, when you come back to it, every few minutes while it is open and a few seconds after each change. It is a three-way merge of this device, the gist and the copy from the last sync: a change on one side wins, a change on both keeps this device's, and flights, logged sleeps and coffees merge one by one, so adding things on both devices offline loses nothing and a delete on one device deletes on the other. New items get time-based ids so two devices never reuse one. Notices stay on each device. If GitHub can't be reached, the app keeps working and tries again later.
 
-On iPhone, the home-screen app keeps its own storage, separate from Safari. Add it to the Home Screen first, then enter your trip there, or use Settings, then **Restore from file**.
+## Data
+
+Everything stays on your devices (and, with sync on, in your encrypted gist). Back up trip saves a file you can keep or AirDrop to another device; Restore from file loads it.
 
 ## Updating
 
-Replace `index.html` (and bump `VERSION` in `sw.js`). The app fetches the new copy whenever it has a connection and shows it the next time you open it. Settings shows the build number.
-
-To force an update on a phone, open Settings and tap **Update app**. It asks the server for the newest build with a unique address, which skips every cache on the way. If a newer build exists, it removes the saved copy and reloads. If you already have the newest build, tap again to clear the saved copy and reload anyway. Your trip is not touched. GitHub Pages can take up to about 10 minutes to publish a push, so a build may not be there yet.
+Settings › Update app checks for a newer build and reloads. GitHub Pages can take about 10 minutes to publish a change. Development happens on `main`, which GitHub Pages publishes; for a new build, bump `BUILD` in `index.html` and `VERSION` in `sw.js`.
 
 ## Files
 
-- `index.html`: the whole app
-- `sw.js`: offline cache
-- `manifest.webmanifest`, `icon*.png`, `apple-touch-icon.png`: install details
+- `index.html`: the app's screens.
+- `engine.js`: time zones, the sleep model and the layover planner.
+- `airports.js`: airport codes with time zones and positions, and the starting destination list.
+- `crew-rest.html`: the crew rest calculator.
+- `sw.js`, `manifest.webmanifest`, icons: offline use and home-screen install.
+- `next/`: a notice for the old preview address (BC New), which moved to the main address.
