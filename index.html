@@ -200,7 +200,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 46';
+var BUILD = '5 Nov 2026 · build 47';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -954,7 +954,7 @@ function viewNow(){
   var from = heroUsed ? heroUsed.a + 1 : nw;
   var ev = events(Pl, Pl.open ? (Pl.openEnd || nw) : from, 4);
   h += '<h2 class="grp-h" style="margin:4px 16px -8px">Up next</h2><section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
-       (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.options.length > 1; })[0];
+       (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.viable && x.viable.length > 1; })[0];
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
        (function(){ var nx = Pl.sleeps.filter(function(x){ return x.a > nw && !x.actual && !x.open && x.kind !== 'rest'; })[0];
          return nx ? '<button class="row" type="button" data-act="adjust" data-v="' + nx.a + '_' + nx.b + '_' + (nx.kind === 'nap' ? 'nap' : 'main') + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Change the next ' + (nx.kind === 'nap' ? 'nap' : 'sleep') + '</button>' : ''; })() +
@@ -1027,7 +1027,7 @@ function tlRow(Pl, it, nw){
   if(it.kind === 'out') return row('data-go="lay/' + esc(it.L.id) + '"', 'var(--out)', '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 8a3 3 0 0 1-6 0L8 3zM12 14v6M8 21h8"/></svg>',
     'Crew meetup until ' + BC.hm(tz, it.L.out.ne), 'Last drink by ' + BC.dow(tz, it.L.out.lastDrink) + ' ' + BC.hm(tz, it.L.out.lastDrink), I.chev);
   var L = it.L, o = L.options.filter(function(x){ return x.id === L.picked; })[0];
-  return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (L.src === 'yours' ? 'Your times' : o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span>' + (L.better ? '<span class="t3" style="color:var(--tint);font-weight:600">A better plan is available</span>' : '') + '</span><span class="tag" style="color:var(--tint)">Plans</span>' + I.chev + '</button>';
+  return '<button class="' + cls + '" type="button" data-go="lay/' + esc(L.id) + '" style="background:var(--sleepbg)"><span class="main"><span class="t1"><b>' + esc(L.ap.city) + ' layover</b></span><span class="t3">' + (L.src === 'yours' ? 'Your times' : o ? 'Plan: ' + esc(o.name) : 'Compare plans') + ' · ' + Math.round((L.dep - L.arr)/H) + ' h on the ground</span>' + (L.better ? '<span class="t3" style="color:var(--tint);font-weight:600">A better plan is available</span>' : '') + '</span><span class="tag" style="color:var(--tint)">' + (L.viable && L.viable.length > 1 ? 'Plans' : 'Plan') + '</span>' + I.chev + '</button>';
 }
 function viewTrip(){
   var Pl = P(), h = '', nw = now();
@@ -1183,10 +1183,12 @@ function viewLay(id){
     h += '<h2 class="grp-h">What happened</h2><div class="list">' + hist.map(function(x){ return '<button class="row" type="button" data-act="' + x.act + '" data-id="' + esc(x.id) + '"><span style="color:var(--sleep)">' + I.moon + '</span><span class="main"><span class="t1">' + esc(x.txt) + '</span></span><span class="t3">' + (x.act === 'unskip' ? 'Undo' : 'Edit') + '</span></button>'; }).join('') + '</div>';
   }
   var replan = hist.length > 0;
-  h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (L.options.some(function(o){ return o.id === 'now'; }) && !replan ? 'Nap now or later?' : replan ? 'Rest of the layover' : 'Pick a plan') + '</h2>';
+  var shown = L.viable || L.options, autoN = shown.filter(function(o){ return o.id !== 'custom'; }).length, hiddenN = L.options.length - shown.length;
+  h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (shown.length <= 1 ? (replan ? 'Rest of the layover' : 'The plan') : shown.some(function(o){ return o.id === 'now'; }) && !replan ? 'Nap now or later?' : replan ? 'Rest of the layover' : 'Pick a plan') + '</h2>';
   if(!L.options.length) h += '<p class="foot">Nothing left to plan here.</p>';
+  else if(autoN <= 1 && hiddenN) h += '<p class="foot" style="margin-top:0">Only one way to split your sleep here is worth doing. The others came out worse on every count, so they are not shown.</p>';
   function pos(v){ return Math.max(0, Math.min(100, (v - 20)/60*100)).toFixed(0) + '%'; }
-  L.options.forEach(function(o){
+  shown.forEach(function(o){
     var m = o.m;
     h += '<button class="opt" type="button" aria-pressed="' + (o.id === sel) + '" data-act="pick" data-id="' + esc(id) + '" data-opt="' + o.id + '">' +
          '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : '') + '</span>' +

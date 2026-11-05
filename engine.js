@@ -533,8 +533,10 @@ function layoversOf(E){
 }
 
 /* usual bedtime for the layover night, on the clock the balance setting picks */
-function usualBeds(E, L){
-  var S = E.S, w = S.balance === 'home' ? 1 : S.balance === 'local' ? 0 : 0.5, out = [];
+/* your usual night on a layover, on the clock the Layover sleep setting picks (or the weight given:
+   0 local time, 1 home time, 0.5 halfway) */
+function usualBeds(E, L, wt){
+  var S = E.S, w = wt != null ? wt : S.balance === 'home' ? 1 : S.balance === 'local' ? 0 : 0.5, out = [];
   var d = dateStr(L.ap.tz, L.ws - 12*H);
   for(var k=0;k<7;k++, d = addDays(d, 1)){
     var bl = localToMs(L.ap.tz, d + 'T' + S.bed);
@@ -610,17 +612,21 @@ function planLayover(E, L, base, fx){
   var naps = fx.fixed.filter(function(k){ return k.kind !== 'main'; }).concat(fx.skips.filter(function(k){ return k.kind !== 'main'; }));
   var arrDecided = naps.some(function(n){ return n.a < cut; }) || (openNap && openNap.a < cut) || !!refMain || T > cut - H;
   var lateDecided = naps.some(function(n){ return n.a >= cut + 4*H && (!refMain || n.a > refMain.a); }) || (openNap && openNap.a >= cut + 4*H);
-  var bedC = [];
-  if(refMain) bedC = [refMain.a];
-  else if(L.out){
-    /* after a crew meetup: straight to bed, or at your usual bedtime that night (an hour either side) */
-    var after = Math.max(L.out.ne + 0.5*H, T);
-    bedC = [after];
-    var un = ubAll.filter(function(u){ return u.a > after - H && u.a - after < 8*H; })[0];
-    if(un) [-1, 0, 1].forEach(function(k){ var x = un.a + k*H; if(x > after + 0.25*H && x <= L.we - 5*H) bedC.push(x); });
+  /* bedtimes for the main sleep (the last night), from a set of usual nights */
+  function bedsFor(ubX){
+    var bedC = [], ubx = ubX.filter(function(u){ return u.a >= L.ws + 2*H && u.a <= L.we - 5*H; });
+    if(refMain) bedC = [refMain.a];
+    else if(L.out){
+      /* after a crew meetup: straight to bed, or at your usual bedtime that night (an hour either side) */
+      var after = Math.max(L.out.ne + 0.5*H, T);
+      bedC = [after];
+      var un = ubX.filter(function(u){ return u.a > after - H && u.a - after < 8*H; })[0];
+      if(un) [-1, 0, 1].forEach(function(k){ var x = un.a + k*H; if(x > after + 0.25*H && x <= L.we - 5*H) bedC.push(x); });
+    }
+    else if(ubx.length){ var B = ubx[ubx.length-1].a; [-1, 0, 1].forEach(function(k){ var x = B + k*H; if(x >= T && x <= L.we - 5*H) bedC.push(x); }); }
+    if(!bedC.length) bedC = [Math.max(T, L.we - 9*H)];
+    return bedC;
   }
-  else if(ub.length){ var B = ub[ub.length-1].a; [-1, 0, 1].forEach(function(k){ var x = B + k*H; if(x >= T && x <= L.we - 5*H) bedC.push(x); }); }
-  if(!bedC.length) bedC = [Math.max(T, L.we - 9*H)];
   var hoursC = [6.5, 7, 7.5, 8, 8.5, 9.5];
   var openEnds = [null];
   if(openNap){
@@ -639,9 +645,9 @@ function planLayover(E, L, base, fx){
   function blk(a, b, kind, open){ return {a:a, b:b, kind:kind, open:!!open}; }
   /* the other nights of a long layover: your usual night (on the balance setting's clock), cut short for the van */
   var taken = fx.fixed.concat(fx.skips, fx.open ? [{a:fx.open.a, b:Math.max(now, fx.open.a) + 4*H}] : [], L.out ? [{a:L.out.ns, b:L.out.ne}] : []);
-  function midsFor(ma, mb){
+  function midsFor(ubX, ma, mb){
     var out = [];
-    ubAll.forEach(function(u){
+    ubX.forEach(function(u){
       var b = Math.min(u.b, L.we);
       if(u.a < Math.max(T, L.ws + 2*H) || b - u.a < 4*H) return;
       if(ma != null && u.a < mb + 6*H && ma < b + 6*H) return;
@@ -650,6 +656,13 @@ function planLayover(E, L, base, fx){
     });
     return out;
   }
+  /* Plans are built on your usual nights on the clock you set (Layover sleep), and also on local time and
+     home time: on a long east-west layover one of those can be far better (two proper nights instead of a
+     nap and a very long day). Each kind of plan keeps its best version; the score already counts the cost
+     of sleeping away from your usual night. */
+  var wSet = E.S.balance === 'home' ? 1 : E.S.balance === 'local' ? 0 : 0.5;
+  [wSet, 0, 1, 0.5].filter(function(w, i, a){ return a.indexOf(w) === i; }).forEach(function(wt){
+  var ubX = wt === wSet ? ubAll : usualBeds(E, L, wt), bedC = bedsFor(ubX);
   openEnds.forEach(function(oe){
     var on = openNap ? blk(openNap.a, oe, 'nap', true) : null, onArr = on && openNap.a < cut;
     bedC.forEach(function(bed){
@@ -660,7 +673,7 @@ function planLayover(E, L, base, fx){
         if(onArr && bed < oe + 3*H && !refMain) return;
         var main = mainF ? null : blk(bed, wake, 'main', !!openMain);
 
-        var mids = mainF ? midsFor(mainF.a, mainF.b) : midsFor(bed, wake);
+        var mids = mainF ? midsFor(ubX, mainF.a, mainF.b) : midsFor(ubX, bed, wake);
         var firstA = mids.length ? Math.min(bed, mids[0].a) : bed, lastB = mids.reduce(function(m, x){ return Math.max(m, x.b); }, wake);
         var arrNaps = [];
         if(!arrDecided && !on){
@@ -692,6 +705,7 @@ function planLayover(E, L, base, fx){
       });
     });
   });
+  });
   if(L.custom){
     var cb = fromNow(L.custom.filter(function(x){ return x.b > x.a && x.a >= T - MIN && x.a >= L.arr && x.b <= L.dep; })
       .map(function(x){ return blk(x.a, x.b, x.kind === 'nap' ? 'nap' : 'main'); }), now);
@@ -707,11 +721,27 @@ function planLayover(E, L, base, fx){
   }
   var list = ['custom', 'now', 'later', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
     var o = opts[k];
-    return {id:k, name:k === 'custom' ? 'Your plan' : nameOf(k), blocks:o.blocks, m:o.res};
+    return {id:k, name:k === 'custom' ? 'Your plan' : nameOf(k), blocks:o.blocks.slice().sort(function(p, q){ return p.a - q.a; }), m:o.res};
   });
   var good = list.filter(function(o){ return !o.m.bad && o.id !== 'custom'; });
   var pool = good.length ? good : list;
-  var sug = pool.length ? pool.reduce(function(p, q){ return q.m.net > p.m.net ? q : p; }, pool[0]) : null;
+  /* the best score; on a near tie, the one that lands you more alert */
+  function better(q, p){ return q.m.net > p.m.net + 0.3 || (Math.abs(q.m.net - p.m.net) <= 0.3 && q.m.land > p.m.land); }
+  var sug = pool.length ? pool.reduce(function(p, q){ return better(q, p) ? q : p; }, pool[0]) : null;
+  /* Only plans worth considering are offered (o.viable): not one you would struggle to sleep in, not far
+     behind the best, and not one another plan beats or matches on every count (score, lowest in flight,
+     landing and the crew meetup) by a point or more. Your own times are always shown. */
+  function beats(x, y){
+    var ok = x.m.net >= y.m.net - 0.5 && x.m.land >= y.m.land - 1 && x.m.fmin >= y.m.fmin - 1 &&
+             (x.m.outMin == null || y.m.outMin == null || x.m.outMin >= y.m.outMin - 1);
+    var clearly = x.m.net > y.m.net + 0.5 || x.m.land > y.m.land + 1 || x.m.fmin > y.m.fmin + 1;
+    return ok && (clearly || better(x, y));
+  }
+  list.forEach(function(o){
+    if(o.id === 'custom' || (sug && o.id === sug.id)){ o.viable = true; return; }
+    o.viable = !o.m.bad && (!sug || o.m.net >= sug.m.net - 8) &&
+               !list.some(function(x){ return x !== o && x.id !== 'custom' && (!x.m.bad || (sug && x.id === sug.id)) && beats(x, o); });
+  });
   return {options:list, suggested:sug ? sug.id : null};
 }
 
@@ -749,6 +779,9 @@ function plan(S, now, opt){
     var want = L.choice || (L.custom ? 'custom' : null);
     var pick = L.options.filter(function(o){ return o.id === want; })[0] || L.options.filter(function(o){ return o.id === P.suggested; })[0];
     L.picked = pick ? pick.id : null;
+    /* an option you picked stays on the list even when it is no longer worth suggesting */
+    if(pick) pick.viable = true;
+    L.viable = L.options.filter(function(o){ return o.viable; });
     /* where the plan comes from: the app (auto), an option you picked (its times still follow changes), or times you set */
     L.src = L.picked === 'custom' ? 'yours' : (L.choice && L.picked === L.choice ? 'pick' : 'auto');
     /* times you set that no longer fit the layover (a flight or van moved) */
