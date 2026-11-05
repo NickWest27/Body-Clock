@@ -203,7 +203,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 48';
+var BUILD = '5 Nov 2026 · build 49';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -590,6 +590,11 @@ function pendingBlock(Pl){
 /* ---------- why text for a planned block ---------- */
 /* sleep debt to the nearest half hour, or '' when under 45 minutes */
 function debtTxt(d){ return d >= 0.75 ? 'About ' + (Math.round(d*2)/2) + ' h' : ''; }
+/* the crew rest you would get on the flight out with a layover option */
+function restWordOf(L, o){
+  var f = L.outF, ks = o.m && o.m.run && o.m.run.bunks ? o.m.run.bunks.filter(function(k){ return k.a >= f.a && k.a < f.b; }) : [];
+  return ks.length ? ks.map(function(k){ return BC.bunkWord(k.g); }).join(', then ') : '';
+}
 /* what the model expects you to get from an assumed crew rest starting at a */
 function bunkOf(Pl, a){ var k = ((Pl.R && Pl.R.bunks) || []).filter(function(x){ return Math.abs(x.a - a) < 2*60000; })[0]; return k || null; }
 /* the crew rest card under an operated flight on Trip */
@@ -1201,8 +1206,17 @@ function viewLay(id){
          (m.outMin != null && L.out && L.out.ne > now() ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Crew meetup</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
                            : '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Lowest in flight</span><b>' + BC.word(m.fmin) + ' · ' + Math.round(m.fmin) + '</b></span><span class="meter"><i style="left:' + pos(m.fmin) + '"></i></span></span>') +
          '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Landing</span><b>' + BC.word(m.land) + ' · ' + Math.round(m.land) + '</b></span><span class="meter"><i style="left:' + pos(m.land) + '"></i></span></span></span>' +
+         (restWordOf(L, o) ? '<span style="font-size:13px;line-height:18px"><b>Your crew rest:</b> ' + esc(restWordOf(L, o)) + '</span>' : '') +
          '<span style="font-size:13px;line-height:18px;color:var(--sec)">' + esc(noteFor(L, o)) + '</span></button>';
   });
+  /* nap or push through: when the nap before you leave is the plan, say what skipping it would do */
+  var sugO = L.options.filter(function(o){ return o.id === L.suggested; })[0], skipO = L.options.filter(function(o){ return o.id === 'none'; })[0];
+  if(sugO && skipO && sugO !== skipO && shown.indexOf(skipO) < 0 && sugO.blocks.some(function(b){ return b.kind === 'nap' && b.a > L.ws + 1000; })){
+    var rw1 = restWordOf(L, sugO), rw0 = restWordOf(L, skipO);
+    h += '<section class="card" style="padding:12px 16px;margin-top:10px"><div style="font-weight:600">Nap, or push through?</div><div class="t3" style="margin-top:4px">' +
+         'Skipping the nap: lowest in flight ' + Math.round(skipO.m.fmin) + ' and landing ' + Math.round(skipO.m.land) + ', against ' + Math.round(sugO.m.fmin) + ' and ' + Math.round(sugO.m.land) + ' with it. ' +
+         (rw0 && rw1 && rw0 !== rw1 ? 'Your crew rest would go better (' + rw0.toLowerCase() + ' instead of ' + rw1.toLowerCase() + '), but a nap in a hotel bed is worth more than the sleep you would gain in the bunk.' : 'The nap is worth more than what skipping it would gain.') + '</div></section>';
+  }
   h += '<p class="foot">Times are ' + esc(L.ap.city) + ' time. Landing is your alertness at ' + esc(L.outF.t.code) + ', with your crew rest ' + (L.outF.restWin ? 'as entered' : L.outF.rest ? 'assumed mid-flight' : 'left out (none entered)') + '.</p>';
   h += '<button class="btn" type="button" data-act="use" data-id="' + esc(id) + '" style="margin-top:6px">' + (sel === L.picked && (S.lay[id] || {}).choice ? 'Plan in use' : 'Use this plan') + '</button></div>';
   return h;

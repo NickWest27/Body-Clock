@@ -602,7 +602,7 @@ var NAMES = {none:'No nap', now:'Nap now', later:'Nap later', both:'Short nap no
    (no wake time yet), fx.skips are planned sleeps you said you did not take, fx.T is the moment
    from which the plan may still change (after the last thing you logged). */
 function planLayover(E, L, base, fx){
-  var scoreRest = assumedRests(L.outF).map(function(r){ return {a:r.a, b:r.b}; }), T = fx.T, now = fx.now;
+  var scoreRest = assumedRests(L.outF).map(function(r){ return {a:r.a, b:r.b, kind:'rest', actual:r.actual}; }), T = fx.T, now = fx.now;
   var ubAll = usualBeds(E, L), ub = ubAll.filter(function(u){ return u.a >= L.ws + 2*H && u.a <= L.we - 5*H; });
   var cut = L.out ? L.out.ns : (ub.length ? ub[ub.length-1].a - 4*H : L.ws + 6*H);
   var mainF = fx.fixed.filter(function(k){ return k.kind === 'main'; })[0] || null;
