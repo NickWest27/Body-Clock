@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Crew Rest</title>
-<meta name="description" content="Splits the crew rest window into equal breaks and gives start, wake-up and end times in UTC.">
+<meta name="description" content="Splits the crew rest window into equal rests and gives start, end and wake-up times in UTC.">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -30,190 +30,82 @@ body{margin:0;background:var(--bg);color:var(--label);font-family:-apple-system,
 .wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 40px)}
 a{color:var(--tint);text-decoration:none}
 .back{display:inline-flex;align-items:center;gap:2px;min-height:44px;font-size:17px}
-h1{margin:0 4px 2px;font-size:34px;line-height:41px;font-weight:700}
-.sub{margin:0 4px 12px;font-size:15px;color:var(--sec)}
-.grp-h{margin:18px 16px 6px;font-size:13px;color:var(--sec);text-transform:uppercase;letter-spacing:.02em}
-.list{background:var(--card);border-radius:16px;overflow:hidden}
-.row{display:flex;align-items:center;gap:10px;padding:10px 16px;min-height:52px}
-.row+.row{border-top:1px solid var(--sep)}
-.row .main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
-.t3{font-size:13px;color:var(--sec)}
-.pill{padding:6px 10px;border-radius:8px;background:var(--fill);font:inherit;font-size:17px;font-variant-numeric:tabular-nums;border:0;color:var(--label);-webkit-appearance:none;appearance:none;min-height:36px}
-.code{width:74px;text-transform:uppercase;text-align:center;font-weight:600;letter-spacing:.04em}
-.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:2px;border-radius:9px;background:var(--fill);min-width:150px}
-.seg button{min-height:32px;border:0;border-radius:7px;background:transparent;font-size:14px;font-weight:600;cursor:pointer;color:var(--label);padding:0 8px}
-.seg button[aria-pressed=true]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.stepper{display:flex;align-items:center;border-radius:8px;background:var(--fill);overflow:hidden;flex:none}
-.stepper button{width:40px;height:34px;border:0;background:none;font-size:20px;cursor:pointer;color:var(--label)}
-.stepper span{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;font-size:16px}
-.link{border:0;background:none;color:var(--tint);font:inherit;font-size:15px;cursor:pointer;padding:4px 0}
-.card{background:var(--card);border-radius:16px;padding:14px 16px}
-.bar{position:relative;height:30px;border-radius:8px;background:var(--fill);margin:10px 0 22px}
-.bar i{position:absolute;top:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;font-style:normal}
-.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--label);opacity:.8}
-.bar .lb{position:absolute;top:34px;font-size:12px;color:var(--sec);transform:translateX(-50%);white-space:nowrap}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{font-size:12px;color:var(--sec);font-weight:600;text-align:left;padding:4px 4px 6px;text-transform:uppercase;letter-spacing:.02em}
-td{padding:9px 4px;border-top:1px solid var(--sep);font-size:16px}
-td.who{font-weight:600}
-td .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
-.wake{font-weight:700}
-.sum{font-size:15px;color:var(--sec);margin-top:10px;line-height:20px}
-.err{margin:10px 4px 0;color:var(--danger);font-size:15px}
-.foot{margin:8px 16px 0;font-size:13px;line-height:18px;color:var(--sec)}
-.zc{display:flex;align-items:baseline;gap:8px;margin:0 4px 4px;font-variant-numeric:tabular-nums}
-.zc b{font-size:28px;font-weight:700}
-.val{font-variant-numeric:tabular-nums;font-size:17px}
-.now{border:0;border-radius:8px;background:var(--fill);color:var(--tint);font:inherit;font-size:15px;font-weight:600;min-height:36px;padding:0 12px;cursor:pointer}
+h1{margin:0 4px;font-size:22px;line-height:28px;font-weight:700;text-align:center}
+.foot{margin:14px 4px 0;font-size:13px;line-height:18px;color:var(--sec)}
 </style>
 </head>
 <body>
-<main class="wrap">
-  <a class="back" href="index.html#settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Settings</a>
+<div class="wrap">
+  <a class="back" href="./#settings">‹ Body Clock</a>
   <h1>Crew rest</h1>
-  <div class="sub">Equal numbered rests, two crew always at the controls. Times in UTC (Z).</div>
-  <div class="zc"><span class="t3">Now</span><b id="zNow"></b></div>
-
-  <h2 class="grp-h">Flight</h2>
-  <div class="list">
-    <div class="row"><span class="main"><span>From · To</span><span class="t3" id="cities"></span></span><input class="pill code" id="from" maxlength="3" autocomplete="off" autocapitalize="characters"><input class="pill code" id="to" maxlength="3" autocomplete="off" autocapitalize="characters"></div>
-    <div class="row"><span class="main"><span>Date</span><span class="t3">Departure, local</span></span><input class="pill" type="date" id="date"></div>
-    <div class="row"><span class="main"><span>Times typed in</span></span><div class="seg" role="group" aria-label="Times typed in"><button type="button" data-k="mode" data-v="local">Local</button><button type="button" data-k="mode" data-v="z">UTC (Z)</button></div></div>
-    <div class="row"><span class="main"><span>Off</span><span class="t3" id="offZ"></span></span><input class="pill" type="time" id="off"></div>
-    <div class="row"><span class="main"><span>On (estimated)</span><span class="t3" id="onZ"></span></span><input class="pill" type="time" id="on"></div>
-  </div>
-
-  <h2 class="grp-h">Breaks</h2>
-  <div class="list">
-    <div class="row"><span class="main"><span>Crew</span></span><div class="seg" role="group" aria-label="Crew"><button type="button" data-k="crew" data-v="2">2</button><button type="button" data-k="crew" data-v="3">3</button><button type="button" data-k="crew" data-v="4">4</button></div></div>
-    <div class="row"><span class="main"><span>Breaks each</span><span class="t3">Two on longer flights</span></span><div class="seg" role="group" aria-label="Breaks each"><button type="button" data-k="each" data-v="1">1</button><button type="button" data-k="each" data-v="2">2</button></div></div>
-    <div class="row"><span class="main"><span>Off to first rest</span><span class="t3">minutes after off</span></span><div class="stepper"><button type="button" data-step="startAfter" data-d="-5" aria-label="Less">−</button><span id="startAfterV"></span><button type="button" data-step="startAfter" data-d="5" aria-label="More">+</button></div></div>
-    <div class="row"><span class="main"><span>Rest begins</span><span class="t3" id="startHint"></span></span><button class="now" type="button" id="startNow">Now</button><input class="pill" type="time" id="start"></div>
-    <div class="row"><span class="main"><span>Rest ends</span><span class="t3">minutes before on</span></span><div class="stepper"><button type="button" data-step="endBefore" data-d="-5" aria-label="Less">−</button><span id="endBeforeV"></span><button type="button" data-step="endBefore" data-d="5" aria-label="More">+</button></div></div>
-    <div class="row"><span class="main"><span>Wake-up call</span><span class="t3">minutes before each break ends</span></span><div class="stepper"><button type="button" data-step="wakeBefore" data-d="-5" aria-label="Less">−</button><span id="wakeBeforeV"></span><button type="button" data-step="wakeBefore" data-d="5" aria-label="More">+</button></div></div>
-    <div class="row"><span class="main"><span>Round break times</span></span><div class="seg" role="group" aria-label="Round to"><button type="button" data-k="round" data-v="1">1 min</button><button type="button" data-k="round" data-v="5">5 min</button></div></div>
-  </div>
-
-  <h2 class="grp-h">Plan in UTC</h2>
-  <div class="list" id="sum"></div>
-  <section class="card" id="out" aria-live="polite" style="margin-top:10px"></section>
-  <p class="foot">The rest window runs from rest begins to rest ends, split equally. Each break starts as the one before ends; the wake-up call comes before the end for the changeover. Check it against your company’s rules and the captain’s plan.</p>
-</main>
+  <div class="cr-cap">Two pilots always at the controls</div>
+  <div id="app" aria-live="polite"></div>
+  <p class="foot">Check the plan against your company’s rules and the captain’s plan. Your inputs stay on this device.</p>
+</div>
 <script src="airports.js"></script>
 <script src="engine.js"></script>
+<script src="crew-ui.js"></script>
 <script>
 (function(){
-'use strict';
-var KEY = 'bc-crewrest', H = 3600000, MIN = 60000;
-var today = new Date(); var iso = function(d){ return d.toISOString().slice(0, 10); };
-var D = {from:'GRU', to:'JFK', date:iso(today), mode:'local', off:'22:30', on:'07:05', crew:3, each:1, start:'', startAfter:10, endBefore:30, wakeBefore:10, round:1, v:2};
-var st = D;
-try{ var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if(sv && typeof sv === 'object'){ st = {}; Object.keys(D).forEach(function(k){ st[k] = sv[k] !== undefined ? sv[k] : D[k]; }); if(!sv.v){ if(st.endBefore === 45) st.endBefore = 30; st.v = 2; } } }catch(e){}
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} }
-function $(id){ return document.getElementById(id); }
-function z(ms, ref){ var s = BC.hm('UTC', ms).replace(':', '') + 'Z'; if(ref != null && BC.dateStr('UTC', ms) !== BC.dateStr('UTC', ref)) s += '<sup>+1</sup>'; return s; }
-function dur(ms){ var m = Math.round(ms/MIN), h = Math.floor(m/60), r = m % 60; return h ? h + ' h' + (r ? ' ' + String(r).padStart(2, '0') : '') : r + ' min'; }
-function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-var COLS = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)'];
-
-/* the flight's off and on as UTC instants */
-function times(){
-  var fa = BC.airport((st.from || '').toUpperCase()), ta = BC.airport((st.to || '').toUpperCase());
-  if(!st.date || !st.off || !st.on) return {err:'Enter the date, off and on times.'};
-  var off, on;
-  if(st.mode === 'local'){
-    if(!fa || !ta) return {err:'Enter airport codes the app knows (like GRU and JFK), or type the times in UTC.'};
-    off = BC.localToMs(fa.tz, st.date + 'T' + st.off);
-    for(var k=0;k<3;k++){ on = BC.localToMs(ta.tz, BC.addDays(st.date, k) + 'T' + st.on); if(on > off) break; }
-  } else {
-    off = Date.parse(st.date + 'T' + st.off + ':00Z'); on = Date.parse(st.date + 'T' + st.on + ':00Z');
+  'use strict';
+  var MIN = 60000, H = 3600000, KEY = 'bc-crewrest2';
+  var D = {crew:3, off:'', on:'', start:10, startSet:'', end:30, wake:10, round:1, gap:0, each:1};
+  var st = {}; Object.keys(D).forEach(function(k){ st[k] = D[k]; });
+  try{ var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if(sv && typeof sv === 'object') Object.keys(D).forEach(function(k){ if(sv[k] !== undefined) st[k] = sv[k]; }); }catch(e){}
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} }
+  /* a UTC HH:MM as the moment nearest to ref */
+  function near(hhmm, ref){
+    var d = new Date(ref), p = hhmm.split(':');
+    var t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), +p[0], +p[1]);
+    while(t < ref - 12*H) t += 24*H;
+    while(t > ref + 12*H) t -= 24*H;
+    return t;
+  }
+  function times(){
+    if(!st.off || !st.on) return null;
+    var off = near(st.off, Date.now()), on = near(st.on, off);
     while(on <= off) on += 24*H;
+    var auto = off + st.start*MIN, start = auto;
+    if(st.startSet){ start = near(st.startSet, auto); }
+    return {off:off, on:on, auto:auto, start:start};
   }
-  if(isNaN(off) || isNaN(on)) return {err:'Check the times.'};
-  if(on - off > 20*H) return {err:'That flight is over 20 hours. Check the on time and date.'};
-  return {off:off, on:on, fa:fa, ta:ta};
-}
-
-function row(t1, t3, val, cls){ return '<div class="row"><span class="main"><span>' + t1 + '</span>' + (t3 ? '<span class="t3">' + t3 + '</span>' : '') + '</span><span class="val' + (cls ? ' ' + cls : '') + '">' + val + '</span></div>'; }
-function compute(){
-  var T = times(), out = $('out'), sum = $('sum');
-  $('cities').textContent = [BC.airport((st.from || '').toUpperCase()), BC.airport((st.to || '').toUpperCase())].map(function(a){ return a ? a.city.replace(/ (Heathrow|Gatwick|O’Hare|Narita|Haneda|Incheon|Kansai)$/, '').replace('Dallas–Fort Worth', 'Dallas') : '–'; }).join(' → ');
-  if(T.err){ $('offZ').textContent = ''; $('onZ').textContent = ''; $('startHint').textContent = ''; sum.innerHTML = ''; out.innerHTML = '<p class="err" style="margin:0">' + esc(T.err) + '</p>'; return; }
-  $('offZ').innerHTML = st.mode === 'local' ? z(T.off) : (T.fa ? BC.hm(T.fa.tz, T.off) + ' ' + esc(T.fa.code) + ' local' : '');
-  $('onZ').innerHTML = st.mode === 'local' ? z(T.on, T.off) : (T.ta ? BC.hm(T.ta.tz, T.on) + ' ' + esc(T.ta.code) + ' local' : '');
-  /* rest begins: the time you set (in Z), or off + the minutes set */
-  var auto = T.off + st.startAfter*MIN, start = auto;
-  if(st.start){
-    var s0 = Date.parse(BC.dateStr('UTC', T.off) + 'T' + st.start + ':00Z');
-    while(s0 < T.off - 2*H) s0 += 24*H;
-    while(s0 > T.off + 22*H) s0 -= 24*H;
-    start = s0;
+  function render(){
+    var T = times(), cp = null;
+    if(T) cp = BC.crewBreaks(T.off, T.on, st.crew, st.each, T.start, {end:st.end, wake:st.wake, round:st.round, gap:st.gap});
+    if(cp && !cp.err && T.start < T.off) cp = {err:'Rest begins before takeoff.'};
+    var h = CRUI.clockHTML() + CRUI.settingsHTML({crew:st.crew, slot:null, off:st.off, on:st.on, offSub:'', onSub:'',
+                 start:st.start, startSet:st.startSet, autoStart:T ? T.auto : null, end:st.end, wake:st.wake, round:st.round, gap:st.gap, each:st.each});
+    h += T ? CRUI.resultsHTML(cp, {each:st.each}) : '<p class="cr-hint" style="margin-top:18px">Type takeoff and landing in UTC (for example 0130) to see the plan.</p>';
+    document.getElementById('app').innerHTML = h;
   }
-  $('startHint').innerHTML = st.start ? 'UTC · <button class="link" type="button" id="useAuto">Use off + ' + st.startAfter + ' (' + z(auto) + ')</button>' : 'UTC · off + ' + st.startAfter + ' min';
-  if(!st.start && document.activeElement !== $('start')) $('start').value = BC.hm('UTC', auto);
-  var end = T.on - st.endBefore*MIN;
-  var sh = row('Off', '', z(T.off)) + row('On', '', z(T.on, T.off)) + row('Flight time', 'Off to on', dur(T.on - T.off)) +
-           row('Rest begins', st.start ? 'Set' : 'Off + ' + st.startAfter + ' min', z(start, T.off)) + row('Rest ends', 'On − ' + st.endBefore + ' min', z(end, T.off));
-  /* two crew are always at the controls, so crew - 2 can rest at once */
-  if(st.crew < 3){ sum.innerHTML = sh; out.innerHTML = '<p class="err" style="margin:0">With 2 crew both are always at the controls, so there are no in-flight breaks.</p>'; bindAuto(); return; }
-  if(start < T.off){ sum.innerHTML = sh; out.innerHTML = '<p class="err" style="margin:0">Rest begins before off.</p>'; bindAuto(); return; }
-  var cp = BC.crewBreaks(T.off, T.on, st.crew, st.each, start, {end:st.endBefore, wake:st.wakeBefore, round:st.round});
-  if(!cp || cp.err){ sum.innerHTML = sh; out.innerHTML = '<p class="err" style="margin:0">That leaves less than 15 minutes per break. Check the times.</p>'; bindAuto(); return; }
-  var atOnce = st.crew - 2;
-  var br = cp.breaks.map(function(x){ return {g:x.slot - 1, label:x.label, round:x.round, a:x.a, b:x.b, wake:x.wake}; });
-  var lens = br.map(function(x){ return x.b - x.a; }), mn = Math.min.apply(null, lens), mx = Math.max.apply(null, lens);
-  sh += row('Rest each', br.length + ' breaks · ' + (atOnce > 1 ? 'two at a time' : 'one at a time'), mx - mn <= MIN ? dur(mn) : dur(mn) + '–' + dur(mx), 'wake');
-  sum.innerHTML = sh;
-  /* timeline from off to on */
-  var span = T.on - T.off, pc = function(t){ return ((t - T.off)/span*100).toFixed(2) + '%'; };
-  var h = '<div class="bar">';
-  br.forEach(function(x){ h += '<i style="left:' + pc(x.a) + ';width:' + ((x.b - x.a)/span*100).toFixed(2) + '%;background:' + COLS[x.g] + '">' + (x.g + 1) + '</i>'; });
-  br.forEach(function(x){ h += '<b style="left:' + pc(x.wake) + '" title="Wake-up"></b>'; });
-  h += '<span class="lb" style="left:0;transform:none">Off ' + z(T.off) + '</span><span class="lb" style="left:auto;right:0;transform:none">On ' + z(T.on, T.off) + '</span></div>';
-  h += '<table><thead><tr><th>Rest</th><th>Start</th><th>End</th><th>Wake-up</th></tr></thead><tbody>';
-  br.forEach(function(x){
-    h += '<tr><td class="who"><span class="sw" style="background:' + COLS[x.g] + '"></span>' + x.label + (st.each > 1 ? ' · ' + (x.round === 1 ? '1st' : '2nd') : '') + '</td><td>' + z(x.a, T.off) + '</td><td>' + z(x.b, T.off) + '</td><td class="wake">' + z(x.wake, T.off) + '</td></tr>';
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('[data-cr]'); if(!b) return;
+    var k = b.dataset.cr;
+    if(k === 'crew') st.crew = +b.dataset.v;
+    else if(k === 'each') st.each = +b.dataset.v;
+    else if(k === 'round') st.round = st.round === 5 ? 1 : 5;
+    else if(k === 'gap') st.gap = st.gap ? 0 : 10;
+    else if(k === 'wake') st.wake = Math.max(0, Math.min(30, st.wake + (+b.dataset.d)));
+    else if(k === 'startNow'){ var n = Math.ceil((Date.now() + MIN)/MIN)*MIN; st.startSet = CRUI.z4(n).slice(0, 2) + ':' + CRUI.z4(n).slice(2); }
+    else if(k === 'startClear') st.startSet = '';
+    save(); render();
   });
-  h += '</tbody></table><div class="sum">Wake-up ' + st.wakeBefore + ' min before each break ends. ' + (atOnce > 1 ? 'Two rest at a time, in pairs.' : 'One rests at a time. Who takes which rest varies by flight, often the FB first, then the pilot flying, then the pilot monitoring.') + '</div>';
-  out.innerHTML = h;
-  bindAuto();
-}
-function bindAuto(){ var ua = $('useAuto'); if(ua) ua.onclick = function(){ st.start = ''; $('start').value = ''; save(); compute(); }; }
-function tickZ(){ $('zNow').textContent = BC.hm('UTC', Date.now()).replace(':', '') + 'Z'; }
-tickZ(); setInterval(tickZ, 5000);
-$('startNow').onclick = function(){ st.start = BC.hm('UTC', Math.ceil((Date.now() + MIN)/MIN)*MIN); $('start').value = st.start; save(); compute(); };
-
-function paint(){
-  ['from', 'to', 'date', 'off', 'on', 'start'].forEach(function(k){ if(document.activeElement !== $(k)) $(k).value = st[k] || ''; });
-  document.querySelectorAll('[data-k]').forEach(function(b){ b.setAttribute('aria-pressed', String(st[b.dataset.k]) === b.dataset.v); });
-  $('endBeforeV').textContent = st.endBefore + ' min'; $('wakeBeforeV').textContent = st.wakeBefore + ' min'; $('startAfterV').textContent = st.startAfter + ' min';
-  compute();
-}
-/* inputs only update the results, never redraw themselves, so pickers stay open */
-['from', 'to', 'date', 'off', 'on', 'start'].forEach(function(k){
-  var el = $(k);
-  el.addEventListener('input', function(){ st[k] = (k === 'from' || k === 'to') ? el.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) : el.value; save(); compute(); });
-  el.addEventListener('change', function(){ st[k] = (k === 'from' || k === 'to') ? el.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) : el.value; save(); compute(); });
-});
-document.addEventListener('click', function(e){
-  var b = e.target.closest('[data-k]');
-  if(b){
-    var k = b.dataset.k, v = b.dataset.v;
-    if(k === 'mode' && v !== st.mode){
-      /* keep the same instants when switching how times are typed */
-      var T = times();
-      if(!T.err){
-        if(v === 'z'){ st.date = BC.dateStr('UTC', T.off); st.off = BC.hm('UTC', T.off); st.on = BC.hm('UTC', T.on); }
-        else if(T.fa && T.ta){ st.date = BC.dateStr(T.fa.tz, T.off); st.off = BC.hm(T.fa.tz, T.off); st.on = BC.hm(T.ta.tz, T.on); }
-      }
+  document.addEventListener('change', function(e){
+    var el = e.target, v = el.value;
+    if(el.id === 'cr-off' || el.id === 'cr-on'){ var t = CRUI.parseHHMM(v); st[el.id === 'cr-off' ? 'off' : 'on'] = t || ''; }
+    else if(el.id === 'cr-start'){
+      /* a number of minutes, or a time (4 digits) */
+      var d = v.replace(/\D/g, '');
+      if(d.length >= 3){ var t2 = CRUI.parseHHMM(d); if(t2) st.startSet = t2; }
+      else if(d !== '') st.start = Math.min(120, +d);
     }
-    st[k] = (k === 'mode') ? v : +v;
-    save(); paint(); return;
-  }
-  var s = e.target.closest('[data-step]');
-  if(s){ var key = s.dataset.step; st[key] = Math.max(0, Math.min(key === 'endBefore' ? 120 : key === 'startAfter' ? 60 : 30, st[key] + (+s.dataset.d))); save(); paint(); }
-});
-paint();
+    else if(el.id === 'cr-end'){ var d2 = v.replace(/\D/g, ''); if(d2 !== '') st.end = Math.min(180, +d2); }
+    else return;
+    save(); render();
+  });
+  /* the Enter key on the number pad moves on */
+  document.addEventListener('keydown', function(e){ if(e.key === 'Enter' && e.target.id && e.target.id.indexOf('cr-') === 0){ e.target.blur(); } });
+  CRUI.injectCSS(); render(); CRUI.startClock();
 })();
 </script>
 </body>

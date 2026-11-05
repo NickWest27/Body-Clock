@@ -1,8 +1,8 @@
 /* Offline cache for Body Clock. Serves the saved copy immediately and refreshes it in the background,
    so an update arrives the next time the app is opened. Change VERSION when you ship a new build. */
-const VERSION = '2026-11-05.43';
+const VERSION = '2026-11-05.44';
 const CACHE = 'bc2-main-' + VERSION;
-const ASSETS = ['./', './index.html', './crew-rest.html', './engine.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const ASSETS = ['./', './index.html', './crew-rest.html', './engine.js', './crew-ui.js', './airports.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS); }).then(function(){ return self.skipWaiting(); }));

@@ -223,18 +223,21 @@ function crewBreaks(off, on, crew, each, start, rules){
   rules = rules || {};
   var g = restSlots(crew); if(!g) return null;
   var end = on - (rules.end != null ? +rules.end : 30)*MIN, wakeB = (rules.wake != null ? +rules.wake : 10)*MIN, unit = (+rules.round === 5 ? 5 : 1)*MIN;
-  var n = g*(each === 2 ? 2 : 1);
-  if(!(end - start >= n*15*MIN) || start < off) return {err:'The rest window is too short for ' + n + ' breaks.', off:off, on:on, start:start, end:end, breaks:[]};
-  var step = (end - start)/n, bounds = [start], out = [];
-  for(var k=1;k<n;k++) bounds.push(Math.round((start + k*step)/unit)*unit);
-  bounds.push(end);
-  for(var j=0;j<n;j++) out.push({slot:j % g + 1, label:'Rest ' + (j % g + 1), round:Math.floor(j/g) + 1, a:bounds[j], b:bounds[j+1], wake:bounds[j+1] - wakeB});
-  return {off:off, on:on, start:start, end:end, breaks:out};
+  var n = g*(each === 2 ? 2 : 1), gap = Math.max(0, +rules.gap || 0)*MIN;
+  if(!(end - start - (n - 1)*gap >= n*15*MIN) || start < off) return {err:'The rest window is too short for ' + n + ' breaks.', off:off, on:on, start:start, end:end, gap:gap, breaks:[]};
+  /* equal breaks, with the crew-change gap (if any) between them; inner times rounded */
+  var len = (end - start - (n - 1)*gap)/n, out = [];
+  function rnd(t){ return Math.round(t/unit)*unit; }
+  for(var j=0;j<n;j++){
+    var a = j ? rnd(start + j*(len + gap)) : start, b = j < n - 1 ? rnd(start + j*(len + gap) + len) : end;
+    out.push({slot:j % g + 1, label:'Rest ' + (j % g + 1), round:Math.floor(j/g) + 1, a:a, b:b, wake:b - wakeB});
+  }
+  return {off:off, on:on, start:start, end:end, gap:gap, breaks:out};
 }
 /* the crew rest timing for a flight: the flight's own, or the defaults in Settings */
 function rulesOf(S, r){
   var d = S.restRules || {}, o = (r && r.rules) || {}, out = {};
-  [['start', 10], ['end', 30], ['wake', 10], ['round', 1]].forEach(function(k){ out[k[0]] = o[k[0]] != null ? +o[k[0]] : d[k[0]] != null ? +d[k[0]] : k[1]; });
+  [['start', 10], ['end', 30], ['wake', 10], ['round', 1], ['gap', 0]].forEach(function(k){ out[k[0]] = o[k[0]] != null ? +o[k[0]] : d[k[0]] != null ? +d[k[0]] : k[1]; });
   return out;
 }
 function crewPlan(S, x){
