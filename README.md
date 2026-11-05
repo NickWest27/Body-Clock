@@ -55,15 +55,11 @@ Sync runs when the app opens, when you come back to it, every few minutes while 
 
 ## Data
 
-Everything stays on the device. Back up trip saves a file you can keep or AirDrop to another device; Restore from file loads it. Import trip from the classic app reads the trip saved by the old app on the same device (flights whose labels name two known airport codes, like DFWGRU).
-
-## The classic app
-
-The previous version (build 17) lives at `classic/` (https://nickwest27.github.io/Body-Clock/classic/) and on the branch `archive/classic-v17`. It is frozen; fixes go into the new app.
+Everything stays on your devices (and, with sync on, in your encrypted gist). Back up trip saves a file you can keep or AirDrop to another device; Restore from file loads it.
 
 ## Updating
 
-Settings › Update app checks for a newer build and reloads. GitHub Pages can take about 10 minutes to publish a change.
+Settings › Update app checks for a newer build and reloads. GitHub Pages can take about 10 minutes to publish a change. Development happens on `main`, which GitHub Pages publishes; for a new build, bump `BUILD` in `index.html` and `VERSION` in `sw.js`.
 
 ## Files
 
@@ -72,4 +68,4 @@ Settings › Update app checks for a newer build and reloads. GitHub Pages can t
 - `airports.js`: airport codes with time zones and positions, and the starting destination list.
 - `crew-rest.html`: the crew rest calculator.
 - `sw.js`, `manifest.webmanifest`, icons: offline use and home-screen install.
-- `classic/`: the frozen classic app.
+- `next/`: a notice for the old preview address (BC New), which moved to the main address.

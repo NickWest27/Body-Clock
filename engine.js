@@ -99,7 +99,7 @@ function sunElev(ms, lat, lon){
   return 90 - Math.acos(Math.max(-1, Math.min(1, cz)))/R;
 }
 
-/* ---------- physiology (same model and constants as the classic app) ---------- */
+/* ---------- physiology ---------- */
 var PAR = {
   tauRise:18.2, tauDecay:4.2, wS:0.64, wC:0.36,
   effMin:0.55, solBase:8, solRange:22,

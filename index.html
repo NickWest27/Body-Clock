@@ -190,8 +190,8 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '4 Nov 2026 · build 42';
-var KEY = 'bodyclock2', CLASSIC_KEY = 'body-clock-overlay-v3', H = BC.H;
+var BUILD = '5 Nov 2026 · build 43';
+var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
 function defaults(){
@@ -862,10 +862,8 @@ function viewNow(){
   if(V.flash) h += '<p class="msg" style="margin:0 4px">' + esc(V.flash) + '</p>';
   h += noticeCard();
   if(!Pl.flights.length){
-    var hasClassic = classicData();
     h += '<section class="card empty"><h2 style="margin:0;font-size:22px">No trip yet</h2><p>Add your flights with airport codes. The app plans your sleep around them.</p>' +
          '<div class="stack" style="gap:10px"><button class="btn" type="button" data-go="flight/new">Add a flight</button>' +
-         (hasClassic ? '<button class="btn sec" type="button" data-act="import">Import trip from the classic app</button>' : '') +
          '<button class="btn sec" type="button" data-act="example">Load example trip</button></div></section>';
     return h;
   }
@@ -1437,14 +1435,12 @@ function viewSettings(){
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
        '<button class="row" type="button" data-act="restore" style="color:var(--tint)">Restore from file</button>' +
-       (classicData() ? '<button class="row" type="button" data-act="import" style="color:var(--tint)">Import trip from the classic app</button>' : '') +
        '<button class="row" type="button" data-act="example" style="color:var(--tint)">Load example trip</button>' +
        '<button class="row" type="button" data-act="clear" style="color:var(--danger)">' + (V.confirmClear ? 'Tap again to remove all flights' : 'Start new trip') + '</button></div>';
   if(V.flash) h += '<p class="msg">' + esc(V.flash) + '</p>';
   h += '<h2 class="grp-h">About</h2><div class="list">' +
        '<div class="row static"><span class="main"><span class="t1">Version</span></span><span class="val">' + esc(BUILD) + '</span></div>' +
-       '<button class="row" type="button" data-act="update" style="color:var(--tint)">' + esc(V.updLabel || 'Update app') + '</button>' +
-       '<a class="row" href="' + (location.pathname.indexOf('/next/') >= 0 ? '../' : 'classic/') + '" style="color:var(--tint)">Open the classic app</a></div>';
+       '<button class="row" type="button" data-act="update" style="color:var(--tint)">' + esc(V.updLabel || 'Update app') + '</button></div>';
   if(V.updMsg) h += '<p class="msg">' + esc(V.updMsg) + '</p>';
   h += '<details class="how" style="margin-top:18px"><summary>How the plan works</summary>' +
        '<p>The model is the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. Alertness here is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
@@ -1587,30 +1583,7 @@ function saveSleep(){
   save(); V.sleep = null; V.confirmDel = false; renderSleep(); render();
 }
 
-/* ---------- classic import, backup ---------- */
-function classicData(){
-  try{ var o = JSON.parse(localStorage.getItem(CLASSIC_KEY) || 'null'); return o && Array.isArray(o.rows) && o.rows.some(function(r){ return r.type === 'flight'; }) ? o : null; }catch(e){ return null; }
-}
-function importClassic(){
-  var o = classicData(); if(!o) return 'Nothing to import.';
-  function zoneOff(z){ return z === 'home' ? o.home : z === 'local' ? o.local : parseFloat(String(z).slice(2)) || 0; }
-  function abs(t, z){ return BC.parseLocal(t) - zoneOff(z)*H; }
-  var flights = [], skipped = [], id = 1;
-  var sleepsIn = o.rows.filter(function(r){ return r.type === 'sleep' || r.type === 'plan'; }).map(function(r){ return [abs(r.s, r.sz), abs(r.e, r.ez)]; });
-  o.rows.filter(function(r){ return r.type === 'flight'; }).forEach(function(r){
-    var m = /([A-Z]{3})\W*(?:to|-|→|>)?\W*([A-Z]{3})/.exec((r.label || '').toUpperCase());
-    var f = m && BC.airport(m[1]), t = m && BC.airport(m[2]);
-    if(!f || !t){ skipped.push(r.label || 'Flight'); return; }
-    var a = abs(r.s, r.sz), b = abs(r.e, r.ez);
-    var rec = {id:id++, from:f.code, to:t.code, dep:BC.msToLocal(f.tz, a), arr:BC.msToLocal(t.tz, b), role:r.role || null, rest:+r.rest || 0};
-    var inside = sleepsIn.filter(function(s){ return s[0] >= a && s[1] <= b; })[0];
-    if(inside && (rec.role || (b - a >= 5*H ? 'operate' : 'commute')) === 'operate') rec.restUTC = {s:BC.isoUTC(inside[0]).slice(11), e:BC.isoUTC(inside[1]).slice(11)};
-    flights.push(rec);
-  });
-  if(o.bed) S.bed = o.bed; if(o.wake) S.wake = o.wake; if(o.landBed != null) S.landBed = o.landBed; if(o.balance) S.balance = o.balance;
-  S.flights = flights; S.lay = {}; S.actual = []; S.skips = []; save();
-  return 'Imported ' + flights.length + ' flight' + (flights.length === 1 ? '' : 's') + '.' + (skipped.length ? ' Not imported, unknown airport: ' + skipped.join(', ') + '. Add those by hand.' : '');
-}
+/* ---------- backup ---------- */
 function exampleTrip(){
   S.flights = [
     {id:1, from:'ATL', to:'DFW', dep:'2026-10-15T16:00', arr:'2026-10-15T17:30', role:null, rest:0},
@@ -1655,7 +1628,6 @@ function restoreFile(file){
     try{
       var o = JSON.parse(rd.result), st = o && o.state ? o.state : o;
       if(st && st.v === 1 && Array.isArray(st.flights)){ S = fix(st); save(); V.flash = 'Trip restored.'; }
-      else if(st && Array.isArray(st.rows)){ V.flash = 'That is a classic app backup. Restore it in the classic app, then use Import.'; }
       else V.flash = 'That file is not a Body Clock backup.';
     }catch(e){ V.flash = 'Could not read that file.'; }
     render();
@@ -1665,8 +1637,8 @@ function restoreFile(file){
 
 /* ---------- update ---------- */
 async function cleanReload(){
-  try{ if(navigator.serviceWorker){ var reg = await navigator.serviceWorker.getRegistration(location.pathname); if(reg && reg.scope.indexOf('/classic/') < 0) await reg.unregister(); } }catch(e){}
-  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('bc2-' + (location.pathname.indexOf('/next/') >= 0 ? 'next-' : 'main-')) === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
+  try{ if(navigator.serviceWorker){ var reg = await navigator.serviceWorker.getRegistration(location.pathname); if(reg) await reg.unregister(); } }catch(e){}
+  try{ if(window.caches){ var keys = await caches.keys(); await Promise.all(keys.filter(function(k){ return k.indexOf('bc2-') === 0 || k.indexOf('body-clock-') === 0; }).map(function(k){ return caches.delete(k); })); } }catch(e){}
   location.replace(location.pathname + '?u=' + Date.now());
 }
 async function checkUpdate(){
@@ -1858,7 +1830,6 @@ document.addEventListener('click', function(e){
     V.confirmSyncOff = false; SY = null; storeSync(); storeBase(null); V.syncDone = 'Sync is off on this device. Your data stays here.'; render(); return;
   }
   if(act === 'restore'){ $('#impFile').click(); return; }
-  if(act === 'import'){ V.flash = importClassic(); if(V.view === 'now'){ render(); } else render(); return; }
   if(act === 'example'){ exampleTrip(); V.flash = 'Example trip loaded: Atlanta, Dallas, São Paulo and back.'; render(); return; }
   if(act === 'clear'){ if(!V.confirmClear){ V.confirmClear = true; render(); setTimeout(function(){ if(V.confirmClear){ V.confirmClear = false; render(); } }, 3500); return; } S.flights = []; S.lay = {}; S.actual = []; S.skips = []; save(); V.confirmClear = false; V.flash = 'All flights removed.'; render(); return; }
   if(act === 'update'){ checkUpdate(); return; }

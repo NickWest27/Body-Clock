@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Body Clock has moved</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<style>
+:root{--bg:#F2F2F7;--card:#FFFFFF;--label:#000;--sec:#5F5F66;--tint:#0A66D8;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root{--bg:#000;--card:#1C1C1E;--label:#FFF;--sec:#A1A1A8;--tint:#3E9BFF}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--label);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;font-size:17px;line-height:1.35;-webkit-font-smoothing:antialiased}
+main{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 28px) 16px calc(env(safe-area-inset-bottom) + 40px)}
+h1{font-size:32px;line-height:38px;margin:0 4px 8px}
+p{margin:0 4px 14px;color:var(--sec)}
+.card{background:var(--card);border-radius:16px;padding:16px 18px;margin:16px 0}
+ol{margin:0;padding-left:22px}
+li{margin:8px 0}
+.btn{display:block;width:100%;text-align:center;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+.pri{background:var(--tint);color:#fff}
+.sec{background:rgba(118,118,128,.16);color:var(--tint);margin-top:10px}
+.msg{margin:10px 4px 0;color:var(--sec);font-size:15px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Body Clock has moved</h1>
+  <p>BC New is now Body Clock, at the main address. This copy no longer updates.</p>
+  <a class="btn pri" href="../">Open Body Clock</a>
+  <div class="card">
+    <ol>
+      <li>Tap Open Body Clock.</li>
+      <li>In Safari, tap Share, then Add to Home Screen.</li>
+      <li>In the new app, open Settings › Sync with your other devices. Turn on sync with your GitHub token and passphrase. Your data comes back.</li>
+      <li>Delete this BC New icon from your Home Screen.</li>
+    </ol>
+  </div>
+  <p id="have"></p>
+  <button class="btn sec" type="button" id="save" hidden>Save a backup of this copy’s data</button>
+  <p class="msg" id="msg"></p>
+  <p style="font-size:14px">No sync? Save the backup, then in the new app use Settings › Restore from file.</p>
+</main>
+<script>
+(function(){
+  /* retire this copy's offline cache */
+  try{ if(navigator.serviceWorker) navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ if(r.scope.indexOf('/next/') >= 0) r.unregister(); }); }).catch(function(){}); }catch(e){}
+  try{ if(window.caches) caches.keys().then(function(ks){ ks.forEach(function(k){ if(k.indexOf('bc2-next-') === 0) caches.delete(k); }); }).catch(function(){}); }catch(e){}
+  var st = null;
+  try{ st = JSON.parse(localStorage.getItem('bodyclock2') || 'null'); }catch(e){}
+  if(st && Array.isArray(st.flights)){
+    var n = st.flights.length;
+    document.getElementById('have').textContent = 'This copy holds ' + n + ' flight' + (n === 1 ? '' : 's') + '.';
+    var b = document.getElementById('save'); b.hidden = false;
+    b.onclick = async function(){
+      var name = 'body-clock-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      var file = new File([JSON.stringify({app:'body-clock', saved:Date.now(), state:st}, null, 1)], name, {type:'application/json'});
+      try{
+        if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); document.getElementById('msg').textContent = 'Choose Save to Files to keep it.'; return; }
+      }catch(e){ if(e && e.name === 'AbortError') return; }
+      var a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      document.getElementById('msg').textContent = 'Saved as ' + name + '.';
+    };
+  }
+})();
+</script>
+</body>
+</html>
