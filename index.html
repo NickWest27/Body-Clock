@@ -20,6 +20,7 @@
   --fill:rgba(118,118,128,.12); --bar:rgba(249,249,249,.94); --tint:#0A66D8; --sleep:#5856D6; --sleepbg:rgba(88,86,214,.14);
   --flight:#1C1C1E; --day:#F7DC94; --nite:#2E3160; --nitebg:rgba(46,49,96,.10); --out:#C2378A; --outbg:rgba(194,55,138,.12);
   --switch:#248A3D; --danger:#C4161C; --tired:#D93A1E; --rested:#2E9E5B; --coffee:#8A5528; --dusk:#E6A766; --sunc:#C98A00; --bodyn:#3459C9;
+  --sk1:#F2CF6B; --sk2:#EFA35C; --sk3:#C47A93; --sk4:#5B5FB0; --sk5:#252955; --skfr:#D9DBE8; --skbody:#E8B94A;
   --scale:linear-gradient(90deg,#C4161C 0%,#E2531A 17%,#EE8A12 33%,#D8B10F 50%,#7DB843 67%,#2E9E5B 83%,#1F7A4D 100%);
   color-scheme:light dark;
 }
@@ -29,6 +30,7 @@
     --fill:rgba(118,118,128,.24); --bar:rgba(22,22,24,.94); --tint:#3E9BFF; --sleep:#8D8BFF; --sleepbg:rgba(94,92,230,.28);
     --flight:#E5E5EA; --day:#8A7440; --nite:#262A55; --nitebg:rgba(120,130,255,.12); --out:#F06BB8; --outbg:rgba(240,107,184,.18);
     --switch:#30D158; --danger:#FF6961; --tired:#FF5A3C; --rested:#3BC77A; --coffee:#C98E5F; --dusk:#9A6A44; --sunc:#F5C451; --bodyn:#7C9BFF;
+    --sk1:#EBC768; --sk2:#E0995A; --sk3:#A5607A; --sk4:#3B3F8C; --sk5:#171A3D; --skfr:#2A2D52; --skbody:#E3BD5F;
   }
 }
 *{box-sizing:border-box}
@@ -111,6 +113,7 @@ h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing
 .seg.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .dialrow{display:flex;align-items:center;gap:14px}
 .dialrow .dial{flex:none;width:138px;height:138px}
+.tunnel{display:block;width:100%;height:auto}
 .seg button[aria-pressed=true]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .sw{position:relative;width:51px;height:31px;border:0;border-radius:16px;background:var(--fill);cursor:pointer;padding:0;flex:none;transition:background .2s}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:left .2s}
@@ -200,7 +203,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 47';
+var BUILD = '5 Nov 2026 · build 48';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -636,93 +639,94 @@ function placeAt(Pl, C, t){
   var q = Pl.E.locAt(t), x = C.at(t);
   return {lat:q.lat, lon:q.lon, fl:q.fl, ap:q.fl ? null : (q.ap || Pl.E.home), name:q.fl ? 'In flight' : shortCity(q.ap || Pl.E.home), tz:q.fl ? q.flight.t.tz : q.tz, x:x};
 }
-function skyCol(e){ return e > 2 ? 'var(--day)' : e < -6 ? 'var(--nite)' : 'var(--dusk)'; }
-/* The body clock dial, on the local clock with noon at the top. Three rings of daylight:
-   outer = where you are, middle = the day your body expects (home's daylight moved by how far
-   your body has shifted), inner = home right now. The hand is the moment shown. */
+/* The body clock tunnel. Your body's clock is fixed, with its noon at the top: its 6 in the morning is at 9 o'clock,
+   its 6 in the evening at 3 o'clock. Time spirals inward into the past, one turn a day, each day smaller, so now
+   is the outer edge. The colours are the daylight where you were at each moment. In step, sunrise sits near
+   9 o'clock and sunset near 3; after a flight they swing round, then creep back as your body adapts. The thin
+   frame outside is your body's usual day (your wake time to your bedtime in Settings) and does not move. */
 var dialN = 0;
-function dial3SVG(Pl, C, t, hand){
-  var home = Pl.E.home, pl = placeAt(Pl, C, t), x = pl.x, shift = x.eff - x.homeOff, lh = ((t/H + x.off) % 24 + 24) % 24, id = 'd' + (dialN++);
-  var cx = 78, cy = 78;
-  function pt(h, r){ var a = (h - 12)/24*2*Math.PI; return [cx + r*Math.sin(a), cy - r*Math.cos(a)]; }
-  function seg(h0, h1, r){ var a = pt(h0, r), b = pt(h1, r); return 'M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 0 1 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2); }
-  function ring(r, w, el){
-    var s = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + skyCol(el(t - lh*H)) + '" stroke-width="' + w + '"/>';
-    for(var k=0;k<96;k++){ var h0 = k/4; s += '<path d="' + seg(h0 - 0.04, h0 + 0.29, r) + '" fill="none" stroke="' + skyCol(el(t + (h0 + 0.125 - lh)*H)) + '" stroke-width="' + w + '"/>'; }
-    return s;
+function skyTone(el){ return el >= 6 ? 'var(--sk1)' : el >= -0.833 ? 'var(--sk2)' : el >= -6 ? 'var(--sk3)' : el >= -12 ? 'var(--sk4)' : 'var(--sk5)'; }
+function tunnelData(Pl, C, nw, days, stepMin){
+  var E = Pl.E, home = E.home, pts = [], st = stepMin*60000, bh = +S.bed.slice(0, 2) + (+S.bed.slice(3))/60, wh = +S.wake.slice(0, 2) + (+S.wake.slice(3))/60;
+  for(var t = nw - days*24*H; t <= nw + 1; t += st){
+    var p;
+    if(t < C.R.t0){
+      /* before the trip: at home, in step */
+      var hh0 = ((t/H + BC.offH(home.tz, t)) % 24 + 24) % 24;
+      p = {t:t, body:hh0, el:BC.sunElev(t, home.lat, home.lon), sl:bh > wh ? (hh0 >= bh || hh0 < wh) : (hh0 >= bh && hh0 < wh), fl:false, city:shortCity(home)};
+    } else {
+      var x = C.at(Math.min(t, C.R.t1)), q = E.locAt(t);
+      p = {t:t, body:x.bodyH, el:BC.sunElev(t, q.lat, q.lon), sl:t <= Pl.R.t1 && t >= Pl.R.t0 ? BC.ptAt(Pl.R, t).sl : false, fl:q.fl, city:q.fl ? null : shortCity(q.ap || home)};
+    }
+    pts.push(p);
   }
-  var here = function(tau){ return BC.sunElev(tau, pl.lat, pl.lon); };
-  var body = function(tau){ return BC.sunElev(tau + shift*H, home.lat, home.lon); };
-  var homeL = function(tau){ return BC.sunElev(tau, home.lat, home.lon); };
-  var R = [[57, 8, here, pl.name], [43.5, 13, body, 'Body'], [29.5, 8, homeL, pl.ap && pl.ap.code === home.code ? 'Home' : shortCity(home)]];
-  var s = '<svg class="dial" viewBox="0 0 156 156" role="img" aria-label="Body clock: ' + esc(pl.name) + ' outside, your body in the middle, ' + esc(shortCity(home)) + ' inside">';
-  R.forEach(function(r){ s += ring(r[0], r[1], r[2]); });
-  s += '<circle cx="' + cx + '" cy="' + cy + '" r="50.7" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.1"/><circle cx="' + cx + '" cy="' + cy + '" r="36.3" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.1"/>';
-  var defs = '<defs>', labs = '';
-  R.forEach(function(r, i){
-    var rb = r[0] + (i === 1 ? 3.2 : 2.9), a = pt(6, rb), b = pt(18, rb);
-    defs += '<path id="' + id + 'p' + i + '" d="M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + rb + ' ' + rb + ' 0 0 0 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2) + '"/>';
-    labs += '<text font-size="' + (i === 1 ? 8.5 : 7.4) + '" font-weight="700" letter-spacing=".04em" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width="2.2" paint-order="stroke" stroke-linejoin="round"><textPath href="#' + id + 'p' + i + '" startOffset="50%" text-anchor="middle">' + esc(r[3].toUpperCase()) + '</textPath></text>';
-  });
-  s += defs + '</defs>' + labs;
-  [[6, '06'], [18, '18'], [0, '00']].forEach(function(l){ var q = pt(l[0], 71); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 3.5).toFixed(1) + '" font-size="10" text-anchor="middle" fill="var(--sec)">' + l[1] + '</text>'; });
-  s += sunIco(cx, 7, 3.4);
-  if(hand){ var e = pt(lh, 64); s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" stroke="var(--tint)" stroke-width="2.5" stroke-linecap="round"/><circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="var(--tint)"/>'; }
-  return s + '</svg>';
+  return pts;
 }
-/* The big body clock: the same three labelled rings, with thin rings for the days before.
-   Between outer and body: where you were on each earlier day (newest outermost), so the rings that line up
-   with the outer one count your days in this time zone. Between body and home: your body's day on each
-   earlier day, so you can see it drift from home towards now. All on today's local clock. */
-function dialBigSVG(Pl, C, nw){
-  var home = Pl.E.home, pl = placeAt(Pl, C, nw), x = pl.x, lh = ((nw/H + x.off) % 24 + 24) % 24, id = 'b' + (dialN++);
-  var cx = 170, cy = 170, ND = 0;
-  for(var k=1;k<=6;k++){ if(nw - k*24*H >= C.R.t0 - 6*H) ND = k; }
-  function pt(h, r){ var a = (h - 12)/24*2*Math.PI; return [cx + r*Math.sin(a), cy - r*Math.cos(a)]; }
-  function seg(h0, h1, r){ var a = pt(h0, r), b = pt(h1, r); return 'M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + r + ' ' + r + ' 0 0 1 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2); }
-  function ring(r, w, el, step){
-    step = step || 0.25;
-    var s = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + skyCol(el(nw - lh*H)) + '" stroke-width="' + w + '"/>';
-    for(var h0=0; h0<24; h0+=step) s += '<path d="' + seg(h0 - 0.04, h0 + step + 0.04, r) + '" fill="none" stroke="' + skyCol(el(nw + (h0 + step/2 - lh)*H)) + '" stroke-width="' + w + '"/>';
-    return s;
+function tunnelSVG(Pl, C, nw, big){
+  var days = big ? 6 : 4, D = tunnelData(Pl, C, nw, days, big ? 10 : 20), id = 't' + (dialN++);
+  var W = big ? 300 : 156, cx = W/2, cy = W/2, R0 = big ? 132 : 64, k = 0.74, fr = R0 + (big ? 9 : 6), fw = big ? 5 : 4;
+  function polar(r, deg){ var a = (deg - 90)*Math.PI/180; return [cx + r*Math.cos(a), cy + r*Math.sin(a)]; }
+  function rOf(age){ return R0*Math.pow(k, age/24); }
+  var P = D.map(function(p){ var age = (nw - p.t)/H; return {p:p, ang:p.body*15 + 180, rO:rOf(age), rI:rOf(age + 24), age:age}; });
+  function quad(a, b, f0, f1, col){
+    var q = [polar(a.rI + (a.rO - a.rI)*f1, a.ang), polar(b.rI + (b.rO - b.rI)*f1, b.ang), polar(b.rI + (b.rO - b.rI)*f0, b.ang), polar(a.rI + (a.rO - a.rI)*f0, a.ang)];
+    return '<path d="M' + q.map(function(z){ return z[0].toFixed(1) + ',' + z[1].toFixed(1); }).join('L') + 'Z" fill="' + col + '" stroke="' + col + '" stroke-width=".6"/>';
   }
-  function shiftAt(t){ var q = C.at(Math.max(C.R.t0, Math.min(C.R.t1, t))); return q.eff - q.homeOff; }
-  var here = function(tau){ return BC.sunElev(tau, pl.lat, pl.lon); };
-  var shN = shiftAt(nw);
-  var body = function(tau){ return BC.sunElev(tau + shN*H, home.lat, home.lon); };
-  var homeL = function(tau){ return BC.sunElev(tau, home.lat, home.lon); };
-  var s = '<svg class="dial" viewBox="0 0 340 340" role="img" aria-label="Body clock with the days before">';
-  var rO = 146, wO = 12, rB = 92, wB = 18, rH = 36, wH = 12, tw = 4, tg = 1.6;
-  s += ring(rO, wO, here);
-  /* where you were, k days ago, on today's clock */
-  for(var k1=1;k1<=ND;k1++){ (function(k){
-    var r = rO - wO/2 - 4 - tw/2 - (k - 1)*(tw + tg);
-    s += ring(r, tw, function(tau){ var tt = tau - k*24*H, q = Pl.E.locAt(tt); return BC.sunElev(tt, q.lat, q.lon); }, 0.5);
-  })(k1); }
-  s += ring(rB, wB, body);
-  /* your body's day, k days ago */
-  for(var k2=1;k2<=ND;k2++){ (function(k){
-    var r = rB - wB/2 - 4 - tw/2 - (k - 1)*(tw + tg), sh = shiftAt(nw - k*24*H);
-    s += ring(r, tw, function(tau){ return BC.sunElev(tau - k*24*H + sh*H, home.lat, home.lon); }, 0.5);
-  })(k2); }
-  s += ring(rH, wH, homeL);
-  s += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (rB + wB/2 + 0.6) + '" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.3"/><circle cx="' + cx + '" cy="' + cy + '" r="' + (rB - wB/2 - 0.6) + '" fill="none" stroke="var(--label)" stroke-opacity=".55" stroke-width="1.3"/>';
-  var R = [[rO, pl.name, 10], [rB, 'Your body', 12], [rH, pl.ap && pl.ap.code === home.code ? 'Home' : shortCity(home), 9]], defs = '<defs>', labs = '';
-  R.forEach(function(r, i){
-    var rb = r[0] + r[2]*0.36, a = pt(6, rb), b = pt(18, rb);
-    defs += '<path id="' + id + 'p' + i + '" d="M' + a[0].toFixed(2) + ' ' + a[1].toFixed(2) + 'A' + rb + ' ' + rb + ' 0 0 0 ' + b[0].toFixed(2) + ' ' + b[1].toFixed(2) + '"/>';
-    labs += '<text font-size="' + r[2] + '" font-weight="700" letter-spacing=".05em" fill="#fff" stroke="rgba(0,0,0,.55)" stroke-width="2.6" paint-order="stroke" stroke-linejoin="round"><textPath href="#' + id + 'p' + i + '" startOffset="50%" text-anchor="middle">' + esc(r[1].toUpperCase()) + '</textPath></text>';
+  var g = '';
+  for(var n=0;n<P.length-1;n++){
+    var a = P[n], b0 = P[n+1], d = b0.ang - a.ang;
+    if(d > 180) d -= 360; if(d < -180) d += 360;
+    if(Math.abs(d) > 12) continue;
+    var b = {rO:b0.rO, rI:b0.rI, ang:a.ang + d};
+    g += quad(a, b, 0.06, 1, skyTone(a.p.el));
+    if(a.p.sl) g += quad(a, b, 0.06, 0.3, 'var(--sleep)');
+    if(a.p.fl) g += quad(a, b, 0.88, 1, 'var(--label)');
+  }
+  /* depth: the far end of the tunnel fades into the card */
+  var defs = '<defs><radialGradient id="' + id + 'v"><stop offset="0" style="stop-color:var(--card);stop-opacity:1"/><stop offset=".25" style="stop-color:var(--card);stop-opacity:.85"/><stop offset=".55" style="stop-color:var(--card);stop-opacity:.15"/><stop offset=".8" style="stop-color:var(--card);stop-opacity:0"/></radialGradient></defs>';
+  g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R0 + '" fill="url(#' + id + 'v)"/>';
+  /* the frame: your body's usual day */
+  var wh = +S.wake.slice(0, 2) + (+S.wake.slice(3))/60, bh = +S.bed.slice(0, 2) + (+S.bed.slice(3))/60, aW = wh*15 + 180, aB = (bh < wh ? bh + 24 : bh)*15 + 180;
+  var p0 = polar(fr, aW), p1 = polar(fr, aB);
+  g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + fr + '" fill="none" stroke="var(--skfr)" stroke-width="' + fw + '"/>' +
+       '<path d="M' + p0[0].toFixed(1) + ',' + p0[1].toFixed(1) + 'A' + fr + ',' + fr + ' 0 ' + ((aB - aW) % 360 > 180 ? 1 : 0) + ' 1 ' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1) + '" fill="none" stroke="var(--skbody)" stroke-width="' + fw + '"/>';
+  [[aW, 'Wake'], [aB, 'Sleep']].forEach(function(m){
+    var q0 = polar(fr - fw - 1, m[0]), q1 = polar(fr + fw + 1, m[0]), qt = polar(fr + (big ? 16 : 0), m[0]);
+    g += '<line x1="' + q0[0].toFixed(1) + '" y1="' + q0[1].toFixed(1) + '" x2="' + q1[0].toFixed(1) + '" y2="' + q1[1].toFixed(1) + '" stroke="var(--label)" stroke-width="' + (big ? 2 : 1.6) + '"/>';
+    if(big) g += '<text x="' + qt[0].toFixed(1) + '" y="' + (qt[1] + 4).toFixed(1) + '" font-size="11" fill="var(--label)" text-anchor="' + (qt[0] < cx - 10 ? 'end' : qt[0] > cx + 10 ? 'start' : 'middle') + '">' + m[1] + '</text>';
   });
-  s += defs + '</defs>' + labs;
-  /* day marks on the thin rings, at 03:00 */
-  for(var k3=1;k3<=ND;k3++){
-    var q1 = pt(15, rO - wO/2 - 4 - tw/2 - (k3 - 1)*(tw + tg)), q2 = pt(15, rB - wB/2 - 4 - tw/2 - (k3 - 1)*(tw + tg));
-    if(k3 === 1 || k3 === ND){ var dl = BC.dow(pl.tz, nw - k3*24*H); s += '<text x="' + (q1[0] + 5).toFixed(1) + '" y="' + (q1[1] + 3).toFixed(1) + '" font-size="9" font-weight="600" fill="var(--label)" stroke="var(--card)" stroke-width="3" paint-order="stroke">' + esc(dl) + '</text>'; }
+  /* sunrise and sunset where you are, on today's turn */
+  var sun = {};
+  for(var m2=1;m2<P.length;m2++){
+    var u = P[m2-1], v = P[m2]; if(v.age >= 24) continue;
+    var up = u.p.el < -0.833 && v.p.el >= -0.833, down = u.p.el >= -0.833 && v.p.el < -0.833;
+    if(!up && !down) continue;
+    sun[up ? 'rise' : 'set'] = v.p.body;
+    var qs = polar((v.rO + v.rI)/2, v.ang);
+    g += '<circle cx="' + qs[0].toFixed(1) + '" cy="' + qs[1].toFixed(1) + '" r="' + (big ? 7 : 4.5) + '" fill="' + (up ? 'var(--sunc)' : 'var(--sk2)') + '" stroke="var(--card)" stroke-width="1.5"/>';
+    if(big){ var qt2 = polar(v.rO - 14, v.ang); g += '<text x="' + qt2[0].toFixed(1) + '" y="' + (qt2[1] + 4).toFixed(1) + '" font-size="10" font-weight="700" fill="var(--label)" text-anchor="middle" stroke="var(--card)" stroke-width="3" paint-order="stroke">' + (up ? 'Sunrise' : 'Sunset') + '</text>'; }
   }
-  [[6, '06'], [18, '18'], [0, '00']].forEach(function(l){ var q = pt(l[0], 162); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="12" text-anchor="middle" fill="var(--sec)">' + l[1] + '</text>'; });
-  s += sunIco(cx, 10, 4.5);
-  var e = pt(lh, 156); s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) + '" stroke="var(--tint)" stroke-width="3" stroke-linecap="round"/><circle cx="' + cx + '" cy="' + cy + '" r="4.5" fill="var(--tint)"/>';
-  return {svg:s + '</svg>', days:ND};
+  /* where you arrived, on the last three days (big only) */
+  if(big){
+    var last = null, labs = [];
+    P.forEach(function(z){
+      if(!z.p.city){ last = null; return; }
+      if(z.p.city === last) return; last = z.p.city;
+      if(z.age > 3*24) return;
+      var q = polar((z.rO + z.rI)/2, z.ang);
+      if(labs.some(function(w){ return Math.hypot(w[0] - q[0], w[1] - q[1]) < 34; })) return; labs.push(q);
+      g += '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="3" fill="var(--label)"/><text x="' + (q[0] + 6).toFixed(1) + '" y="' + (q[1] - 6).toFixed(1) + '" font-size="' + Math.max(9, 13*((z.rO + z.rI)/2)/R0 + 2).toFixed(0) + '" font-weight="600" fill="var(--label)" stroke="var(--card)" stroke-width="3" paint-order="stroke">' + esc(z.p.city) + '</text>';
+    });
+  }
+  /* now, at the outer edge */
+  var pn = P[P.length - 1], qn = polar(fr, pn.ang);
+  g += '<circle cx="' + qn[0].toFixed(1) + '" cy="' + qn[1].toFixed(1) + '" r="' + (big ? 6 : 4.5) + '" fill="var(--tint)" stroke="var(--card)" stroke-width="2"/>';
+  if(big) [[0, '12'], [90, '18'], [180, '00'], [270, '06']].forEach(function(l){ var q = polar(fr + 28, l[0]); if(Math.abs(l[0] - 270) < 1 || Math.abs(l[0] - 90) < 1) q = polar(fr + 30, l[0]); g += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" font-size="11" fill="var(--sec)" text-anchor="middle">' + l[1] + '</text>'; });
+  var x = C.at(Math.max(C.R.t0, Math.min(C.R.t1, nw)));
+  g += '<text x="' + cx + '" y="' + (cy - (big ? 10 : 4)) + '" font-size="' + (big ? 12 : 8) + '" fill="var(--sec)" text-anchor="middle">Your body</text>' +
+       '<text x="' + cx + '" y="' + (cy + (big ? 12 : 9)) + '" font-size="' + (big ? 24 : 14) + '" font-weight="700" fill="var(--label)" text-anchor="middle">' + hh(x.bodyH) + '</text>';
+  var pad = big ? 52 : 6, vb = (-pad) + ' ' + (-pad) + ' ' + (W + 2*pad) + ' ' + (W + 2*pad);
+  return {svg:'<svg class="' + (big ? 'tunnel' : 'dial') + '" viewBox="' + vb + '" role="img" aria-label="Body clock: your body’s time ' + hh(x.bodyH) + (sun.rise != null ? ', sunrise here at ' + hh(sun.rise) + ' on your body’s clock' : '') + (sun.set != null ? ', sunset at ' + hh(sun.set) : '') + '">' + defs + g + '</svg>', sun:sun, days:days};
 }
 function clockCard(Pl, nw){
   var C = BC.clock(S, nw);
@@ -734,7 +738,7 @@ function clockCard(Pl, nw){
   var line = function(k, v){ return '<div class="lab" style="display:flex;gap:6px;margin-top:2px"><b style="color:var(--label);font-weight:600">' + esc(k) + '</b>' + esc(v) + '</div>'; };
   var foot = C.back && C.adaptedBy && C.adaptedBy > nw ? '<div class="lab" style="margin-top:6px">Back in step with ' + esc(shortCity(home)) + ' about ' + esc(BC.dow(home.tz, C.adaptedBy)) + '.</div>' : '';
   return '<button class="card" type="button" data-go="chart/clock" style="border:0;text-align:left;width:100%;cursor:pointer;padding:14px 16px">' +
-    '<div class="dialrow">' + dial3SVG(Pl, C, nw, true) + '<div style="flex:1;min-width:0"><div class="eyebrow">Body clock</div><div style="font-size:20px;font-weight:600;line-height:25px;margin-bottom:4px">' + esc(big) + (pl.fl ? '' : ' <span style="font-weight:400;color:var(--sec);font-size:15px">' + (Math.abs(x.gap) < 0.25 ? 'with ' : x.gap < 0 ? 'of ' : '') + esc(pl.name) + '</span>') + '</div>' +
+    '<div class="dialrow">' + tunnelSVG(Pl, C, nw, false).svg + '<div style="flex:1;min-width:0"><div class="eyebrow">Body clock</div><div style="font-size:20px;font-weight:600;line-height:25px;margin-bottom:4px">' + esc(big) + (pl.fl ? '' : ' <span style="font-weight:400;color:var(--sec);font-size:15px">' + (Math.abs(x.gap) < 0.25 ? 'with ' : x.gap < 0 ? 'of ' : '') + esc(pl.name) + '</span>') + '</div>' +
     line(pl.name, BC.hm(pl.tz, nw)) + line('Body', hh(x.bodyH)) + (atHome ? '' : line(shortCity(home), BC.hm(home.tz, nw))) + foot + '</div>' + I.chev + '</div></button>';
 }
 
@@ -1305,15 +1309,17 @@ function viewChart(){
   var F = Pl.flights, a, b, tz;
   if(M === 'clock'){
     var C = BC.clock(S, nw);
-    var big = dialBigSVG(Pl, C, Math.min(Math.max(nw, C.R.t0), C.R.t1));
-    h += '<figure class="chart" style="padding:14px 10px 12px">' + big.svg.replace('class="dial"', 'class="dial" style="width:100%;height:auto;display:block"') +
-         '<p class="foot" style="margin:8px 6px 0">Three labelled rings, on today’s local clock: where you are, <b>your body</b>, and home. ' + (big.days ? 'The thin rings are the ' + big.days + ' day' + (big.days > 1 ? 's' : '') + ' before, newest on the outside. Outer group: where you were. When they line up with the outer ring you’ve been in this time zone that long. Inner group: your body’s day, drifting from home towards now.' : '') + ' When the body ring lines up with the outer ring, you’ve adjusted.</p></figure>';
+    var big = tunnelSVG(Pl, C, nw, true), sun = big.sun;
+    h += '<figure class="chart" style="padding:14px 10px 12px">' + big.svg +
+         '<div class="legend" style="padding:4px 10px 0"><span><span class="sw10" style="background:var(--sk1)"></span>Daylight where you were</span><span><span class="sw10" style="background:var(--sk5)"></span>Night</span><span><span class="sw10" style="background:var(--sleep)"></span>Sleep</span><span><span class="sw10" style="background:var(--label)"></span>Flying</span></div>' +
+         '<p class="foot" style="margin:8px 6px 0">' + (sun.rise != null || sun.set != null ? 'Today ' + (sun.rise != null ? 'sunrise came at ' + hh(sun.rise) : '') + (sun.rise != null && sun.set != null ? ' and ' : '') + (sun.set != null ? 'sunset at ' + hh(sun.set) : '') + ' on your body’s clock. ' : '') +
+         'Your body’s clock is fixed, noon at the top: in step, sunrise sits near 9 o’clock and sunset near 3. Each turn in is a day earlier, smaller toward the centre, with the last ' + big.days + ' days shown. The frame outside is your body’s usual day, from your wake time to your bedtime.</p></figure>';
     var rows = [], x = C.at(nw), Ln = E.locAt(nw);
     if(nw >= C.R.t0 && nw <= C.R.t1) rows.push(['Now', 'Your body thinks it’s ' + hh(x.bodyH), gapPhrase(x.gap, Ln.fl ? 'local time' : (Ln.ap || E.home).city)]);
     F.forEach(function(f){ if(f.role !== 'operate' || f.b < nw) return; var xf = C.at(f.b); rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b), gapPhrase(xf.gap, f.t.city)]); });
     if(C.back) rows.push(['Back in step with ' + E.home.city, 'Within 30 minutes of home time', C.adaptedBy ? (C.adaptedBy <= nw ? 'Done' : 'About ' + BC.dayShort(E.home.tz, C.adaptedBy)) : 'More than a week']);
     h += '<div class="list" style="margin-top:14px">' + rows.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val" style="max-width:48%">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
-    h += '<p class="foot">Daylight moves the middle ring, in the model about an hour a day when the gap is big and slower as it closes. Being outside in local morning light speeds it up. The model counts daylight only, not meals, exercise or melatonin, and people vary a lot.</p>';
+    h += '<p class="foot">Daylight moves your body’s clock, in the model about an hour a day when the gap is big and slower as it closes. Being outside in local morning light speeds it up. The model counts daylight only, not meals, exercise or melatonin, and people vary a lot.</p>';
     return h;
   }
   var land = V.chartView === 'land' && target;
