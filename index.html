@@ -203,7 +203,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 49';
+var BUILD = '5 Nov 2026 · build 50';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -1200,13 +1200,13 @@ function viewLay(id){
   shown.forEach(function(o){
     var m = o.m;
     h += '<button class="opt" type="button" aria-pressed="' + (o.id === sel) + '" data-act="pick" data-id="' + esc(id) + '" data-opt="' + o.id + '">' +
-         '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : '') + '</span>' +
+         '<span style="display:flex;align-items:center;gap:10px"><span class="radio"></span><span style="flex:1;font-size:17px;font-weight:600">' + esc(o.name) + '</span>' + (o.id === L.suggested ? '<span class="badge">Suggested</span>' : o.safer ? '<span class="badge" style="background:var(--fill);color:var(--label)">Safer bet</span>' : '') + '</span>' +
          '<span style="font-size:15px;line-height:20px;color:var(--sec);font-variant-numeric:tabular-nums">' + esc(o.blocks.length ? o.blocks.map(function(b){ return b.open ? 'Wake ' + (sameDay(tz, b.b, L.arr) ? '' : BC.dow(tz, b.b) + ' ') + BC.hm(tz, b.b) : (b.kind === 'main' ? 'Sleep ' : 'Nap ') + (sameDay(tz, b.a, L.arr) ? '' : BC.dow(tz, b.a) + ' ') + BC.hm(tz, b.a) + '–' + BC.hm(tz, b.b); }).join(' · ') : 'Stay up until you leave') + '</span>' +
          '<span class="two" style="gap:14px">' +
          (m.outMin != null && L.out && L.out.ne > now() ? '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Crew meetup</span><b>' + BC.word(m.outMin) + ' · ' + Math.round(m.outMin) + '</b></span><span class="meter"><i style="left:' + pos(m.outMin) + '"></i></span></span>'
                            : '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Lowest in flight</span><b>' + BC.word(m.fmin) + ' · ' + Math.round(m.fmin) + '</b></span><span class="meter"><i style="left:' + pos(m.fmin) + '"></i></span></span>') +
          '<span style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--sec)">Landing</span><b>' + BC.word(m.land) + ' · ' + Math.round(m.land) + '</b></span><span class="meter"><i style="left:' + pos(m.land) + '"></i></span></span></span>' +
-         (restWordOf(L, o) ? '<span style="font-size:13px;line-height:18px"><b>Your crew rest:</b> ' + esc(restWordOf(L, o)) + '</span>' : '') +
+         (restWordOf(L, o) ? '<span style="font-size:13px;line-height:18px"><b>Your crew rest:</b> ' + esc(restWordOf(L, o)) + (o.safer ? '. Nearly as good, and less rides on one sleep: if the nap does not come, you still have the bunk.' : '') + '</span>' : '') +
          '<span style="font-size:13px;line-height:18px;color:var(--sec)">' + esc(noteFor(L, o)) + '</span></button>';
   });
   /* nap or push through: when the nap before you leave is the plan, say what skipping it would do */

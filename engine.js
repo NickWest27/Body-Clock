@@ -597,7 +597,7 @@ function evalPlan(E, L, base, blocks, scoreRest, ck){
           outMin:outMin, ease:ease, bad:bad, awakeAtBed:(main && lastWake != null) ? (main.a - lastWake)/H : null, run:R};
 }
 
-var NAMES = {none:'No nap', now:'Nap now', later:'Nap later', both:'Short nap now, nap later'};
+var NAMES = {none:'No nap', now:'Nap now', later:'Nap later', short:'Short nap later', both:'Short nap now, nap later'};
 /* Plan the rest of a layover. fx.fixed are sleeps you logged (done), fx.open is a sleep you are in now
    (no wake time yet), fx.skips are planned sleeps you said you did not take, fx.T is the moment
    from which the plan may still change (after the last thing you logged). */
@@ -683,7 +683,7 @@ function planLayover(E, L, base, fx){
         var lateNaps = [];
         if(!lateDecided && !(on && !onArr)){
           [2, 3].forEach(function(endBefore){
-            [2, 3].forEach(function(len){
+            [1, 1.5, 2, 3].forEach(function(len){
               var e = L.we - endBefore*H, st = e - len*H;
               if(st >= lastB + 4*H && st >= T) lateNaps.push([st, e]);
             });
@@ -698,7 +698,8 @@ function planLayover(E, L, base, fx){
         }
         consider('none', pre.concat(lateOpen));
         arrNaps.filter(function(n){ return n[1] - n[0] >= 2.5*H; }).forEach(function(n){ consider('now', [blk(n[0], n[1], 'nap')].concat(pre)); });
-        lateNaps.forEach(function(ln){ consider('later', pre.concat([blk(ln[0], ln[1], 'nap')])); });
+        /* a nap of up to an hour and a half before you leave is its own choice: it leaves more sleep for the crew rest */
+        lateNaps.forEach(function(ln){ consider(ln[1] - ln[0] <= 1.5*H ? 'short' : 'later', pre.concat([blk(ln[0], ln[1], 'nap')])); });
         arrNaps.filter(function(n){ return n[1] - n[0] <= 2*H; }).forEach(function(n){
           lateNaps.forEach(function(ln){ consider('both', [blk(n[0], n[1], 'nap')].concat(pre, [blk(ln[0], ln[1], 'nap')])); });
         });
@@ -714,12 +715,13 @@ function planLayover(E, L, base, fx){
   var replan = fx.fixed.length || fx.skips.length || fx.open;
   function nameOf(k){
     if(openNap && openNap.a < cut) return k === 'now' ? 'Keep napping' : 'Short nap now, nap later';
-    if(!replan && !(k === 'later' && !opts.now)) return NAMES[k];
+    if(!replan && !((k === 'later' || k === 'short') && !opts.now)) return NAMES[k];
+    if(k === 'short') return mainF ? 'Short nap before you leave' : openMain ? 'Wake earlier, short nap later' : 'Sleep, then a short nap before you leave';
     if(k === 'none') return mainF ? 'Skip the nap' : openMain ? 'Sleep in, no nap' : 'One long sleep, no nap';
     if(k === 'later') return mainF ? 'Nap before you leave' : openMain ? 'Wake earlier, nap later' : 'Sleep, then nap before you leave';
     return NAMES[k];
   }
-  var list = ['custom', 'now', 'later', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
+  var list = ['custom', 'now', 'later', 'short', 'both', 'none'].filter(function(k){ return opts[k]; }).map(function(k){
     var o = opts[k];
     return {id:k, name:k === 'custom' ? 'Your plan' : nameOf(k), blocks:o.blocks.slice().sort(function(p, q){ return p.a - q.a; }), m:o.res};
   });
@@ -737,8 +739,13 @@ function planLayover(E, L, base, fx){
     var clearly = x.m.net > y.m.net + 0.5 || x.m.land > y.m.land + 1 || x.m.fmin > y.m.fmin + 1;
     return ok && (clearly || better(x, y));
   }
+  /* how well you would sleep in your crew rest on the flight out (0 to 1, or null with none) */
+  function restG(o){ var ks = (o.m.run && o.m.run.bunks || []).filter(function(k){ return k.a >= L.outF.a && k.a < L.outF.b; }); return ks.length ? ks.reduce(function(m, k){ return m + k.g; }, 0)/ks.length : null; }
   list.forEach(function(o){
     if(o.id === 'custom' || (sug && o.id === sug.id)){ o.viable = true; return; }
+    /* a safer split: about as good as the best, and much better sleep in your crew rest, so less rides on one sleep */
+    var gS = sug ? restG(sug) : null, gO = restG(o);
+    if(sug && !o.m.bad && gS != null && gO != null && gO - gS >= 0.3 && o.m.fmin >= sug.m.fmin - 1.5 && o.m.land >= sug.m.land - 1.5 && o.m.net >= sug.m.net - 3){ o.viable = true; o.safer = true; return; }
     o.viable = !o.m.bad && (!sug || o.m.net >= sug.m.net - 8) &&
                !list.some(function(x){ return x !== o && x.id !== 'custom' && (!x.m.bad || (sug && x.id === sug.id)) && beats(x, o); });
   });
