@@ -54,7 +54,7 @@ h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing
 .card{background:var(--card);border-radius:22px;padding:18px 20px 16px}
 .list{background:var(--card);border-radius:16px;overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;padding:10px 16px;min-height:52px;width:100%;border:0;background:none;text-align:left;color:var(--label);cursor:pointer;font-size:17px}
-.row+.row,.row+.subrow+.row{border-top:1px solid var(--sep)}
+.row+.row,.row+.restcard+.row{border-top:1px solid var(--sep)}
 .row.static{cursor:default}
 .row .main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
 .row .t1{font-size:17px}
@@ -62,8 +62,17 @@ h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing
 .row .t2{font-size:15px;color:var(--sec);font-variant-numeric:tabular-nums}
 .row .t3{font-size:13px;color:var(--sec)}
 .row .val{font-size:17px;color:var(--sec);text-align:right}
-.subrow{display:flex;align-items:center;gap:10px;padding:0 16px 12px;font-size:15px;color:var(--sec);border:0;background:none;width:100%;text-align:left;cursor:pointer;min-height:32px}
-.subrow.link{color:var(--tint)}
+.restcard{display:flex;align-items:center;gap:12px;width:calc(100% - 88px);margin:0 16px 14px 72px;padding:10px 12px;border:0;border-radius:14px;background:var(--sleepbg);color:var(--label);font:inherit;text-align:left;cursor:pointer}
+.restcard .rc-ico{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--sleep);color:#fff}
+.restcard .rc-ico svg{width:18px;height:18px}
+.restcard .main{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.restcard .t1{font-size:16px;font-weight:600}
+.restcard .t3{font-size:14px;color:var(--sec);font-variant-numeric:tabular-nums;line-height:1.3}
+.restcard.todo{background:var(--fill)}
+.restcard.todo .rc-ico{background:var(--tint)}
+.restcard.todo .t1{color:var(--tint)}
+.restcard.past{opacity:.6}
+@media (max-width:360px){.restcard{margin-left:16px;width:calc(100% - 32px)}}
 .chev{width:18px;height:18px;flex:none;color:var(--ter)}
 .grp-h{margin:18px 16px 6px;font-size:13px;color:var(--sec);text-transform:uppercase}
 .grp-h.day{margin:18px 4px 6px;font-weight:600;letter-spacing:.02em}
@@ -191,7 +200,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 44';
+var BUILD = '5 Nov 2026 · build 45';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -578,6 +587,22 @@ function pendingBlock(Pl){
 /* ---------- why text for a planned block ---------- */
 /* sleep debt to the nearest half hour, or '' when under 45 minutes */
 function debtTxt(d){ return d >= 0.75 ? 'About ' + (Math.round(d*2)/2) + ' h' : ''; }
+/* the crew rest card under an operated flight on Trip */
+function restCard(f, past){
+  var t1, t2, set = !!f.restWin;
+  if(set && f.restAuto && f.crewPlan){
+    var rb = f.restBreaks[0], n = BC.restSlots(f.r.crew);
+    t1 = 'Crew rest · Rest ' + f.crewPlan.slot + ' of ' + n + (f.restBreaks.length > 1 ? ', twice' : '');
+    t2 = BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z · wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z<br>' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, rb.a) + '–' + BC.hm(f.f.tz, rb.b);
+  } else if(set){
+    t1 = 'Crew rest';
+    t2 = BC.hm('UTC', f.restWin[0]).replace(':', '') + '–' + BC.hm('UTC', f.restWin[1]).replace(':', '') + 'Z<br>' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, f.restWin[0]) + '–' + BC.hm(f.f.tz, f.restWin[1]);
+  } else {
+    t1 = 'Set up crew rest';
+    t2 = 'Pick the crew and your rest' + (f.rest ? '. Until then the plan assumes ' + hrsTxt(f.rest) + '.' : '.');
+  }
+  return '<button class="restcard' + (set ? '' : ' todo') + (past ? ' past' : '') + '" type="button" data-go="rest/' + f.id + '"><span class="rc-ico">' + (set ? I.moon : I.timer) + '</span><span class="main"><span class="t1">' + t1 + '</span><span class="t3">' + t2 + '</span></span>' + I.chev + '</button>';
+}
 function whyFor(Pl, s){
   var L = layOfBlock(Pl, s);
   if(s.kind === 'home') return 'Back on your usual night at home.';
@@ -981,9 +1006,7 @@ function tlRow(Pl, it, nw){
     var h = row('data-go="flight/' + f.id + '"', 'var(--flight)', I.plane.replace('stroke="currentColor"', 'stroke="var(--card)"'), '<b>' + esc(f.f.code + ' → ' + f.t.code) + '</b>',
       'Lands ' + whenTxt(f.t.tz, f.b, f.a) + ' ' + BC.zabbr(f.t.tz, f.b) + ' · ' + durTxt(f.b - f.a), right);
     if(f.role === 'operate'){
-      h += f.restWin ? '<button class="subrow' + (past ? ' past' : '') + '" type="button" data-go="rest/' + f.id + '" style="padding-left:84px"><span style="color:var(--sleep)">' + I.moon + '</span>' + (function(){ var rb = f.restAuto && f.restBreaks ? f.restBreaks[0] : {a:f.restWin[0], b:f.restWin[1], wake:f.restWin[1]};
-          return (f.restAuto && f.crewPlan ? 'Your break (rest ' + f.crewPlan.slot + (f.restBreaks.length > 1 ? ', twice' : '') + ') ' : 'Crew rest ') + BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z' + (rb.wake !== rb.b ? ', wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z' : '') + ' · ' + esc(shortCity(f.f)) + ' ' + BC.hm(f.f.tz, rb.a) + '–' + BC.hm(f.f.tz, rb.b); })() + '</button>'
-                     : '<button class="subrow link" type="button" data-go="rest/' + f.id + '" style="padding-left:84px">' + I.timer + 'Crew rest: set alarm once you know it</button>';
+      h += restCard(f, past);
     }
     return h;
   }
@@ -1360,14 +1383,11 @@ function viewRest(id){
     });
     h += '<p class="foot">' + (manual ? 'Using the times you typed. ' : cp ? 'The alarm is the wake-up call, ' + rule.wake + ' min before your rest ends. ' : '') + esc(dep) + ' time is the clock you left on.</p>';
   }
-  /* typing the times by hand */
-  h += '<h2 class="grp-h">' + (cp ? 'Or type your rest (UTC)' : 'Your rest, as given (UTC)') + '</h2><div class="list">' +
-       '<label class="row static"><span class="main"><span class="t1">Start</span></span><input class="pill" type="time" step="300" id="rs" value="' + esc(r.s || '') + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">End</span></span><input class="pill" type="time" step="300" id="re" value="' + esc(r.e || '') + '"></label></div>';
-  if(manual) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="clearRest" data-id="' + f.id + '">' + (cp ? 'Use the crew plan again' : 'Clear crew rest') + '</button></div>';
-  else if(!f.restWin && (r.s || r.e)) h += '<p class="err">Those times do not fall inside this flight (' + BC.hm('UTC', f.a) + '–' + BC.hm('UTC', f.b) + ' UTC).</p>';
+  /* rest typed by hand in an earlier build (only on a flight without a crew plan) */
+  if(manual && !cp) h += '<h2 class="grp-h">Rest you typed earlier</h2><div class="list"><div class="row static"><span class="main"><span class="t1">' + esc(r.s.replace(':', '') + '–' + r.e.replace(':', '') + 'Z') + '</span><span class="t3">Pick the crew above to use a crew plan instead</span></span></div>' +
+                       '<button class="row" type="button" data-act="clearRest" data-id="' + f.id + '" style="color:var(--danger)">Remove it</button></div>';
   if(!f.restWin && !cp){
-    h += '<p class="foot">Set the crew and which rest you take on the flight and the app works out your break, or type it here once it is set onboard. Until then the plan assumes ' + (f.rest ? hrsTxt(f.rest) + ' in the middle of the flight' : 'no crew rest') + '.</p>' +
+    h += '<p class="foot">Pick the crew and your rest above and the app works out your rest. Until then the plan assumes ' + (f.rest ? hrsTxt(f.rest) + ' in the middle of the flight' : 'no crew rest') + '.</p>' +
          '<div class="list"><div class="row static"><span class="main"><span class="t1">Expected rest</span></span><span class="val" style="color:var(--label)">' + (f.rest ? hrsTxt(f.rest) : 'None') + '</span>' +
          '<span class="stepper"><button type="button" data-act="rest" data-id="' + f.id + '" data-d="-0.5" aria-label="Less">−</button><span></span><button type="button" data-act="rest" data-id="' + f.id + '" data-d="0.5" aria-label="More">+</button></span></div></div>';
   }
@@ -1559,7 +1579,7 @@ function saveSleep(){
 function exampleTrip(){
   S.flights = [
     {id:1, from:'ATL', to:'DFW', dep:'2026-10-15T16:00', arr:'2026-10-15T17:30', role:null, rest:0},
-    {id:2, from:'DFW', to:'GRU', dep:'2026-10-15T20:45', arr:'2026-10-16T09:00', role:null, rest:3, restUTC:{s:'02:00', e:'05:00'}},
+    {id:2, from:'DFW', to:'GRU', dep:'2026-10-15T20:45', arr:'2026-10-16T09:00', role:null, rest:3, crew:3, slot:1},
     {id:3, from:'GRU', to:'DFW', dep:'2026-10-17T22:00', arr:'2026-10-18T06:30', role:null, rest:3},
     {id:4, from:'DFW', to:'ATL', dep:'2026-10-18T09:30', arr:'2026-10-18T12:42', role:null, rest:0}];
   S.lay = {}; S.actual = []; S.skips = []; save();
@@ -1586,7 +1606,7 @@ function tidyRules(raw){
 function crewRestTap(b){
   var raw = S.flights.filter(function(x){ return String(x.id) === String(V.arg); })[0]; if(!raw) return;
   var k = b.dataset.cr, cur = BC.rulesOf(S, raw);
-  if(k === 'crew'){ raw.crew = +b.dataset.v; var ns = BC.restSlots(raw.crew); raw.slot = Math.min(BC.slotOf(raw), ns); delete raw.seat; }
+  if(k === 'crew'){ raw.crew = +b.dataset.v; var ns = BC.restSlots(raw.crew); raw.slot = Math.min(BC.slotOf(raw), ns); delete raw.seat; delete raw.restUTC; }
   else if(k === 'slot'){ raw.slot = +b.dataset.v; delete raw.seat; S.lastSlot = raw.slot; }
   else if(k === 'each') raw.each = +b.dataset.v;
   else if(k === 'round'){ cur.round = cur.round === 5 ? 1 : 5; raw.rules = cur; }
@@ -1898,12 +1918,6 @@ function onChange(e){
       else if(dg !== ''){ var cs = BC.rulesOf(S, rawR); cs.start = Math.min(120, +dg); rawR.rules = cs; }
     } else if(dg !== ''){ var ce = BC.rulesOf(S, rawR); ce.end = Math.min(180, +dg); rawR.rules = ce; }
     tidyRules(rawR); save(); render(); return;
-  }
-  if(id === 'rs' || id === 're'){
-    var raw = S.flights.filter(function(x){ return String(x.id) === String(V.arg); })[0]; if(!raw) return;
-    var s = $('#rs').value, en = $('#re').value;
-    if(s || en) raw.restUTC = {s:s, e:en}; else delete raw.restUTC;
-    save(); render(); return;
   }
   if(id === 'impFile'){ var f = t.files && t.files[0]; if(f) restoreFile(f); t.value = ''; }
 }

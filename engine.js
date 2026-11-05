@@ -269,12 +269,13 @@ function flightsOf(S){
     var van = r.van ? localToMs(f.tz, r.van) : NaN;
     var x = {id:r.id, r:r, f:f, t:t, a:a, b:b, role:role, rest:role === 'operate' ? (+r.rest || 0) : 0, restWin:null, van:(van < a && van > a - 8*H) ? van : null};
     x.crewPlan = role === 'operate' ? crewPlan(S, x) : null;
-    if(x.crewPlan && x.crewPlan.mine && x.crewPlan.mine.length && !(r.restUTC && r.restUTC.s && r.restUTC.e)){
+    if(x.crewPlan && x.crewPlan.mine && x.crewPlan.mine.length){
       x.restWins = x.crewPlan.mine.map(function(m){ return [m.a, m.wake]; });
       x.restBreaks = x.crewPlan.mine;
       x.restWin = x.restWins[0]; x.restAuto = true;
     }
-    if(r.restUTC && r.restUTC.s && r.restUTC.e){
+    /* rest times typed by hand in earlier builds count only on a flight without a crew plan */
+    if(!x.restAuto && r.restUTC && r.restUTC.s && r.restUTC.e){
       var day = isoUTC(a).slice(0,10), s = NaN;
       for(var k=-1;k<=1 && isNaN(s);k++){
         var c = parseLocal(addDays(day, k) + 'T' + r.restUTC.s);
