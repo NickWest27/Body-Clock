@@ -203,7 +203,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '5 Nov 2026 · build 50';
+var BUILD = '6 Nov 2026 · build 51';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -769,9 +769,8 @@ function zoneTz(Pl, zone, ms){
   return q.fl ? q.flight.f.tz : q.tz;
 }
 function zoneLabel(Pl, zone, ms){
-  var tz = zoneTz(Pl, zone, ms), city = '';
+  var tz = zoneTz(Pl, zone, ms);
   if(zone === 'utc') return 'UTC (Zulu)';
-  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === tz){ city = AIRPORTS[k][0]; return true; } return false; });
   return cityOfTz(tz) + ' time';
 }
 function zoneSeg(act, zone, ms){
@@ -792,14 +791,13 @@ function openAdjust(a0, b0, kind){
 function renderAdj(){
   var box = $('#sheet');
   if(!V.adj){ box.innerHTML = ''; return; }
-  var c = V.calc, cr = V.calcRes, fresh = cr && cr.key === calcKey(c), Pl = P(), nw = now(), city = '';
-  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === c.tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  var c = V.calc, cr = V.calcRes, fresh = cr && cr.key === calcKey(c), Pl = P(), nw = now(), city = cityOfTz(c.tz);
   var h = '<div class="sheet" data-act="adjBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Change sleep"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="adjCancel" style="justify-self:start">Cancel</button><div class="ttl">Change sleep</div><span></span></div>' +
       '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span></span><input class="pill" type="datetime-local" id="adjBed" value="' + esc(c.bed) + '"></label>' +
       '<label class="row static"><span class="main"><span class="t1">Wake</span>' + (c.wakeAuto ? '<span class="t3" style="color:var(--tint)">Best for the flight</span>' : '') + '</span><input class="pill" type="datetime-local" id="adjWake" value="' + esc(c.wake) + '"></label>' +
       '<button class="row" type="button" data-act="adjBest" style="color:var(--tint);min-height:46px"' + (c.wakeAuto ? ' disabled' : '') + '>' + I.sun + 'Best wake-up for this bedtime</button></div>' +
-      '<p class="foot">' + esc(city ? city + ' time' : 'Local time') + '. The app planned ' + BC.hm(c.tz, V.adj.a0) + '–' + BC.hm(c.tz, V.adj.b0) + '.</p>';
+      '<p class="foot">' + esc(city) + ' time. The plan had ' + BC.hm(c.tz, V.adj.a0) + '–' + BC.hm(c.tz, V.adj.b0) + '.</p>';
   h += '<h2 class="grp-h" style="margin-top:14px">What happens</h2>';
   if(!fresh){
     h += '<div class="tl" style="padding:22px 16px;color:var(--sec)">Working…</div>';
@@ -816,7 +814,7 @@ function renderAdj(){
     else if(w.a <= nw) h += '<button class="btn sec" type="button" data-act="cLog">Log it: I fell asleep at ' + BC.hm(c.tz, w.a) + '</button>';
     var Lc = r.ctx.L, cfgc = Lc ? S.lay[Lc.id] : null;
     if(cfgc && (cfgc.custom || cfgc.choice)) h += '<button class="btn sec" type="button" data-act="adjReset" data-id="' + esc(Lc.id) + '">Back to the app’s plan</button>';
-    h += '</div><p class="foot">“vs plan” compares with the plan as it stands. The numbers compare choices; they are not a measurement.</p>';
+    h += '</div><p class="foot">The numbers are for comparing choices, not a measurement.</p>';
   }
   box.innerHTML = h + '</div></div>';
 }
@@ -873,7 +871,7 @@ function renderCaf(){
       '<div class="list">' + CAF_SIZES.map(function(z){ return '<button class="row" type="button" data-act="cafMg" data-v="' + z[0] + '"><span class="main"><span class="t1">' + z[1] + '</span><span class="t3">' + z[2] + '</span></span>' + (+c.mg === z[0] ? '<span style="color:var(--tint);font-weight:700">✓</span>' : '') + '</button>'; }).join('') + '</div>' +
       zoneSeg('cafZone', c.zone || 'local', BC.localToMs(c.tz, c.t)) +
       '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
-      '<p class="foot">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '. Type the time on whichever clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
+      '<p class="foot">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '. Pick the clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
   if(c.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cafDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete') + '</button></div>';
   box.innerHTML = h + '</div></div>';
 }
@@ -894,7 +892,7 @@ function viewNow(){
   var Pl = P(), nw = now(), E = Pl.E, h = '';
   var L = (nw >= E.t0 && nw <= E.t1) ? E.locAt(nw) : {tz:E.home.tz, ap:E.home, fl:false};
   var tz = L.tz, homeTz = E.home.tz;
-  var place = L.fl ? 'In flight · ' + L.flight.f.city : (L.ap ? L.ap.city : E.home.city);
+  var place = L.fl ? 'In flight · ' + shortCity(L.flight.f) : shortCity(L.ap || E.home);
   h += '<header style="padding:4px 4px 0"><div class="eyebrow">' + esc(BC.dayLong(tz, nw)) + '</div><h1>Now</h1>' +
        '<div class="sub">' + esc(place) + ' ' + BC.hm(tz, nw) + (BC.offH(tz, nw) !== BC.offH(homeTz, nw) ? ' · ' + esc(E.home.city) + ' ' + BC.hm(homeTz, nw) : '') + '</div></header>';
   if(V.flash) h += '<p class="msg" style="margin:0 4px">' + esc(V.flash) + '</p>';
@@ -909,12 +907,14 @@ function viewNow(){
   var cur = Pl.sleeps.filter(function(s){ return s.a <= nw && nw < s.b && !s.open && !s.actual; })[0];
   var nextS = Pl.sleeps.filter(function(s){ return s.a > nw && s.kind !== 'rest' && !s.actual; })[0];
   var inF = Pl.flights.filter(function(f){ return f.a <= nw && nw < f.b; })[0];
-  var heroUsed = null, pend = pendingBlock(Pl);
+  var heroUsed = null, pend = pendingBlock(Pl), pendL = pend ? layOfBlock(Pl, pend) : null;
+  /* once the flight out has left, the question no longer changes the plan */
+  if(pendL && nw >= pendL.dep) pend = null;
   if(pend && !Pl.open){
     var pL = layOfBlock(Pl, pend), ptz = pL ? pL.ap.tz : homeTz, pk = pend.kind === 'nap' ? 'nap' : 'sleep';
     h += '<section class="card" aria-label="Check what happened"><div class="hero-l" style="margin-bottom:8px">' + I.moon + 'Quick check</div>' +
          '<div style="font-size:22px;font-weight:600;line-height:28px">Did you ' + pk + ' ' + (sameDay(ptz, pend.a, nw) ? '' : BC.dow(ptz, pend.a) + ' ') + BC.hm(ptz, pend.a) + '–' + BC.hm(ptz, pend.b) + '?</div>' +
-         '<p class="why">Your answer re-plans the rest of the ' + (pL ? 'layover' : 'day') + '.</p>' +
+         '<p class="why">Your answer updates the rest of the ' + (pL ? 'layover' : 'day') + '.</p>' +
          '<div class="two" style="margin-top:12px;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><button class="btn small" type="button" data-act="yes" style="width:100%">Yes</button><button class="btn small sec" type="button" data-act="diff" style="width:100%">Other times</button><button class="btn small sec" type="button" data-act="no" style="width:100%">No</button></div></section>';
   }
   h += '<section class="card" aria-label="Do this now">';
@@ -927,13 +927,20 @@ function viewNow(){
   } else if(inF && !(cur && cur.kind !== 'rest')){
     h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'In flight</div><div class="lab" style="font-size:13px">' + esc(inF.f.code + ' → ' + inF.t.code) + '</div></div>';
     if(inF.role === 'operate'){
-      if(inF.restWin){
-        h += '<div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(inF.f.tz, inF.restWin[1]) + '</div></div></div>' +
+      var restsLeft = (inF.restWins || (inF.restWin ? [inF.restWin] : [])).filter(function(w){ return w[1] > nw; });
+      if(inF.restWin && !restsLeft.length){
+        /* the rest is over: what is left is the low point and the landing */
+        var CA = S.caf.on !== false ? BC.cafAdvice(S, nw) : null, cof = CA && CA.coffee && CA.coffee.inFlight && CA.coffee.t > nw ? CA.coffee : null;
+        h += '<div class="two"><div><div class="lab">' + (cof ? 'Coffee · ' + esc(shortCity(inF.f)) : 'Lowest ahead') + '</div><div class="big">' + (cof ? BC.hm(inF.f.tz, cof.t) : esc(BC.word(inF.minA))) + '</div></div><div><div class="lab">Landing · ' + esc(shortCity(inF.t)) + '</div><div class="big">' + BC.hm(inF.t.tz, inF.b) + '</div></div></div>' +
+             '<p class="why">Your rest is over.' + (cof ? ' The coffee helps you through your body’s low point, about ' + Math.round((inF.b - cof.t)/H*10)/10 + ' h before landing.' : '') + '</p>';
+      } else if(inF.restWin){
+        var nr = restsLeft[0];
+        h += '<div class="two"><div><div class="lab">Lie down</div><div class="big">' + BC.hm(inF.f.tz, nr[0]) + '</div></div><div><div class="lab">Alarm</div><div class="big">' + BC.hm(inF.f.tz, nr[1]) + '</div></div></div>' +
              '<p class="why">' + esc(shortCity(inF.f)) + ' time, the clock you left on. ' + (function(){ var rb = inF.restAuto && inF.restBreaks ? inF.restBreaks.filter(function(x){ return x.b > nw; })[0] || inF.restBreaks[0] : null;
-             return rb ? 'Break ' + BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z, wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z.' : 'UTC ' + BC.hm('UTC', inF.restWin[0]) + '–' + BC.hm('UTC', inF.restWin[1]) + '.'; })() + '</p>';
-      } else h += '<p class="why" style="margin-top:0">Enter your crew rest once you know it, and get the times on ' + esc(shortCity(inF.f)) + ' time.</p>';
-      h += '<div style="margin-top:14px"><button class="btn" type="button" data-go="rest/' + inF.id + '">' + (inF.restWin ? 'Change crew rest' : 'Set crew rest alarm') + '</button></div>';
-    } else h += '<p class="why" style="margin-top:0">Lands ' + BC.hm(inF.t.tz, inF.b) + ' ' + esc(inF.t.city) + ' time.</p>';
+             return rb ? 'Rest ' + BC.hm('UTC', rb.a).replace(':', '') + '–' + BC.hm('UTC', rb.b).replace(':', '') + 'Z, wake-up ' + BC.hm('UTC', rb.wake).replace(':', '') + 'Z.' : 'UTC ' + BC.hm('UTC', inF.restWin[0]) + '–' + BC.hm('UTC', inF.restWin[1]) + '.'; })() + '</p>';
+      } else h += '<p class="why" style="margin-top:0">Set up your crew rest to get lie-down and alarm times on ' + esc(shortCity(inF.f)) + ' time.</p>';
+      h += '<div style="margin-top:14px"><button class="btn" type="button" data-go="rest/' + inF.id + '">' + (inF.restWin ? 'Crew rest' : 'Set up crew rest') + '</button></div>';
+    } else h += '<p class="why" style="margin-top:0">Lands ' + BC.hm(inF.t.tz, inF.b) + ' ' + esc(shortCity(inF.t)) + ' time.</p>';
   } else {
     var s = cur || nextS;
     if(s && (cur || s.a - nw < 18*H)){
@@ -953,7 +960,7 @@ function viewNow(){
       var nf = Pl.flights.filter(function(f){ return f.a > nw; })[0];
       if(nf){
         h += '<div class="hero-h"><div class="hero-l fl">' + I.plane + 'Next flight</div><div class="lab" style="font-size:13px">in ' + esc(durTxt(nf.a - nw)) + '</div></div>' +
-             '<div style="font-size:28px;font-weight:600">' + esc(nf.f.code + ' → ' + nf.t.code) + '</div><p class="why">Departs ' + esc(whenTxt(nf.f.tz, nf.a, nw)) + ' ' + esc(nf.f.city) + ' time.</p>';
+             '<div style="font-size:28px;font-weight:600">' + esc(nf.f.code + ' → ' + nf.t.code) + '</div><p class="why">Departs ' + esc(whenTxt(nf.f.tz, nf.a, nw)) + ' ' + esc(shortCity(nf.f)) + ' time.</p>';
       } else h += '<div class="hero-h"><div class="hero-l">' + I.moon + 'Trip done</div></div><p class="why" style="margin-top:0">Your usual night at home: bed ' + esc(S.bed) + ', wake ' + esc(S.wake) + '.</p>';
       h += '<div style="margin-top:14px"><button class="btn sec" type="button" data-act="bedNow" data-kind="">Going to bed now</button></div>';
     }
@@ -962,7 +969,7 @@ function viewNow(){
   /* up next */
   var from = heroUsed ? heroUsed.a + 1 : nw;
   var ev = events(Pl, Pl.open ? (Pl.openEnd || nw) : from, 4);
-  h += '<h2 class="grp-h" style="margin:4px 16px -8px">Up next</h2><section class="list" aria-label="Up next">' + ev.map(function(e){ return eventRow(e, nw); }).join('') +
+  h += '<h2 class="grp-h" style="margin:4px 16px -8px">Up next</h2><section class="list" aria-label="Up next">' + (ev.length ? ev.map(function(e){ return eventRow(e, nw); }).join('') : '<div class="row static"><span class="main"><span class="t3">Nothing planned. Add your next trip with + on Trip.</span></span></div>') +
        (function(){ var cl = Pl.layovers.filter(function(x){ return nw >= x.arr && nw < x.dep && x.viable && x.viable.length > 1; })[0];
          return cl ? '<button class="row" type="button" data-go="lay/' + esc(cl.id) + '" style="color:var(--tint);min-height:48px">' + I.moon + 'Compare plans for the rest of ' + esc(cl.ap.city) + '</button>' : ''; })() +
        (function(){ var nx = Pl.sleeps.filter(function(x){ return x.a > nw && !x.actual && !x.open && x.kind !== 'rest'; })[0];
@@ -1028,8 +1035,8 @@ function tlRow(Pl, it, nw){
     if(sl.open){ var op = Pl.open; return row('data-act="editSleep" data-id="' + (op ? op.id : '') + '"', 'var(--sleep)', I.moon.replace('stroke="currentColor"', 'stroke="#fff"'), 'In bed now', 'Suggested wake ' + whenTxt(tz, sl.b, sl.a), ''); }
     var calc = 'data-act="adjust" data-v="' + sl.a + '_' + sl.b + '_' + (nap ? 'nap' : 'main') + '"';
     if(sl.kind === 'home') return row(calc, 'var(--fill)', I.moon.replace('stroke="currentColor"', 'stroke="var(--sleep)"'), 'Sleep at home until ' + whenTxt(tz, sl.b, sl.a), 'Your usual night · ' + dur, I.chev);
-    var pend = past || (sl.a < nw), srcTxt = sl.src === 'yours' ? 'Your times' : sl.src === 'pick' ? 'Auto · option you picked' : 'Auto';
-    return row(calc, sl.src === 'yours' ? 'var(--sleep)' : 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', sl.src === 'yours' ? 'stroke="#fff"' : 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), srcTxt + (pend ? ', not confirmed' : '') + ' · ' + dur, I.chev);
+    var pend = past || (sl.a < nw), srcTxt = sl.src === 'yours' ? 'Your times' : 'Planned';
+    return row(calc, sl.src === 'yours' ? 'var(--sleep)' : 'var(--sleepbg)', I.moon.replace('stroke="currentColor"', sl.src === 'yours' ? 'stroke="#fff"' : 'stroke="var(--sleep)"'), (nap ? 'Nap' : 'Sleep') + ' until ' + whenTxt(tz, sl.b, sl.a), srcTxt + (pend ? ', not logged' : '') + ' · ' + dur, I.chev);
   }
   if(it.kind === 'van') return row('data-go="flight/' + it.f.id + '"', 'var(--fill)', I.car.replace('stroke="currentColor"', 'stroke="var(--label)"'), 'Van to ' + esc(it.f.f.code), 'For ' + esc(it.f.f.code + ' → ' + it.f.t.code) + ' at ' + BC.hm(it.f.f.tz, it.f.a), I.chev);
   if(it.kind === 'caf') return row('data-act="cafEdit" data-id="' + it.c.id + '"', 'var(--coffee)', I.cup.replace('stroke="currentColor"', 'stroke="#fff"'), esc(cafName(it.c.mg)), 'Logged · ' + it.c.mg + ' mg', '<span class="tag">Edit</span>');
@@ -1068,7 +1075,7 @@ function viewTrip(){
   });
   if(open) h += '</div>';
   if(!nowDone) h += '<div class="nowline">Now · ' + BC.hm(placeTz(Pl, nw), nw) + '</div>';
-  h += '<p class="foot">Times are local to where you are. Logged sleeps are what you told the app; planned ones are its suggestion. Tap a planned sleep to change its times and see what that does.</p>';
+  h += '<p class="foot">Times are local to where you are. Tap a planned sleep to change its times and see what that does.</p>';
   return h;
 }
 
@@ -1139,7 +1146,7 @@ function calcItems(c, cr, nw){
     var L = P2.layovers.filter(function(x){ return x.outF.id === fl.id; })[0];
     if(L && L.duty > w.b) out.push({t:L.duty, ico:'car', t1:(L.van ? 'Van ' : 'Leave for the airport ') + BC.hm(L.ap.tz, L.duty), t3:esc(L.ap.city), rt:wordHTML(A(L.duty), true) + dlt(A(L.duty), base ? BC.ptAt(Pl.R, L.duty).A : null)});
     out.push({t:fl.a, ico:'plane', t1:fl.f.code + ' → ' + fl.t.code + ' ' + BC.hm(fl.f.tz, fl.a), t3:'Lowest in flight', rt:wordHTML(fl.minA, true) + dlt(fl.minA, base && base.minA)});
-    out.push({t:fl.b, ico:'land', t1:'Land ' + fl.t.code + ' ' + BC.hm(fl.t.tz, fl.b), t3:esc(fl.t.city) + ' time', rt:wordHTML(fl.landA, true) + dlt(fl.landA, base && base.landA)});
+    out.push({t:fl.b, ico:'land', t1:'Land ' + fl.t.code + ' ' + BC.hm(fl.t.tz, fl.b), t3:esc(shortCity(fl.t)) + ' time', rt:wordHTML(fl.landA, true) + dlt(fl.landA, base && base.landA)});
   });
   out.sort(function(p, q){ return p.t - q.t; });
   return out;
@@ -1183,7 +1190,7 @@ function viewLay(id){
          '<label class="row static"><span class="main"><span class="t1">Starts</span></span><input class="pill" type="datetime-local" id="meetA" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ns) + '"></label>' +
          '<label class="row static"><span class="main"><span class="t1">Ends</span><span class="t3">Change it if it ran late</span></span><input class="pill" type="datetime-local" id="meetB" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ne) + '"></label>';
   } else h += '<button class="row" type="button" data-act="meetAdd" data-id="' + esc(id) + '" style="color:var(--tint)">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Add a crew meetup</button>';
-  h += '</div><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before you leave for the airport; change it in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
+  h += '</div><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before you leave · set in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
   var hist = L.fixed.map(function(x){ return {t:x.a, txt:(x.kind === 'main' ? 'Slept ' : 'Napped ') + BC.dow(tz, x.a) + ' ' + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b), act:'editSleep', id:x.id}; })
     .concat(L.skips.map(function(x, i){ return {t:x.a, txt:'Skipped the ' + (x.kind === 'main' ? 'sleep' : 'nap') + ' at ' + BC.hm(tz, x.a), act:'unskip', id:String(x.a)}; }));
   if(L.open) hist.push({t:L.open.a, txt:'In bed since ' + BC.dow(tz, L.open.a) + ' ' + BC.hm(tz, L.open.a), act:'editSleep', id:L.open.id});
@@ -1195,7 +1202,7 @@ function viewLay(id){
   var shown = L.viable || L.options, autoN = shown.filter(function(o){ return o.id !== 'custom'; }).length, hiddenN = L.options.length - shown.length;
   h += '<h2 style="margin:8px 4px 0;font-size:22px">' + (shown.length <= 1 ? (replan ? 'Rest of the layover' : 'The plan') : shown.some(function(o){ return o.id === 'now'; }) && !replan ? 'Nap now or later?' : replan ? 'Rest of the layover' : 'Pick a plan') + '</h2>';
   if(!L.options.length) h += '<p class="foot">Nothing left to plan here.</p>';
-  else if(autoN <= 1 && hiddenN) h += '<p class="foot" style="margin-top:0">Only one way to split your sleep here is worth doing. The others came out worse on every count, so they are not shown.</p>';
+  else if(autoN <= 1 && hiddenN) h += '<p class="foot" style="margin-top:0">This is the only plan worth doing here. The others came out worse on every count.</p>';
   function pos(v){ return Math.max(0, Math.min(100, (v - 20)/60*100)).toFixed(0) + '%'; }
   shown.forEach(function(o){
     var m = o.m;
@@ -1217,7 +1224,7 @@ function viewLay(id){
          'Skipping the nap: lowest in flight ' + Math.round(skipO.m.fmin) + ' and landing ' + Math.round(skipO.m.land) + ', against ' + Math.round(sugO.m.fmin) + ' and ' + Math.round(sugO.m.land) + ' with it. ' +
          (rw0 && rw1 && rw0 !== rw1 ? 'Your crew rest would go better (' + rw0.toLowerCase() + ' instead of ' + rw1.toLowerCase() + '), but a nap in a hotel bed is worth more than the sleep you would gain in the bunk.' : 'The nap is worth more than what skipping it would gain.') + '</div></section>';
   }
-  h += '<p class="foot">Times are ' + esc(L.ap.city) + ' time. Landing is your alertness at ' + esc(L.outF.t.code) + ', with your crew rest ' + (L.outF.restWin ? 'as entered' : L.outF.rest ? 'assumed mid-flight' : 'left out (none entered)') + '.</p>';
+  h += '<p class="foot">Times are ' + esc(shortCity(L.ap)) + ' time. Landing is your alertness at ' + esc(L.outF.t.code) + ', with ' + (L.outF.crewPlan ? 'Rest ' + L.outF.crewPlan.slot + ' as your crew rest' : L.outF.restWin ? 'your crew rest' : L.outF.rest ? 'a crew rest assumed mid-flight' : 'no crew rest') + '.</p>';
   h += '<button class="btn" type="button" data-act="use" data-id="' + esc(id) + '" style="margin-top:6px">' + (sel === L.picked && (S.lay[id] || {}).choice ? 'Plan in use' : 'Use this plan') + '</button></div>';
   return h;
 }
@@ -1329,8 +1336,8 @@ function viewChart(){
          '<p class="foot" style="margin:8px 6px 0">' + (sun.rise != null || sun.set != null ? 'Today ' + (sun.rise != null ? 'sunrise came at ' + hh(sun.rise) : '') + (sun.rise != null && sun.set != null ? ' and ' : '') + (sun.set != null ? 'sunset at ' + hh(sun.set) : '') + ' on your body’s clock. ' : '') +
          'Your body’s clock is fixed, noon at the top: in step, sunrise sits near 9 o’clock and sunset near 3. Each turn in is a day earlier, smaller toward the centre, with the last ' + big.days + ' days shown. The frame outside is your body’s usual day, from your wake time to your bedtime.</p></figure>';
     var rows = [], x = C.at(nw), Ln = E.locAt(nw);
-    if(nw >= C.R.t0 && nw <= C.R.t1) rows.push(['Now', 'Your body thinks it’s ' + hh(x.bodyH), gapPhrase(x.gap, Ln.fl ? 'local time' : (Ln.ap || E.home).city)]);
-    F.forEach(function(f){ if(f.role !== 'operate' || f.b < nw) return; var xf = C.at(f.b); rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b), gapPhrase(xf.gap, f.t.city)]); });
+    if(nw >= C.R.t0 && nw <= C.R.t1) rows.push(['Now', 'Your body thinks it’s ' + hh(x.bodyH), gapPhrase(x.gap, Ln.fl ? 'local time' : shortCity(Ln.ap || E.home))]);
+    F.forEach(function(f){ if(f.role !== 'operate' || f.b < nw) return; var xf = C.at(f.b); rows.push(['Landing at ' + f.t.code, BC.dow(f.t.tz, f.b) + ' ' + BC.hm(f.t.tz, f.b), gapPhrase(xf.gap, shortCity(f.t))]); });
     if(C.back) rows.push(['Back in step with ' + E.home.city, 'Within 30 minutes of home time', C.adaptedBy ? (C.adaptedBy <= nw ? 'Done' : 'About ' + BC.dayShort(E.home.tz, C.adaptedBy)) : 'More than a week']);
     h += '<div class="list" style="margin-top:14px">' + rows.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val" style="max-width:48%">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
     h += '<p class="foot">Daylight moves your body’s clock, in the model about an hour a day when the gap is big and slower as it closes. Being outside in local morning light speeds it up. The model counts daylight only, not meals, exercise or melatonin, and people vary a lot.</p>';
@@ -1340,7 +1347,7 @@ function viewChart(){
   if(land){ a = Math.max(nw, E.t0); b = target.b; tz = E.locAt(a).tz; }
   else { a = F[0].a - 6*H; b = Math.min(Pl.R.t1, F[F.length-1].b + 18*H); tz = E.home.tz; }
   h += '<div class="seg" role="group" aria-label="Time span" style="margin-bottom:12px"><button type="button" data-act="cv" data-v="land" aria-pressed="' + !!land + '"' + (target ? '' : ' disabled') + '>Until you land</button><button type="button" data-act="cv" data-v="trip" aria-pressed="' + !land + '">Whole trip</button></div>';
-  var clockName = land ? esc(E.locAt(a).fl ? 'Departure' : (E.locAt(a).ap || E.home).city) + ' time' : 'Days on home time';
+  var clockName = land ? esc(E.locAt(a).fl ? 'Departure' : shortCity(E.locAt(a).ap || E.home)) + ' time' : 'Days on home time';
   if(M === 'press'){
     h += '<figure class="chart">' + pressSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Low<span style="width:46px;height:8px;border-radius:4px;background:linear-gradient(90deg,' + pressCol(0.1) + ',' + pressCol(0.4) + ',' + pressCol(0.75) + ');display:inline-block"></span>High</span><span><span class="sw10" style="border:1.5px dashed var(--bodyn);background:none"></span>Sleep threshold</span><span><span class="sw10" style="background:var(--tired);opacity:.45"></span>Tired: sleep would come</span><span><span class="sw10" style="background:var(--rested);opacity:.45"></span>Not tired yet</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
     var R = Pl.R, rows2 = [], from = Math.max(nw, a);
@@ -1354,14 +1361,14 @@ function viewChart(){
         rows2.push(['Sleep pressure now', lastWake ? 'Awake for ' + durTxt(Math.round((nw - lastWake)/(15*60000))*15*60000) : 'Since your last sleep', pressWord(pn.S)]);
         if(debtTxt(pn.debt)) rows2.push(['Sleep debt', 'Short on sleep over the last few days', debtTxt(pn.debt)]);
         var ez = BC.easeOf(R, pn);
-        rows2.push(['If you lay down now', ez >= 0.6 ? (pn.debt >= 1 && BC.easeOf(R, {S:pn.S, cb:pn.cb, caf:pn.caf, debt:0}) < 0.6 ? 'Sleep debt is tipping it' : 'Your body clock and sleep pressure agree') : pn.cb > 0.6 ? 'Your body clock is keeping you awake' : 'Not enough sleep pressure yet', easeWord(ez) + ' to fall asleep']);
+        rows2.push(['If you lie down now', ez >= 0.6 ? (pn.debt >= 1 && BC.easeOf(R, {S:pn.S, cb:pn.cb, caf:pn.caf, debt:0}) < 0.6 ? 'Sleep debt is tipping it' : 'Your body clock and sleep pressure agree') : pn.cb > 0.6 ? 'Your body clock is keeping you awake' : 'Not enough sleep pressure yet', easeWord(ez) + ' to fall asleep']);
       }
     }
     var win = null;
     for(var i=0;i<R.pts.length;i++){ var p = R.pts[i]; if(p.t < from || p.t > b) continue; var on = !p.sl && p.S > gateOf(R, p); if(on && !win) win = {a:p.t}; if(win && p.sl) break; if(win && !on){ win.b = p.t; break; } }
-    if(win){ var wtz = E.locAt(win.a).tz; rows2.push(['Next window to fall asleep', E.locAt(win.a).fl ? 'In flight, ' + E.locAt(win.a).flight.f.city + ' time' : (E.locAt(win.a).ap || E.home).city + ' time', whenTxt(wtz, win.a, nw) + (win.b ? '–' + whenTxt(wtz, win.b, win.a) : ' on')]); }
+    if(win){ var wtz = E.locAt(win.a).tz; rows2.push(['Next window to fall asleep', E.locAt(win.a).fl ? 'In flight, ' + shortCity(E.locAt(win.a).flight.f) + ' time' : shortCity(E.locAt(win.a).ap || E.home) + ' time', whenTxt(wtz, win.a, nw) + (win.b ? '–' + whenTxt(wtz, win.b, win.a) : ' onward')]); }
     h += '<div class="list" style="margin-top:14px">' + rows2.map(function(r){ return '<div class="row static"><span class="main"><span class="t1">' + esc(r[0]) + '</span><span class="t3">' + esc(r[1]) + '</span></span><span class="val">' + esc(r[2]) + '</span></div>'; }).join('') + '</div>';
-    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. The dashed line is the sleep threshold: above it you can fall asleep. It is set by your body clock, low in your body’s night and high in its late afternoon, which is why you can be exhausted and still not sleep at the wrong body time. Red is when sleep pressure is above it, green when it is below. Sleep debt (sleep you are short over the last few days, with bunk sleep counted at three quarters) lowers the line, so sleep comes more easily, and lowers alertness.</p>';
+    h += '<p class="foot">Sleep pressure builds while you are awake and clears while you sleep. You can fall asleep when it is above the dashed line (red). The line moves with your body clock, low in its night and high in its late afternoon, which is why you can be exhausted and still not sleep. Sleep debt lowers the line, so sleep comes more easily.</p>';
     return h;
   }
   h += '<figure class="chart">' + chartSVG(Pl, a, b, tz) + '<div class="legend" style="padding:4px 16px 0"><span>Very tired<span style="width:46px;height:8px;border-radius:4px;background:var(--scale);display:inline-block"></span>Sharp</span><span><span class="sw10" style="background:var(--sleep);opacity:.5"></span>Sleep</span><span><span class="sw10" style="background:var(--out)"></span>Crew meetup</span><span style="margin-left:auto">' + clockName + '</span></div></figure>';
@@ -1440,7 +1447,7 @@ function viewSettings(){
        '<label class="row static"><span class="main"><span class="t1">Time to get ready</span><span class="t3">minutes</span></span>' + num('sReady', Math.round(S.ready*60), 0, 180, 5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Layover sleep</span></span>' + sel('sBal', S.balance, [['home','Keep home time'],['balanced','Balanced'],['local','Follow local time']]) + '</label>' +
        '<button class="row" type="button" data-go="dest"><span class="main"><span class="t1">Destinations</span></span><span class="val">' + S.dests.length + ' airports</span>' + I.chev + '</button></div>' +
-       '<p class="foot">Balanced splits the difference between your home night and the local night.</p>';
+       '<p class="foot">Balanced sleeps halfway between your home night and the local night. On each layover the app also tries home and local time, and uses one when it is clearly better.</p>';
   h += '<h2 class="grp-h">Caffeine and alcohol</h2><div class="list">' +
        '<div class="row static"><span class="main"><span class="t1">Caffeine advice</span><span class="t3">Cut-off and best coffee time on Now</span></span><button class="sw" type="button" role="switch" aria-label="Caffeine advice" aria-checked="' + (S.caf.on !== false) + '" data-act="cafOn"></button></div>' +
        '<label class="row static"><span class="main"><span class="t1">No caffeine before sleep</span><span class="t3">hours</span></span>' + num('sCut', S.caf.cut, 3, 10, 0.5) + '</label>' +
@@ -1449,11 +1456,11 @@ function viewSettings(){
   h += '<h2 class="grp-h">Crew rest</h2><div class="list">' +
        '<label class="row static"><span class="main"><span class="t1">Off to first rest</span><span class="t3">minutes after off</span></span>' + num('rrStart', S.restRules.start, 0, 60, 5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Rest ends</span><span class="t3">minutes before on</span></span>' + num('rrEnd', S.restRules.end, 0, 120, 5) + '</label>' +
-       '<label class="row static"><span class="main"><span class="t1">Wake-up call</span><span class="t3">minutes before a break ends</span></span>' + num('rrWake', S.restRules.wake, 0, 30, 5) + '</label>' +
+       '<label class="row static"><span class="main"><span class="t1">Wake-up call</span><span class="t3">minutes before a rest ends</span></span>' + num('rrWake', S.restRules.wake, 0, 30, 5) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Round times to</span></span>' + sel('rrRound', String(S.restRules.round), [['1', '1 minute'], ['5', '5 minutes']]) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Gap between rests</span><span class="t3">for the crew change</span></span>' + sel('rrGap', String(+S.restRules.gap || 0), [['0', 'None'], ['10', '10 minutes']]) + '</label></div>' +
-       '<p class="foot">Defaults for every crew plan. Change them for one flight on its Crew rest screen. Two crew are always at the controls: with 3 crew one rests at a time in three numbered rests, with 4 crew two at a time in two. Who takes which rest varies by flight (often FB, then PF, then PM); you pick yours on the flight.</p>';
-  h += '<h2 class="grp-h">Tools</h2><div class="list"><a class="row" href="crew-rest.html" style="color:var(--tint)">' + I.moon + '<span class="main"><span class="t1">Crew rest calculator</span><span class="t3" style="color:var(--sec)">Preview · equal breaks in UTC</span></span>' + I.chev + '</a></div>';
+       '<p class="foot">Defaults for every flight. Change them for one flight on its Crew rest screen. Two pilots are always at the controls, so with 3 pilots one rests at a time and with 4, two at a time.</p>';
+  h += '<h2 class="grp-h">Tools</h2><div class="list"><a class="row" href="crew-rest.html" style="color:var(--tint)">' + I.moon + '<span class="main"><span class="t1">Crew rest calculator</span><span class="t3" style="color:var(--sec)">Equal rests in UTC, without a trip</span></span>' + I.chev + '</a></div>';
   h += syncSection();
   h += '<h2 class="grp-h">Your data</h2><div class="list">' +
        '<button class="row" type="button" data-act="backup" style="color:var(--tint)">Back up trip</button>' +
@@ -1466,9 +1473,10 @@ function viewSettings(){
        '<button class="row" type="button" data-act="update" style="color:var(--tint)">' + esc(V.updLabel || 'Update app') + '</button></div>';
   if(V.updMsg) h += '<p class="msg">' + esc(V.updMsg) + '</p>';
   h += '<details class="how" style="margin-top:18px"><summary>How the plan works</summary>' +
-       '<p>The model is the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. Alertness here is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
-       '<p>For each layover the app tries naps after landing, naps before you leave, both or neither, with your main sleep moved earlier or later, and scores each plan on alertness from wake-up to landing, the last 90 minutes counting most. Plans that need you to fall asleep when you probably cannot, or that leave you up for long stretches under high sleep pressure, lose points. </p>' +
-       '<p>Caffeine you log is in the model: it takes about 45 minutes to peak and half of it is gone after 5 hours. While it is in you it lifts alertness a little, makes it harder to fall asleep and makes sleep less restful. Crew rest you enter is used as it is; until then the plan assumes your expected rest in the middle of the flight. The numbers are for comparing plans, not a fitness-for-duty measure.</p></details>';
+       '<p>The app uses the two-process model of sleep: sleep pressure builds while you are awake and clears while you sleep, and your body clock adds a daily rhythm that shifts slowly with daylight where you are. On top of that it keeps a running sleep debt: sleep you are short beyond a usual day, which fades over a few days. Alertness is a 0 to 100 index: Sharp 55 and up, Okay 40 to 54, Drowsy 25 to 39, Very tired below 25.</p>' +
+       '<p>For each layover the app tries a nap after landing, a long or short nap before you leave, both or neither, with your main sleep earlier or later, on your Layover sleep clock and on home and local time. It scores each plan on your alertness from wake-up to landing, the last 90 minutes counting most, and takes points off plans that need you to fall asleep when you probably cannot. Only plans worth doing are shown.</p>' +
+       '<p>Your crew rest comes from the crew plan on each flight. A bunk is not a hotel bed: the app predicts how well you will sleep in each rest from how easy sleep is when it starts, and counts bunk sleep at three quarters. Caffeine you log takes about 45 minutes to peak and half of it is gone after 5 hours; while it is in you it lifts alertness a little and makes sleep harder to start and lighter.</p>' +
+       '<p>The numbers are for comparing choices, not a fitness-for-duty measure.</p></details>';
   return h;
 }
 
@@ -1485,7 +1493,7 @@ function viewDest(){
          '<span style="width:44px;font-weight:600;letter-spacing:.02em">' + c + '</span><span class="main"><span class="t2" style="font-size:17px">' + esc(a ? a[0] : '') + '</span></span><span class="val" style="font-size:15px">' + (a ? BC.zabbr(a[1], now()) : '') + '</span></div>';
   });
   h += '</div><div style="margin-top:14px"><button class="btn sec" type="button" data-act="destReset">Reset to the starting list</button></div>' +
-       '<p class="foot">The starting list is American’s 787 network as of 2026 plus the hubs, from public route news. Aircraft change, so check it against your own flying.</p>';
+       '<p class="foot">Reset puts back the list the app started with, common long-haul destinations and US hubs.</p>';
   return h;
 }
 
@@ -1512,16 +1520,16 @@ function renderSheet(){
   var fl = V.flight, d = flightDerived(fl), auto = d.dur != null ? (d.dur >= 5*H ? 'operate' : 'commute') : 'operate', role = fl.role || auto;
   var chips = S.dests.filter(function(c){ return c !== fl.from; }).slice(0, 10);
   var h = '<div class="sheet" data-act="sheetBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="' + (fl.id ? 'Edit flight' : 'New flight') + '">' +
-      '<div class="grab"><span></span></div><div class="sheet-h"><button class="navbtn" type="button" data-act="sheetCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (fl.id ? 'Flight' : 'New Flight') + '</div><button class="navbtn r" type="button" data-act="sheetSave">' + (fl.id ? 'Done' : 'Add') + '</button></div>';
+      '<div class="grab"><span></span></div><div class="sheet-h"><button class="navbtn" type="button" data-act="sheetCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (fl.id ? 'Flight' : 'New flight') + '</div><button class="navbtn r" type="button" data-act="sheetSave">' + (fl.id ? 'Done' : 'Add') + '</button></div>';
   h += '<div class="stack" style="gap:8px">';
   h += '<div class="codes"><label class="code"><span class="eyebrow">From</span><input id="fFrom" value="' + esc(fl.from) + '" maxlength="3" autocomplete="off" autocapitalize="characters" list="dl"><span class="t3">' + (d.f ? esc(d.f.city) + ' · ' + BC.zabbr(d.f.tz, isNaN(d.a) ? now() : d.a) : fl.from ? 'Unknown code' : '') + '</span></label>' +
        '<label class="code"><span class="eyebrow">To</span><input id="fTo" value="' + esc(fl.to) + '" maxlength="3" autocomplete="off" autocapitalize="characters" list="dl"><span class="t3">' + (d.t ? esc(d.t.city) + ' · ' + BC.zabbr(d.t.tz, isNaN(d.b) ? now() : d.b) : fl.to ? 'Unknown code' : '') + '</span></label></div>' +
        '<datalist id="dl">' + S.dests.map(function(c){ return '<option value="' + c + '">' + esc(AIRPORTS[c] ? AIRPORTS[c][0] : '') + '</option>'; }).join('') + '</datalist>';
   h += '<div class="chips" role="group" aria-label="Your destinations">' + chips.map(function(c){ return '<button type="button" data-act="toChip" data-code="' + c + '" aria-pressed="' + (c === fl.to) + '">' + c + '</button>'; }).join('') + '</div>';
-  h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(d.f.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(d.t.city) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
+  h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(shortCity(d.f)) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(shortCity(d.t)) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
        '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div>' +
-       '<label class="row static" style="flex-wrap:wrap;row-gap:8px"><span class="main" style="min-width:120px"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(d.f.city) + ' time' : '') : 'Optional · leave empty if there is none') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
+       '<label class="row static" style="flex-wrap:wrap;row-gap:8px"><span class="main" style="min-width:120px"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(shortCity(d.f)) + ' time' : '') : 'Optional · leave empty if there is none') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
        '<p class="foot">Times are local at each airport, as on your schedule.</p>';
   h += '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:6px"><div style="margin-bottom:10px">Your role</div><div class="seg" role="group" aria-label="Your role"><button type="button" data-act="role" data-v="operate" aria-pressed="' + (role === 'operate') + '">Operate</button><button type="button" data-act="role" data-v="commute" aria-pressed="' + (role === 'commute') + '">Commute</button></div></div>';
   if(role === 'operate'){
@@ -1531,13 +1539,13 @@ function renderSheet(){
     if(nSlots && +fl.slot > nSlots) fl.slot = nSlots;
     function segB(act, v, on, label){ return '<button type="button" data-act="' + act + '" data-v="' + v + '" aria-pressed="' + on + '">' + label + '</button>'; }
     h += '<div class="list">' +
-         '<div class="row static"><span class="main"><span class="t1">Crew</span></span><div class="seg three" role="group" aria-label="Crew" style="width:180px">' + [2, 3, 4].map(function(n){ return segB('fcrew', n, +fl.crew === n, n); }).join('') + '</div></div>' +
+         '<div class="row static"><span class="main"><span class="t1">Pilots</span></span><div class="seg three" role="group" aria-label="Pilots" style="width:180px">' + [2, 3, 4].map(function(n){ return segB('fcrew', n, +fl.crew === n, n); }).join('') + '</div></div>' +
          (nSlots ? '<div class="row static"><span class="main"><span class="t1">Your rest</span><span class="t3">' + (nSlots === 3 ? 'Order varies, often FB, then PF, then PM' : 'Two rest at a time, in pairs') + '</span></span><div class="seg" role="group" aria-label="Your rest" style="width:' + (nSlots*60) + 'px;grid-template-columns:repeat(' + nSlots + ',minmax(0,1fr))">' + [1, 2, 3].slice(0, nSlots).map(function(k){ return segB('fslot', k, +fl.slot === k, k === 1 ? '1st' : k === 2 ? '2nd' : '3rd'); }).join('') + '</div></div>' : '') +
-         (+fl.crew >= 3 ? '<div class="row static"><span class="main"><span class="t1">Breaks each</span><span class="t3">Two on longer flights</span></span><div class="seg" role="group" aria-label="Breaks each" style="width:120px">' + segB('feach', 1, +fl.each !== 2, 1) + segB('feach', 2, +fl.each === 2, 2) + '</div></div>' : '') +
+         (+fl.crew >= 3 ? '<div class="row static"><span class="main"><span class="t1">Rests each</span><span class="t3">Two on longer flights</span></span><div class="seg" role="group" aria-label="Breaks each" style="width:120px">' + segB('feach', 1, +fl.each !== 2, 1) + segB('feach', 2, +fl.each === 2, 2) + '</div></div>' : '') +
          '</div>';
     if(+fl.crew >= 3 && !isNaN(d.a) && !isNaN(d.b) && d.b > d.a){
       var cp = BC.crewBreaks(d.a, d.b, +fl.crew, +fl.each === 2 ? 2 : 1, d.a + BC.rulesOf(S, fl).start*60000, BC.rulesOf(S, fl)), mine = cp && cp.breaks ? cp.breaks.filter(function(x){ return x.slot === +fl.slot; }) : [];
-      h += '<p class="foot">' + (mine.length ? 'Your break' + (mine.length > 1 ? 's' : '') + ': ' + mine.map(function(m){ return BC.hm('UTC', m.a).replace(':', '') + '–' + BC.hm('UTC', m.b).replace(':', '') + 'Z, wake-up ' + BC.hm('UTC', m.wake).replace(':', '') + 'Z'; }).join('; ') + ', from the scheduled times. Fine-tune it on the flight’s Crew rest screen.' : (cp && cp.err ? cp.err : '')) + '</p>';
+      h += '<p class="foot">' + (mine.length ? 'Your rest' + (mine.length > 1 ? 's' : '') + ': ' + mine.map(function(m){ return BC.hm('UTC', m.a).replace(':', '') + '–' + BC.hm('UTC', m.b).replace(':', '') + 'Z, wake-up ' + BC.hm('UTC', m.wake).replace(':', '') + 'Z'; }).join('; ') + ', from the scheduled times. Fine-tune it on the Crew rest screen.' : (cp && cp.err ? cp.err : '')) + '</p>';
     } else if(+fl.crew === 2) h += '<p class="foot">With 2 crew both stay at the controls, so there is no crew rest.</p>';
   }
   h += '<p class="foot">Flights over 5 hours start as Operate.</p>';
@@ -1875,7 +1883,7 @@ document.addEventListener('click', function(e){
   if(act === 'destReset'){ S.dests = DEFAULT_DESTS.slice(); save(); render(); return; }
   if(act === 'destAdd'){
     var c = ($('#dAdd').value || '').trim().toUpperCase();
-    if(!AIRPORTS[c]){ V.destMsg = c ? c + ' is not in the built-in list yet. Tell Claude and it can be added.' : 'Type a three-letter code.'; render(); return; }
+    if(!AIRPORTS[c]){ V.destMsg = c ? c + ' is not in the app’s airport list yet.' : 'Type a three-letter code.'; render(); return; }
     if(S.dests.indexOf(c) < 0) S.dests.push(c);
     V.destMsg = ''; save(); render(); return;
   }
