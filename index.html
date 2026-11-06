@@ -122,6 +122,14 @@ h1{margin:2px 0 0;font-size:34px;line-height:41px;font-weight:700;letter-spacing
 .pill{padding:6px 10px;border-radius:8px;background:var(--fill);font-size:17px;font-variant-numeric:tabular-nums;border:0;color:var(--label)}
 input.pill,select.pill{-webkit-appearance:none;appearance:none;font:inherit;font-size:17px}
 input[type=time].pill,input[type=datetime-local].pill{min-height:36px}
+.clk{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--tint);line-height:16px}
+/* a time row: the label and its clock stay on one line; the field moves under them when there is no room */
+.row:has(.clk){flex-wrap:wrap;row-gap:6px}
+.row:has(.clk) .main{min-width:170px}
+.row:has(.clk) .pill{margin-left:auto}
+.clk{white-space:nowrap}
+.clk svg{width:13px;height:13px;flex:none}
+.zlab{font-size:13px;color:var(--sec);margin:12px 4px 4px}
 select.pill{padding-right:10px;max-width:60vw}
 .opt{display:flex;flex-direction:column;gap:10px;width:100%;padding:14px 16px;border-radius:16px;background:var(--card);border:2px solid transparent;text-align:left;cursor:pointer}
 .opt[aria-pressed=true]{border-color:var(--tint)}
@@ -203,7 +211,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '6 Nov 2026 · build 51';
+var BUILD = '6 Nov 2026 · build 52';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -444,6 +452,7 @@ function nextId(){ return uid(S.flights); }
 function $(s){ return document.querySelector(s); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 var I = {
+  clock:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   chev:'<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
   back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
   moon:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
@@ -757,6 +766,23 @@ function cityOfTz(tz){
   if(!hit) Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === tz){ hit = k; return true; } return false; });
   return hit ? shortCity(BC.airport(hit)) : tz.split('/').pop().replace(/_/g, ' ');
 }
+/* the clock a time field expects, shown on the field's row: "Rio de Janeiro time · GIG", or "UTC · Z" */
+function codeOfTz(tz){
+  if(tz === 'UTC') return 'Z';
+  var hit = null, codes = [];
+  (S.flights || []).forEach(function(f){ codes.push(f.from, f.to); }); codes.push(S.home);
+  codes.some(function(k){ if(AIRPORTS[k] && AIRPORTS[k][1] === tz){ hit = k; return true; } return false; });
+  return hit || '';
+}
+/* tz is the clock; ms (optional) names it after where you were then, ap (optional) after that airport */
+function clk(tz, ms, ap){
+  if(tz === 'UTC') return '<span class="clk">' + I.clock + 'UTC · Z</span>';
+  if(!ap && ms != null){
+    try{ var q = P().E.locAt(ms); ap = q.fl ? (q.flight.f.tz === tz ? q.flight.f : q.flight.t.tz === tz ? q.flight.t : null) : (q.ap && q.ap.tz === tz ? q.ap : null); }catch(e){ ap = null; }
+  }
+  var name = ap ? shortCity(ap) : cityOfTz(tz), code = ap ? ap.code : codeOfTz(tz);
+  return '<span class="clk">' + I.clock + esc(name + ' time') + (code ? ' · ' + esc(code) : '') + '</span>';
+}
 /* ---------- which clock a time is typed in: local where you were, the departure city's clock, or UTC ---------- */
 function zoneTz(Pl, zone, ms){
   if(zone === 'utc') return 'UTC';
@@ -777,7 +803,7 @@ function zoneSeg(act, zone, ms){
   var Pl = P(), seen = {}, opts = [];
   ['local', 'watch', 'utc'].forEach(function(z){ var tz = zoneTz(Pl, z, ms); if(seen[tz]) return; seen[tz] = 1; opts.push([z, cityOfTz(tz)]); });
   if(!opts.some(function(o){ return o[0] === zone; })) zone = opts[0][0];
-  return '<div class="seg' + (opts.length === 3 ? ' three' : '') + '" role="group" aria-label="Which clock the time is on" style="margin:10px 0 0">' + opts.map(function(z){ return '<button type="button" data-act="' + act + '" data-v="' + z[0] + '" aria-pressed="' + (zone === z[0]) + '">' + esc(z[1]) + '</button>'; }).join('') + '</div>';
+  return '<div class="zlab">Times are on</div><div class="seg' + (opts.length === 3 ? ' three' : '') + '" role="group" aria-label="Which clock the time is on">' + opts.map(function(z){ return '<button type="button" data-act="' + act + '" data-v="' + z[0] + '" aria-pressed="' + (zone === z[0]) + '">' + esc(z[1]) + '</button>'; }).join('') + '</div>';
 }
 
 /* ---------- change a sleep (what the calculator used to do) ---------- */
@@ -794,10 +820,10 @@ function renderAdj(){
   var c = V.calc, cr = V.calcRes, fresh = cr && cr.key === calcKey(c), Pl = P(), nw = now(), city = cityOfTz(c.tz);
   var h = '<div class="sheet" data-act="adjBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Change sleep"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="adjCancel" style="justify-self:start">Cancel</button><div class="ttl">Change sleep</div><span></span></div>' +
-      '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span></span><input class="pill" type="datetime-local" id="adjBed" value="' + esc(c.bed) + '"></label>' +
-      '<label class="row static"><span class="main"><span class="t1">Wake</span>' + (c.wakeAuto ? '<span class="t3" style="color:var(--tint)">Best for the flight</span>' : '') + '</span><input class="pill" type="datetime-local" id="adjWake" value="' + esc(c.wake) + '"></label>' +
+      '<div class="list"><label class="row static"><span class="main"><span class="t1">Bed</span>' + clk(c.tz, BC.localToMs(c.tz, c.bed)) + '</span><input class="pill" type="datetime-local" id="adjBed" value="' + esc(c.bed) + '"></label>' +
+      '<label class="row static"><span class="main"><span class="t1">Wake</span>' + clk(c.tz, BC.localToMs(c.tz, c.bed)) + (c.wakeAuto ? '<span class="t3" style="color:var(--tint)">Best for the flight</span>' : '') + '</span><input class="pill" type="datetime-local" id="adjWake" value="' + esc(c.wake) + '"></label>' +
       '<button class="row" type="button" data-act="adjBest" style="color:var(--tint);min-height:46px"' + (c.wakeAuto ? ' disabled' : '') + '>' + I.sun + 'Best wake-up for this bedtime</button></div>' +
-      '<p class="foot">' + esc(city) + ' time. The plan had ' + BC.hm(c.tz, V.adj.a0) + '–' + BC.hm(c.tz, V.adj.b0) + '.</p>';
+      '<p class="foot">The plan had ' + BC.hm(c.tz, V.adj.a0) + '–' + BC.hm(c.tz, V.adj.b0) + '.</p>';
   h += '<h2 class="grp-h" style="margin-top:14px">What happens</h2>';
   if(!fresh){
     h += '<div class="tl" style="padding:22px 16px;color:var(--sec)">Working…</div>';
@@ -864,14 +890,13 @@ function openCaf(id){
 function renderCaf(){
   var box = $('#sheet');
   if(!V.caf){ box.innerHTML = ''; return; }
-  var c = V.caf, city = '';
-  Object.keys(AIRPORTS).some(function(k){ if(AIRPORTS[k][1] === c.tz){ city = AIRPORTS[k][0]; return true; } return false; });
+  var c = V.caf;
   var h = '<div class="sheet" data-act="cafBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log caffeine"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="cafCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (c.id ? 'Edit caffeine' : 'Log caffeine') + '</div><button class="navbtn r" type="button" data-act="cafSave">Save</button></div>' +
       '<div class="list">' + CAF_SIZES.map(function(z){ return '<button class="row" type="button" data-act="cafMg" data-v="' + z[0] + '"><span class="main"><span class="t1">' + z[1] + '</span><span class="t3">' + z[2] + '</span></span>' + (+c.mg === z[0] ? '<span style="color:var(--tint);font-weight:700">✓</span>' : '') + '</button>'; }).join('') + '</div>' +
       zoneSeg('cafZone', c.zone || 'local', BC.localToMs(c.tz, c.t)) +
-      '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span></span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
-      '<p class="foot">' + esc(zoneLabel(P(), c.zone || 'local', BC.localToMs(c.tz, c.t))) + '. Pick the clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
+      '<div class="list" style="margin-top:8px"><label class="row static"><span class="main"><span class="t1">When</span>' + clk(c.tz, BC.localToMs(c.tz, c.t)) + '</span><input class="pill" type="datetime-local" id="cafT" value="' + esc(c.t) + '"></label></div>' +
+      '<p class="foot">Pick the clock you remember it by. A strong espresso or a large brewed coffee counts as large.</p>';
   if(c.id) h += '<div style="margin-top:10px"><button class="btn sec" type="button" data-act="cafDel" style="color:var(--danger)">' + (V.confirmDel ? 'Tap again to delete' : 'Delete') + '</button></div>';
   box.innerHTML = h + '</div></div>';
 }
@@ -1187,8 +1212,8 @@ function viewLay(id){
   h += '<div class="stack" style="gap:10px"><div class="list">';
   if(L.out){
     h += '<div class="row static"><span class="dot" style="background:var(--out)"></span><span class="main"><span class="t1">Crew meetup</span><span class="t3">You’ll be up and out; the plan sleeps around it</span></span><button class="navbtn" type="button" data-act="meetRm" data-id="' + esc(id) + '" style="color:var(--danger)">Remove</button></div>' +
-         '<label class="row static"><span class="main"><span class="t1">Starts</span></span><input class="pill" type="datetime-local" id="meetA" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ns) + '"></label>' +
-         '<label class="row static"><span class="main"><span class="t1">Ends</span><span class="t3">Change it if it ran late</span></span><input class="pill" type="datetime-local" id="meetB" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ne) + '"></label>';
+         '<label class="row static"><span class="main"><span class="t1">Starts</span>' + clk(tz, null, L.ap) + '</span><input class="pill" type="datetime-local" id="meetA" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ns) + '"></label>' +
+         '<label class="row static"><span class="main"><span class="t1">Ends</span>' + clk(tz, null, L.ap) + '<span class="t3">Change it if it ran late</span></span><input class="pill" type="datetime-local" id="meetB" data-id="' + esc(id) + '" value="' + BC.msToLocal(tz, L.out.ne) + '"></label>';
   } else h += '<button class="row" type="button" data-act="meetAdd" data-id="' + esc(id) + '" style="color:var(--tint)">' + I.plus.replace('width="22" height="22"', 'width="18" height="18"') + 'Add a crew meetup</button>';
   h += '</div><div class="list"><div class="row static"><span style="color:var(--coffee)">' + I.glass + '</span><span class="main"><span class="t1">Last drink by</span><span class="t3">' + esc(S.night.last) + ' hours before you leave · set in Settings</span></span><span class="val" style="color:var(--label);font-weight:600">' + BC.dow(tz, L.lastDrink) + ' ' + BC.hm(tz, L.lastDrink) + '</span></div></div>';
   var hist = L.fixed.map(function(x){ return {t:x.a, txt:(x.kind === 'main' ? 'Slept ' : 'Napped ') + BC.dow(tz, x.a) + ' ' + BC.hm(tz, x.a) + '–' + BC.hm(tz, x.b), act:'editSleep', id:x.id}; })
@@ -1440,8 +1465,8 @@ function viewSettings(){
   h += '<h2 class="grp-h">Home</h2><div class="list"><label class="row static"><span class="main"><span class="t1">Home airport</span></span>' + sel('sHome', S.home, homeOpts.map(function(c){ return [c, c + ' · ' + AIRPORTS[c][0]]; })) + '</label></div>' +
        '<p class="foot">Your body clock starts on this city’s time, with its sunrise and sunset.</p>';
   h += '<h2 class="grp-h">Your usual sleep at home</h2><div class="list">' +
-       '<label class="row static"><span class="main"><span class="t1">Bedtime</span></span><input class="pill" type="time" id="sBed" value="' + esc(S.bed) + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">Wake up</span></span><input class="pill" type="time" id="sWake" value="' + esc(S.wake) + '"></label></div>';
+       '<label class="row static"><span class="main"><span class="t1">Bedtime</span>' + clk(BC.airport(S.home).tz, null, BC.airport(S.home)) + '</span><input class="pill" type="time" id="sBed" value="' + esc(S.bed) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Wake up</span>' + clk(BC.airport(S.home).tz, null, BC.airport(S.home)) + '</span><input class="pill" type="time" id="sWake" value="' + esc(S.wake) + '"></label></div>';
   h += '<h2 class="grp-h">Trips</h2><div class="list">' +
        '<label class="row static"><span class="main"><span class="t1">Landing to hotel bed</span><span class="t3">hours</span></span>' + num('sLand', S.landBed, 0, 6, 0.25) + '</label>' +
        '<label class="row static"><span class="main"><span class="t1">Time to get ready</span><span class="t3">minutes</span></span>' + num('sReady', Math.round(S.ready*60), 0, 180, 5) + '</label>' +
@@ -1526,10 +1551,10 @@ function renderSheet(){
        '<label class="code"><span class="eyebrow">To</span><input id="fTo" value="' + esc(fl.to) + '" maxlength="3" autocomplete="off" autocapitalize="characters" list="dl"><span class="t3">' + (d.t ? esc(d.t.city) + ' · ' + BC.zabbr(d.t.tz, isNaN(d.b) ? now() : d.b) : fl.to ? 'Unknown code' : '') + '</span></label></div>' +
        '<datalist id="dl">' + S.dests.map(function(c){ return '<option value="' + c + '">' + esc(AIRPORTS[c] ? AIRPORTS[c][0] : '') + '</option>'; }).join('') + '</datalist>';
   h += '<div class="chips" role="group" aria-label="Your destinations">' + chips.map(function(c){ return '<button type="button" data-act="toChip" data-code="' + c + '" aria-pressed="' + (c === fl.to) + '">' + c + '</button>'; }).join('') + '</div>';
-  h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span><span class="t3">' + (d.f ? esc(shortCity(d.f)) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
-       '<label class="row static"><span class="main"><span class="t1">Arrives</span><span class="t3">' + (d.t ? esc(shortCity(d.t)) + ' time' : '') + '</span></span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
+  h += '<div class="list" style="margin-top:6px"><label class="row static"><span class="main"><span class="t1">Departs</span>' + (d.f ? clk(d.f.tz, null, d.f) : '<span class="t3">Type the From airport first</span>') + '</span><input class="pill" type="datetime-local" id="fDep" value="' + esc(fl.dep) + '"></label>' +
+       '<label class="row static"><span class="main"><span class="t1">Arrives</span>' + (d.t ? clk(d.t.tz, null, d.t) : '<span class="t3">Type the To airport first</span>') + '</span><input class="pill" type="datetime-local" id="fArr" value="' + esc(fl.arr) + '"></label>' +
        '<div class="row static" style="min-height:44px"><span class="main"><span class="t2">Flight time</span></span><span class="val" style="font-size:15px">' + (d.dur != null ? durTxt(d.dur) : '–') + '</span></div>' +
-       '<label class="row static" style="flex-wrap:wrap;row-gap:8px"><span class="main" style="min-width:120px"><span class="t1">Van pickup</span><span class="t3">' + (fl.van ? (d.f ? esc(shortCity(d.f)) + ' time' : '') : 'Optional · leave empty if there is none') + '</span></span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
+       '<label class="row static" style="flex-wrap:wrap;row-gap:8px"><span class="main" style="min-width:120px"><span class="t1">Van pickup</span>' + (d.f ? clk(d.f.tz, null, d.f) : '') + (fl.van ? '' : '<span class="t3">Optional · leave empty if there is none</span>') + '</span><input class="pill" type="datetime-local" id="fVan" value="' + esc(fl.van || '') + '"' + (fl.van ? '' : ' style="color:var(--sec)"') + '>' + (fl.van ? '<button class="rm" type="button" data-act="vanClear" aria-label="Clear van time" style="margin-left:6px">×</button>' : '') + '</label></div>' +
        '<p class="foot">Times are local at each airport, as on your schedule.</p>';
   h += '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:6px"><div style="margin-bottom:10px">Your role</div><div class="seg" role="group" aria-label="Your role"><button type="button" data-act="role" data-v="operate" aria-pressed="' + (role === 'operate') + '">Operate</button><button type="button" data-act="role" data-v="commute" aria-pressed="' + (role === 'commute') + '">Commute</button></div></div>';
   if(role === 'operate'){
@@ -1583,13 +1608,13 @@ function openSleep(id, preset){
 function renderSleep(){
   var box = $('#sheet');
   if(!V.sleep){ box.innerHTML = ''; return; }
-  var sl = V.sleep, city = '';
-  Object.keys(AIRPORTS).some(function(c){ if(AIRPORTS[c][1] === sl.tz){ city = AIRPORTS[c][0]; return true; } return false; });
+  var sl = V.sleep;
   var h = '<div class="sheet" data-act="sleepBg"><div class="sheet-in" role="dialog" aria-modal="true" aria-label="Log a sleep"><div class="grab"><span></span></div>' +
       '<div class="sheet-h"><button class="navbtn" type="button" data-act="sleepCancel" style="justify-self:start">Cancel</button><div class="ttl">' + (sl.id ? 'Edit sleep' : 'Log a sleep') + '</div><button class="navbtn r" type="button" data-act="sleepSave">Save</button></div>' +
-      '<div class="list"><label class="row static"><span class="main"><span class="t1">Fell asleep</span></span><input class="pill" type="datetime-local" id="slBed" value="' + esc(sl.bed) + '"></label>' +
-      '<label class="row static"><span class="main"><span class="t1">Woke up</span><span class="t3">' + (sl.open ? 'Leave empty if still asleep' : '') + '</span></span><input class="pill" type="datetime-local" id="slWake" value="' + esc(sl.wake) + '"></label></div>' +
-      '<p class="foot">' + esc(zoneLabel(P(), sl.zone || 'local', BC.localToMs(sl.tz, sl.bed))) + '. Rough times are fine.</p>' + zoneSeg('slZone', sl.zone || 'local', BC.localToMs(sl.tz, sl.bed)) +
+      zoneSeg('slZone', sl.zone || 'local', BC.localToMs(sl.tz, sl.bed)) +
+      '<div class="list" style="margin-top:10px"><label class="row static"><span class="main"><span class="t1">Fell asleep</span>' + clk(sl.tz, BC.localToMs(sl.tz, sl.bed)) + '</span><input class="pill" type="datetime-local" id="slBed" value="' + esc(sl.bed) + '"></label>' +
+      '<label class="row static"><span class="main"><span class="t1">Woke up</span>' + clk(sl.tz, BC.localToMs(sl.tz, sl.bed)) + (sl.open ? '<span class="t3">Leave empty if still asleep</span>' : '') + '</span><input class="pill" type="datetime-local" id="slWake" value="' + esc(sl.wake) + '"></label></div>' +
+      '<p class="foot">Rough times are fine.</p>' +
       '<div class="card" style="padding:12px 16px;border-radius:16px;margin-top:8px"><div style="margin-bottom:10px">It was</div><div class="seg" role="group" aria-label="Kind of sleep"><button type="button" data-act="slKind" data-v="nap" aria-pressed="' + (sl.kind === 'nap') + '">A nap</button><button type="button" data-act="slKind" data-v="main" aria-pressed="' + (sl.kind === 'main') + '">My main sleep</button></div></div>' +
       '<p class="foot">The app keeps what you log as fact and re-plans everything after it.</p>';
   if(V.sleepErr) h += '<p class="err">' + esc(V.sleepErr) + '</p>';
