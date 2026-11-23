@@ -211,7 +211,7 @@ details.how p{font-size:15px;line-height:21px;color:var(--sec)}
 <script>
 (function(){
 'use strict';
-var BUILD = '6 Nov 2026 · build 52';
+var BUILD = '23 Nov 2026 · build 53';
 var KEY = 'bodyclock2', H = BC.H;
 
 /* ---------- state ---------- */
@@ -1459,11 +1459,12 @@ function viewRest(id){
 
 function viewSettings(){
   var h = '<h1 style="margin:4px 4px 8px">Settings</h1>';
-  var homeOpts = S.dests.concat(Object.keys(AIRPORTS).filter(function(c){ return S.dests.indexOf(c) < 0; }).sort());
+  /* your Destinations list (and the current home), not all 7,900 airports */
+  var homeOpts = (S.dests.indexOf(S.home) < 0 ? [S.home] : []).concat(S.dests).filter(function(c){ return AIRPORTS[c]; });
   function sel(id, val, opts){ return '<select class="pill" id="' + id + '">' + opts.map(function(o){ return '<option value="' + esc(o[0]) + '"' + (String(o[0]) === String(val) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; }
   function num(id, val, min, max, step){ return '<input class="pill" type="number" inputmode="decimal" id="' + id + '" value="' + esc(val) + '" min="' + min + '" max="' + max + '" step="' + step + '" style="width:84px;text-align:right">'; }
   h += '<h2 class="grp-h">Home</h2><div class="list"><label class="row static"><span class="main"><span class="t1">Home airport</span></span>' + sel('sHome', S.home, homeOpts.map(function(c){ return [c, c + ' · ' + AIRPORTS[c][0]]; })) + '</label></div>' +
-       '<p class="foot">Your body clock starts on this city’s time, with its sunrise and sunset.</p>';
+       '<p class="foot">Your body clock starts on this city’s time, with its sunrise and sunset. To pick an airport not shown, add it to Destinations first.</p>';
   h += '<h2 class="grp-h">Your usual sleep at home</h2><div class="list">' +
        '<label class="row static"><span class="main"><span class="t1">Bedtime</span>' + clk(BC.airport(S.home).tz, null, BC.airport(S.home)) + '</span><input class="pill" type="time" id="sBed" value="' + esc(S.bed) + '"></label>' +
        '<label class="row static"><span class="main"><span class="t1">Wake up</span>' + clk(BC.airport(S.home).tz, null, BC.airport(S.home)) + '</span><input class="pill" type="time" id="sWake" value="' + esc(S.wake) + '"></label></div>';
@@ -1509,8 +1510,7 @@ function viewDest(){
   var h = navBar('settings', 'Settings', '<button class="navbtn" type="button" data-act="destEdit" style="font-weight:' + (V.destEdit ? 600 : 400) + '">' + (V.destEdit ? 'Done' : 'Edit') + '</button>');
   h += '<h1 style="margin:0 4px 10px">Destinations</h1>';
   h += '<div class="list"><div class="row static"><label for="dAdd" class="t1" style="color:var(--sec)">Add</label><input id="dAdd" placeholder="Airport code, like LIS" maxlength="3" autocapitalize="characters" autocomplete="off" style="flex:1;min-width:0;border:0;background:none;font:inherit;font-size:17px;text-transform:uppercase;color:var(--label);padding:8px 0;outline:none"><button class="btn small" type="button" data-act="destAdd">Add</button></div></div>';
-  if(V.destMsg) h += '<p class="err">' + esc(V.destMsg) + '</p>';
-  h += '<p class="foot">Your quick picks when adding flights. Each code brings its time zone, daylight saving and sun times.</p>';
+  h += '<p class="foot" id="dHint" aria-live="polite"' + (V.destMsg ? ' style="color:var(--danger)"' : '') + '>' + esc(V.destMsg || V.destOk || 'Your quick picks when adding flights. Any airport with a three-letter code works, and brings its time zone, daylight saving and sun times.') + '</p>';
   h += '<h2 class="grp-h">Your list · ' + S.dests.length + '</h2><div class="list">';
   S.dests.forEach(function(c){
     var a = AIRPORTS[c];
@@ -1908,9 +1908,9 @@ document.addEventListener('click', function(e){
   if(act === 'destReset'){ S.dests = DEFAULT_DESTS.slice(); save(); render(); return; }
   if(act === 'destAdd'){
     var c = ($('#dAdd').value || '').trim().toUpperCase();
-    if(!AIRPORTS[c]){ V.destMsg = c ? c + ' is not in the app’s airport list yet.' : 'Type a three-letter code.'; render(); return; }
+    if(!AIRPORTS[c]){ V.destMsg = c.length === 3 ? 'No airport has the code ' + c + '. Check the code.' : 'Type a three-letter code.'; render(); return; }
     if(S.dests.indexOf(c) < 0) S.dests.push(c);
-    V.destMsg = ''; save(); render(); return;
+    V.destMsg = ''; V.destOk = AIRPORTS[c][0] + ' (' + c + ') added.'; save(); render(); V.destOk = ''; return;
   }
   /* flight sheet */
   if(act === 'sheetBg' && e.target === b){ V.flight = null; renderSheet(); return; }
@@ -1987,6 +1987,16 @@ function onChange(e){
   if(id === 'impFile'){ var f = t.files && t.files[0]; if(f) restoreFile(f); t.value = ''; }
 }
 document.addEventListener('input', function(e){
+  /* Destinations: say which airport a code is while you type it */
+  if(e.target.id === 'dAdd'){
+    var hint = $('#dHint'), c = e.target.value.trim().toUpperCase(), a = AIRPORTS[c];
+    if(hint){
+      hint.style.color = c.length === 3 && !a ? 'var(--danger)' : '';
+      hint.textContent = c.length < 3 ? 'Your quick picks when adding flights. Any airport with a three-letter code works, and brings its time zone, daylight saving and sun times.' :
+        a ? a[0] + ' · ' + BC.zabbr(a[1], now()) + (S.dests.indexOf(c) >= 0 ? ' · already on your list' : '') : 'No airport has the code ' + c + '. Check the code.';
+    }
+    return;
+  }
   var t = e.target;
   if(V.flight && (t.id === 'fFrom' || t.id === 'fTo')){
     var v = t.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
@@ -1997,6 +2007,7 @@ document.addEventListener('input', function(e){
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape' && V.flight){ V.flight = null; renderSheet(); }
   if(e.key === 'Escape' && V.sleep){ V.sleep = null; renderSleep(); }
+  if(e.key === 'Enter' && e.target.id === 'dAdd'){ e.preventDefault(); }
   if(e.key === 'Enter' && e.target.id === 'dAdd'){ var btn = document.querySelector('[data-act=destAdd]'); if(btn) btn.click(); }
 });
 

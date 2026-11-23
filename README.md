@@ -69,7 +69,7 @@ Settings › Update app checks for a newer build and reloads. GitHub Pages can t
 
 - `index.html`: the app's screens.
 - `engine.js`: time zones, the sleep model and the layover planner.
-- `airports.js`: airport codes with time zones and positions, and the starting destination list.
+- `airports.js`: every airport with an IATA code (about 7,900) with its time zone and position, and the starting destination list. About 100 have hand-tuned names; the rest come from the open [mwgg/Airports](https://github.com/mwgg/Airports) list (MIT licence). Any of them can be added under Settings › Destinations, and the Home airport picker offers your Destinations list.
 - `crew-rest.html`: the crew rest calculator.
 - `crew-ui.js`: the crew rest layout, shared by the calculator and the app's Crew rest screen.
 - `sw.js`, `manifest.webmanifest`, icons: offline use and home-screen install.
